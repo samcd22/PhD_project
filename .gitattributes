@@ -1,0 +1,4 @@
+# .gitattributes file which identifies Python and Word properly:
+*.ipynb linguist-language=Python
+*.Docx linguist-language=Word
+*.docx linguist-language=Word
