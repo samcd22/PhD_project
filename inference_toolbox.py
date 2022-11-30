@@ -4,7 +4,7 @@ import scipy.stats as stats
 
 
 class Parameter:
-    prior_params = pd.Series({})
+    prior_params = pd.Series({},dtype='float64')
     val = 0
     def __init__(self, init_val, step_select = "" ,step_size = 1, prior_select = ""):
         self.val = init_val
@@ -53,14 +53,21 @@ class Parameter:
 # \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
         
 class Model:
-    model_params = pd.Series({})
+    model_params = pd.Series({},dtype='float64')
     def add_model_param(self,name,val):
         self.model_params[name] = val
     
     # Model Function
     def get_model(self,model_select):
-        def GPM(params, X):       
-            return params.Q.val / (2*params.a.val*X[:,0]**params.b.val*np.pi*self.model_params.u)*(np.exp(-(X[:,1]**2)/(2*params.a.val*X[:,0]**params.b.val)))*(np.exp(-(X[:,2]-self.model_params.H)**2/(2*params.a.val*X[:,0]**params.b.val))+np.exp(-(X[:,2]+self.model_params.H)**2/(2*params.a.val*X[:,0]**params.b.val)))
+        def GPM(params, x, y, z):
+            a = params.a.val
+            b = params.b.val
+            Q = params.Q.val
+            H = self.model_params.H
+            u = self.model_params.u
+            tmp = 2*a*x**b
+            
+            return Q / (tmp*np.pi*u)*(np.exp(-(y**2)/tmp))*(np.exp(-(z-H)**2/tmp)+np.exp(-(z+H)**2/tmp))
 
         if model_select == "GPM":
             return GPM
@@ -71,7 +78,7 @@ class Model:
 
 # Likelihood Function
 class Likelihood:
-    likelihood_params = pd.Series({})
+    likelihood_params = pd.Series({},dtype='float64')
     def add_likelihood_param(self,name,val):
         self.likelihood_params[name] = val
     
@@ -89,6 +96,9 @@ class Likelihood:
         
         if likelihood_select == "gaussian hetroscedastic fixed sigma":
             return gaussian_log_likelihood_hetroscedastic_fixed_sigma
+        
+        def log_gaussian_log_likelihood_fixed_sigma(model_vals,measured_vals):
+            return 0
     
 # \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
@@ -109,12 +119,12 @@ class Sampler:
     
     def accept_params(self, current_log_priors, proposed_log_priors):
         # Calculate the log posterior of the current parameters
-        curr_modelled_vals = self.model_func(self.current_params,self.data[:,1:])
+        curr_modelled_vals = self.model_func(self.current_params,self.data[:,1],self.data[:,2],self.data[:,3])
         curr_log_lhood = self.likelihood_func(curr_modelled_vals, self.data[:,0])
         curr_log_posterior = curr_log_lhood + current_log_priors
         
          # Calculate the log posterior of the proposed parameters
-        prop_modelled_vals = self.model_func(self.proposed_params,self.data[:,1:])
+        prop_modelled_vals = self.model_func(self.proposed_params,self.data[:,1],self.data[:,2],self.data[:,3])
         prop_log_lhood = self.likelihood_func(prop_modelled_vals, self.data[:,0])
         prop_log_posterior = curr_log_lhood + proposed_log_priors
         
@@ -175,7 +185,7 @@ class Sampler:
         return samples
     
     def get_mean_samples(self,samples):
-        means = pd.Series({})
+        means = pd.Series({},dtype='float64')
         for col in samples.columns:
             mean = samples[col].apply(lambda x: x.val).mean()
             means[col] = Parameter(mean)

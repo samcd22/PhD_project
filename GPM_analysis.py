@@ -23,7 +23,7 @@ class GPM_analysis:
 
     def compare_transects(self):
         unique_transects = np.unique(self.data[:,4])
-        for transect in unique_transects[:1]:
+        for transect in unique_transects:
             peak_dist = []
             test_transect_data = []
             predict_transect_data = []
@@ -38,6 +38,9 @@ class GPM_analysis:
             test_transect_data = np.array(test_transect_data)[indices]
             predict_transect_data = np.array(predict_transect_data)[indices]
 
-            plt.plot(peak_dist,test_transect_data)
-            plt.plot(peak_dist,predict_transect_data)
+            plt.plot(peak_dist,test_transect_data,alpha=0.5)
+            plt.plot(peak_dist,predict_transect_data,alpha=0.5)
+            plt.xlabel('Distance from Peak')
+            plt.ylabel('Number density (m^-3)')
+            plt.title('Transect ' + str(int(transect)))
             plt.show()
