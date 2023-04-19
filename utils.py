@@ -45,4 +45,14 @@ def traceplots(x, xnames = None, title = None):
         plt.setp(ax_hist.get_yticklabels(), visible=False)
         xlim = ax_hist.get_xlim()
         ax_hist.set_xlim([xlim[0], 1.1*xlim[1]])
+    fig.show()
 
+def print_all_distances_and_heights(data):
+    for experiment in data.Experiment.unique():
+        experiment_data = data[data['Experiment'] == experiment]
+
+        selected_data = experiment_data[['Concentration', 'Transect_Num', 'Height', 'Distance', 'Peak_Dist']]
+        print('\n',experiment)
+        for distance in selected_data.Distance.unique():
+            distance_data = selected_data[selected_data.Distance == distance]
+            print(distance, distance_data.Height.unique())
