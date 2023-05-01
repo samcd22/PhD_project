@@ -45,3 +45,23 @@ class Model:
         
         if self.model_select == "GPM_alt_norm":
             return GPM_alt_norm
+        
+        def GPM_alt_norm_log_Q(params, x, y, z):
+            I_y = params.I_y.val
+            I_z = params.I_z.val
+            log_10_Q = params.log_10_Q.val
+            H = self.model_params.H
+            return 10**log_10_Q/(np.pi*I_y*I_z*x**2)*np.exp(-y**2/(2*I_y**2*x**2))*(np.exp(-(z-H)**2/(2*I_z**2*x**2))+np.exp(-(z+H)**2/(2*I_z**2*x**2)))
+        
+        if self.model_select == "GPM_alt_norm_log_Q":
+            return GPM_alt_norm_log_Q
+        
+        def log_GPM_alt_norm(params, x, y, z):
+            I_y = params.I_y.val
+            I_z = params.I_z.val
+            Q = params.Q.val
+            H = self.model_params.H
+            return np.log10(Q/(np.pi*I_y*I_z*x**2)*np.exp(-y**2/(2*I_y**2*x**2))*(np.exp(-(z-H)**2/(2*I_z**2*x**2))+np.exp(-(z+H)**2/(2*I_z**2*x**2))))
+        
+        if self.model_select == "log_GPM_alt_norm":
+            return log_GPM_alt_norm

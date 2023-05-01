@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 import json
-from parameter import Parameter
+from inference_toolbox.parameter import Parameter
 
 class Sampler:
     def __init__(self, params, model, likelihood, data, joint_pdf = True, show_sample_info = False):
@@ -16,6 +16,7 @@ class Sampler:
         self.joint_pdf = joint_pdf
         self.show_sample_info = show_sample_info
         self.sample_info_rows = []
+        self.instance = -1
 
     def get_hyperparams(self):
         self.hyperparams = {}
@@ -90,11 +91,6 @@ class Sampler:
             self.current_params = self.copy_params(self.proposed_params)
             return self.copy_params(self.proposed_params), 1
         else:
-            # print(prop_log_lhood, prop_log_posterior, step_backward_log_prob, step_forward_log_prob)
-            # print([x.val for x in self.proposed_params])
-            # print([x.val for x in self.current_params])
-            # print('\n')
-
             return self.copy_params(self.current_params), 0
     
     def sample_one(self):
@@ -123,19 +119,11 @@ class Sampler:
             # Create a list of log prior probabilities from each current and proposed parameter
             current_log_priors.append(log_prior_func(current_param.val))
             proposed_log_priors.append(log_prior_func(proposed_param.val))
-
-        # print(step_forward_log_probs)
-        # print(step_backward_log_probs)
-
-            # if proposed_param.val <0:
-            #     print(current_param.val)
-            #     print(proposed_param.val)
-            #     raise Exception("Number below 0")
-            
-            # Can include non joint PDF here
             
         if self.joint_pdf:
             return self.accept_params(sum(current_log_priors), sum(proposed_log_priors), sum(step_forward_log_probs), sum(step_backward_log_probs))
+            
+            # Can include non joint PDF here
             
     def check_data_exists(self):
         data_path = 'results/inference'
@@ -147,7 +135,7 @@ class Sampler:
             f.close()
             if self.hyperparams == instance_hyperparams:
                 data_exists = True
-                print(instance_folder)
+                self.instance = int(instance_folder.split('_')[1])
             return data_exists
             
     def sample_all(self, n_samples):
@@ -170,37 +158,8 @@ class Sampler:
                 self.sample_info.to_csv(sample_info_file_name)
             acceptance_rate = sum(accepted)/len(accepted)*100
             samples = pd.DataFrame(samples)
-
+            for col in samples:
+                samples[col] = samples[col].apply(lambda x: x.val)
+        
         return samples, acceptance_rate
     
-    def get_mean_samples(self,samples):
-        if type(samples) == list and samples == []:
-            means = []
-        else: 
-            means = pd.Series({},dtype='float64')
-            for col in samples.columns:
-                mean = samples[col].apply(lambda x: x.val).mean()
-                means[col] = Parameter(mean)
-        return means
-    
-    def get_lower_samples(self,samples):
-        if type(samples) == list and samples == []:
-            lowers = []
-        else: 
-            lowers = pd.Series({},dtype='float64')
-            for col in samples.columns:
-                formatted_samples = samples[col].apply(lambda x: x.val)
-                lower = np.quantile(formatted_samples, 0.05)
-                lowers[col] = Parameter(lower)
-        return lowers
-        
-    def get_upper_samples(self,samples):
-        if type(samples) == list and samples == []:
-            uppers = []
-        else: 
-            uppers = pd.Series({},dtype='float64')
-            for col in samples.columns:
-                formatted_samples = samples[col].apply(lambda x: x.val)
-                upper = np.quantile(formatted_samples, 0.95)
-                uppers[col] = Parameter(upper)
-        return uppers
