@@ -13,8 +13,7 @@ class Likelihood:
     
     def get_log_likelihood_func(self):
         def gaussian_log_likelihood_fixed_sigma(modeled_vals, measured_vals):
-            print(pd.DataFrame({'modelled': modeled_vals, 'measured': measured_vals, 'residuals': abs(modeled_vals-measured_vals)}))
-            return -np.sum((modeled_vals-measured_vals)**2/(2*self.likelihood_params.sigma**2)) - modeled_vals.size*np.log(np.sqrt(2*np.pi)*self.likelihood_params.sigma)
+            return -np.sum((modeled_vals-measured_vals)**2)/(2*self.likelihood_params.sigma**2) - modeled_vals.size*np.log(np.sqrt(2*np.pi)*self.likelihood_params.sigma)
 
         def gaussian_log_likelihood_hetroscedastic_fixed_sigma(modeled_vals, measured_vals):
             res = abs(modeled_vals-measured_vals)
@@ -30,8 +29,6 @@ class Likelihood:
                 beta = mu/self.likelihood_params.sigma**2
                 a = mu**2/self.likelihood_params.sigma**2
                 llhood = stats.gamma.logpdf(val, a, scale=1/beta)
-                if llhood == np.inf:
-                    x = 1
                 log_likelihood += llhood
             return log_likelihood
 
