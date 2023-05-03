@@ -3,9 +3,10 @@ import pandas as pd
 import scipy.stats as stats
 
 class Parameter:
-    prior_params = pd.Series({},dtype='float64')
-    val = 0
+
     def __init__(self, init_val, step_select = "" ,step_size = 1, prior_select = ""):
+        self.prior_params = pd.Series({},dtype='float64')
+        self.val = 0        
         self.init_val = init_val
         self.val = init_val
         self.step_select = step_select

@@ -1,0 +1,15 @@
+{
+    "image": "jsimdare/darenumpyro",
+    "mounts": [
+        "source=${localWorkspaceFolder},target=/project,type=bind,consistency=cached"
+    ],
+    "workspaceFolder": "/project",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-toolsai.jupyter",
+                "ms-python.python"
+            ]
+        }
+    }
+}

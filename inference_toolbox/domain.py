@@ -30,7 +30,7 @@ class Domain:
 
 
     def create_cone(self):
-        r_values = np.linspace(0.001, self.domain_params.r, self.resolution)
+        r_values = np.linspace(1, self.domain_params.r, self.resolution)
         x, y, z = [], [], []
 
         # Create a meshgrid of r and theta values
