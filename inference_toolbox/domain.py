@@ -35,9 +35,9 @@ class Domain:
 
         # Create a meshgrid of r and theta values
         for R in r_values:
-            theta_values = np.linspace(-self.domain_params.theta, self.domain_params.theta, int(np.ceil(self.resolution*R/self.domain_params.r)))
+            theta_values = np.linspace(-self.domain_params.theta, self.domain_params.theta, int(np.ceil(self.resolution*R/(self.domain_params.r))))
             for Theta in theta_values:
-                phi_values = np.linspace(0,np.pi,int(np.ceil(self.resolution*abs(Theta)/2*self.domain_params.theta)))
+                phi_values = np.linspace(0,np.pi,int(np.ceil(self.resolution*abs(Theta)/(2*self.domain_params.theta))))
                 for Phi in phi_values:
                 # Compute the x, y, and z values for each point in the meshgrid
                     x.append(self.domain_params.source[0] + R*(np.cos(Theta)))

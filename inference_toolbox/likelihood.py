@@ -13,7 +13,11 @@ class Likelihood:
     
     def get_log_likelihood_func(self):
         def gaussian_log_likelihood_fixed_sigma(modeled_vals, measured_vals):
-            return -np.sum((modeled_vals-measured_vals)**2)/(2*self.likelihood_params.sigma**2) - modeled_vals.size*np.log(np.sqrt(2*np.pi)*self.likelihood_params.sigma)
+            # cum_sum = 0
+            # for i in range(len(modeled_vals)): 
+                # in_exp = (modeled_vals[i]-measured_vals[i])**2/(2*self.likelihood_params.sigma**2)
+                # cum_sum +=in_exp
+            return -np.sum((modeled_vals-measured_vals)**2)/(2*self.likelihood_params.sigma**2)#- modeled_vals.size*np.log(np.sqrt(2*np.pi)*self.likelihood_params.sigma)
 
         def gaussian_log_likelihood_hetroscedastic_fixed_sigma(modeled_vals, measured_vals):
             res = abs(modeled_vals-measured_vals)

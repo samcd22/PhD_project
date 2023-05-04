@@ -133,8 +133,8 @@ class Visualiser:
         upper_conc_and_bins.columns=['x', 'y', 'z', 'conc', 'bin']
 
         # Define min and max values for colorbar
-        min_val = np.percentile([C_lower, C_mean, C_upper],5)
-        max_val = np.percentile([C_lower, C_mean, C_upper],95)
+        min_val = np.percentile([C_lower, C_mean, C_upper],10)
+        max_val = np.percentile([C_lower, C_mean, C_upper],90)
 
         # I NEED TO EDIT THIS TO IT CHANGES FOR EACH PLOT!!!!!!
         # Calculates the percentage differances and RMSE if the test points are set to be included
