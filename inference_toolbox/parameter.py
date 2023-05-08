@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import scipy.stats as stats
 import numpyro
 
 class Parameter:
@@ -20,17 +19,15 @@ class Parameter:
 
     def get_prior_function(self):
         if self.prior_select == 'gaussian':
-            def gaussian_prior():
-                return numpyro.distributions.Normal(self.prior_params.mu, self.prior_params.sigma)
-            return gaussian_prior
+            return numpyro.distributions.Normal(self.prior_params.mu, self.prior_params.sigma)
         
         elif self.prior_select == 'gamma':
-            def gamma_prior():
-                return numpyro.distributions.Gamma(self.alpha(self.prior_params.mu,self.prior_params.sigma), self.beta(self.prior_params.mu,self.prior_params.sigma))
-            return gamma_prior
+            return numpyro.distributions.Gamma(self.alpha(self.prior_params.mu,self.prior_params.sigma), self.beta(self.prior_params.mu,self.prior_params.sigma))
         
     def sample_param(self):
-        return numpyro.sample(self.name, self.get_prior_function)
+        prior_func = self.get_prior_function()
+        a = numpyro.sample(self.name, prior_func)
+        return a
         
     # # Step Function
     # def get_step_function(self):

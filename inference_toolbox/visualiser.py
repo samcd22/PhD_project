@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib
-matplotlib.use('Qt5Agg')
+# matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 import os
 import json
@@ -12,13 +12,13 @@ from matplotlib.gridspec import GridSpec
 from inference_toolbox.parameter import Parameter
 
 class Visualiser:
-    def __init__(self, test_data, samples, model, hyperparams, acceptance_rate, previous_instance = -1, data_path = 'results/inference'):
+    def __init__(self, test_data, samples, model, hyperparams, previous_instance = -1, data_path = 'results/inference'):
         self.test_data = test_data
 
         self.model = model
         self.model_func = model.get_model()
         self.hyperparams = hyperparams
-        self.acceptance_rate = acceptance_rate
+        self.acceptance_rate = 0.5
         self.data_path = data_path
         self.instance = self.get_instance(previous_instance)
         self.save_hyperparams()
@@ -28,10 +28,9 @@ class Visualiser:
         else:
             self.samples = samples
         
-        self.params_lower = self.get_ag_samples(self.samples, 0.05).apply(lambda x: Parameter(x))
-        self.params_mean = self.get_ag_samples(self.samples, 0.5).apply(lambda x: Parameter(x))
-        self.params_upper = self.get_ag_samples(self.samples, 0.95).apply(lambda x: Parameter(x))
-
+        self.params_lower = self.get_ag_samples(self.samples, 0.05)
+        self.params_mean = self.get_ag_samples(self.samples, 0.5)
+        self.params_upper = self.get_ag_samples(self.samples, 0.95)
 
     def get_traceplot(self):
         full_path = self.data_path + '/instance_' + str(self.instance) + '/traceplot.png'
@@ -309,7 +308,9 @@ class Visualiser:
         full_path = self.data_path + '/instance_' + str(self.instance) + '/samples.csv'
         if type(self.samples) == list and self.samples == []:
             raise Exception('Samples data is empty!')    
-        self.samples.to_csv(full_path)
+        print(self.samples)
+        print(pd.DataFrame(self.samples))
+        pd.DataFrame(self.samples).to_csv(full_path)
         
     def load_samples(self):
         full_path = self.data_path + '/instance_' + str(self.instance) + '/samples.csv'

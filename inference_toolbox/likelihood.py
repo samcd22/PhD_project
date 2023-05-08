@@ -22,7 +22,7 @@ class Likelihood:
         
         elif self.likelihood_select == 'gaussian':
             def gaussian_likelihood(mu, params):
-                return numpyro.distributions.Normal(mu, params.sigma.sample_param())
+                return numpyro.distributions.Normal(mu, params.sigma)
             return gaussian_likelihood
         
         elif self.likelihood_select == 'gamma_fixed_sigma':
@@ -32,6 +32,6 @@ class Likelihood:
         
         elif self.likelihood_select == 'gamma':
             def gamma_likelihood(mu, params):
-                sigma = params.sigma.sample_param()
+                sigma = params.sigma
                 return numpyro.distributions.Gamma(self.alpha(mu,sigma), self.beta(mu,sigma))
             return gamma_likelihood

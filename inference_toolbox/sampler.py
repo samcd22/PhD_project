@@ -48,26 +48,38 @@ class Sampler:
             mcmc_obj.run(rng_key=rng_key)
             mcmc_obj.print_summary()
             samples = mcmc_obj.get_samples()
-        return samples
+            return self.format_samples(samples)
+        else:
+            return []
+        
+    def format_samples(self, samples):
+        new_samples = pd.DataFrame({}, dtype='float64')
+        for param in self.params.index:
+            new_samples[param] = np.array(samples[param])
+
+        print(new_samples)
+        return new_samples
     
     def sample_one(self):
-        mu = self.model_func(self.params, self.data.x, self.data.y, self.data.z)
+        current_params_sample = pd.Series({}, dtype='float64')
+        for param_ind in self.params.index:
+            s = self.params[param_ind].sample_param()
+            current_params_sample[param_ind] = s
+
+        mu = self.model_func(current_params_sample, self.data.x, self.data.y, self.data.z)
         numpyro.deterministic('mu', mu)
-        observations_modelled = numpyro.sample('obs', self.likelihood_func(mu, self.params))
+        observations_modelled = numpyro.sample('obs', self.likelihood_func(mu, current_params_sample), obs=jnp.array(self.data.Concentration))
 
     def get_hyperparams(self):
         self.hyperparams = {}
         # Adding Parameter related hyperparameters
         self.hyperparams['params'] = {}
-        for param_ind in self.current_params.index:
+        for param_ind in self.params.index:
             self.hyperparams['params'][param_ind] = {}
-            self.hyperparams['params'][param_ind]['init_val'] = self.current_params[param_ind].init_val
-            self.hyperparams['params'][param_ind]['step_func'] = self.current_params[param_ind].step_select
-            self.hyperparams['params'][param_ind]['step_size'] = self.current_params[param_ind].step_size
-            self.hyperparams['params'][param_ind]['prior_func'] = self.current_params[param_ind].prior_select
+            self.hyperparams['params'][param_ind]['prior_func'] = self.params[param_ind].prior_select
             self.hyperparams['params'][param_ind]['prior_params'] = {}
-            for prior_param_ind in self.current_params[param_ind].prior_params.index:
-                self.hyperparams['params'][param_ind]['prior_params'][prior_param_ind] = self.current_params[param_ind].prior_params[prior_param_ind]
+            for prior_param_ind in self.params[param_ind].prior_params.index:
+                self.hyperparams['params'][param_ind]['prior_params'][prior_param_ind] = self.params[param_ind].prior_params[prior_param_ind]
 
         # Adding Model related hyperparameters
         self.hyperparams['model'] = {}
