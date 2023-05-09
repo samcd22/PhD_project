@@ -89,7 +89,7 @@ class Visualiser:
 
             results_df = pd.DataFrame({'x': X.flatten(), 'y': Y.flatten(), 'z': Z.flatten(), 'C_lower': C_lower, 'C_mean': C_mean,'C_upper': C_upper})
 
-            return self.threeD_plots(results_df, name, include_test_points = include_test_points, log_results=log_results, title=title)
+            self.threeD_plots(results_df, name, include_test_points = include_test_points, log_results=log_results, title=title)
 
     def threeD_plots(self, results, name, q=10, include_test_points = True, log_results = True, title = 'Concentration of Droplets'):
 
@@ -250,14 +250,14 @@ class Visualiser:
     def get_param_string(self):
         param_string_array = []
         for param in self.params_mean.index:
-            if np.floor(np.log10(self.params_mean[param].val)) < 2:
-                lower_string =  "{:.2f}".format(self.params_lower[param].val)
-                mean_string = "{:.2f}".format(self.params_mean[param].val)
-                upper_string = "{:.2f}".format(self.params_upper[param].val)
+            if np.floor(np.log10(self.params_mean[param])) < 2:
+                lower_string =  "{:.2f}".format(self.params_lower[param])
+                mean_string = "{:.2f}".format(self.params_mean[param])
+                upper_string = "{:.2f}".format(self.params_upper[param])
             else:
-                lower_string =  "{:.2e}".format(self.params_lower[param].val)
-                mean_string = "{:.2e}".format(self.params_mean[param].val)
-                upper_string = "{:.2e}".format(self.params_upper[param].val)
+                lower_string =  "{:.2e}".format(self.params_lower[param])
+                mean_string = "{:.2e}".format(self.params_mean[param])
+                upper_string = "{:.2e}".format(self.params_upper[param])
             param_string_array.append(param + ' = [' + lower_string + ', ' + mean_string + ', ' + upper_string + ']')
 
         return ('\n').join(param_string_array)
@@ -308,7 +308,6 @@ class Visualiser:
         full_path = self.data_path + '/instance_' + str(self.instance) + '/samples.csv'
         if type(self.samples) == list and self.samples == []:
             raise Exception('Samples data is empty!')    
-        print(self.samples)
         print(pd.DataFrame(self.samples))
         pd.DataFrame(self.samples).to_csv(full_path)
         

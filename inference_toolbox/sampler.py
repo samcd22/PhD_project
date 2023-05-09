@@ -34,7 +34,7 @@ class Sampler:
 
         # self.sample_info_rows.append(pd.Series(sample_info_row))
 
-    def sample_all(self, n_samples, n_warmup = -1, rng_key = random.PRNGKey(2120)):
+    def sample_all(self, n_samples, n_warmup = -1, n_chains = 1, rng_key = random.PRNGKey(2120)):
         if n_warmup == -1:
             n_warmup = int(0.25*n_samples)
         data_exists = self.check_data_exists()
@@ -44,7 +44,7 @@ class Sampler:
             os.remove(sample_info_file_name)
         if not data_exists:
             kernel = numpyro.infer.NUTS(self.sample_one)
-            mcmc_obj = numpyro.infer.MCMC(kernel, num_warmup=n_warmup, num_samples=n_samples)
+            mcmc_obj = numpyro.infer.MCMC(kernel, num_warmup=n_warmup, num_samples=n_samples, num_chains=n_chains)
             mcmc_obj.run(rng_key=rng_key)
             mcmc_obj.print_summary()
             samples = mcmc_obj.get_samples()
@@ -56,12 +56,10 @@ class Sampler:
         new_samples = pd.DataFrame({}, dtype='float64')
         for param in self.params.index:
             new_samples[param] = np.array(samples[param])
-
-        print(new_samples)
         return new_samples
     
     def sample_one(self):
-        current_params_sample = pd.Series({}, dtype='float64')
+        current_params_sample ={}
         for param_ind in self.params.index:
             s = self.params[param_ind].sample_param()
             current_params_sample[param_ind] = s
