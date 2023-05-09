@@ -1,2 +1,12 @@
 /data/
 /results/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+# Sphinx documentation
+docs/_build/
+# Jupyter Notebook
+.ipynb_checkpoints
+# MacOS
+.DS_Store
