@@ -34,7 +34,7 @@ class Sampler:
 
         # self.sample_info_rows.append(pd.Series(sample_info_row))
 
-    def sample_all(self, n_samples, n_warmup = -1, n_chains = 1, rng_key = random.PRNGKey(2120)):
+    def sample_all(self, n_samples, n_warmup = -1, n_chains = 1, thinning_rate = 1, rng_key = random.PRNGKey(2120)):
         if n_warmup == -1:
             n_warmup = int(0.25*n_samples)
         data_exists = self.check_data_exists()
@@ -44,19 +44,31 @@ class Sampler:
             os.remove(sample_info_file_name)
         if not data_exists:
             kernel = numpyro.infer.NUTS(self.sample_one)
-            mcmc_obj = numpyro.infer.MCMC(kernel, num_warmup=n_warmup, num_samples=n_samples, num_chains=n_chains)
+            mcmc_obj = numpyro.infer.MCMC(kernel, num_warmup=n_warmup, num_samples=n_samples, num_chains=n_chains, thinning=thinning_rate)
             mcmc_obj.run(rng_key=rng_key)
-            mcmc_obj.print_summary()
-            samples = mcmc_obj.get_samples()
+            samples = mcmc_obj.get_samples(group_by_chain=True)
             return self.format_samples(samples)
         else:
-            return []
+            return [], []
         
     def format_samples(self, samples):
-        new_samples = pd.DataFrame({}, dtype='float64')
+        chain_new_samples = pd.DataFrame({}, dtype='float64')
         for param in self.params.index:
-            new_samples[param] = np.array(samples[param])
-        return new_samples
+            sample_chains = np.array(samples[param])
+            chains = range(sample_chains.shape[0])
+            chain_array = np.array([])
+            chain_new_samples_array = np.array([])
+            sample_index_array = np.array([])
+            
+            for chain in chains:
+                chain_new_samples_array = np.concatenate((chain_new_samples_array, sample_chains[chain]))
+                chain_array = np.concatenate((chain_array, (chain+1)*np.ones(sample_chains[chain].shape)))
+                sample_index_array = np.concatenate((sample_index_array, np.array(range(sample_chains.shape[1]))+1))
+            chain_new_samples[param] = chain_new_samples_array
+        chain_new_samples['chain'] = chain_array
+        chain_new_samples['sample_index'] = sample_index_array
+
+        return chain_new_samples.groupby('sample_index').mean().drop(columns = ['chain']), chain_new_samples
     
     def sample_one(self):
         current_params_sample ={}

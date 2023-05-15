@@ -12,7 +12,7 @@ from matplotlib.gridspec import GridSpec
 from inference_toolbox.parameter import Parameter
 
 class Visualiser:
-    def __init__(self, test_data, samples, model, hyperparams, previous_instance = -1, data_path = 'results/inference'):
+    def __init__(self, test_data, samples, model, hyperparams, chain_samples = -1, previous_instance = -1, data_path = 'results/inference'):
         self.test_data = test_data
 
         self.model = model
@@ -22,23 +22,42 @@ class Visualiser:
         self.data_path = data_path
         self.instance = self.get_instance(previous_instance)
         self.save_hyperparams()
+        self.num_chains = 1
 
         if type(samples) == list and samples == []:
             self.samples = self.load_samples()
         else:
             self.samples = samples
-        
+
+        if type(chain_samples) == list and chain_samples == []:
+            self.chain_samples = self.load_samples(chain = True)
+        else:
+            self.chain_samples = chain_samples
+
+        if type(self.chain_samples) != int or self.chain_samples != -1:
+            self.num_chains = int(np.max(self.chain_samples['chain'].unique()))
+
         self.params_lower = self.get_ag_samples(self.samples, 0.05)
         self.params_mean = self.get_ag_samples(self.samples, 0.5)
         self.params_upper = self.get_ag_samples(self.samples, 0.95)
 
     def get_traceplot(self):
-        full_path = self.data_path + '/instance_' + str(self.instance) + '/traceplot.png'
-        if os.path.exists(full_path):
-            print('Traceplot already exists')
-        else:
-            tp = self.traceplots(self.samples.values, xnames = self.samples.columns, title = 'MCMC samples')
-            tp.savefig(full_path)
+        traceplot_folder = self.data_path + '/instance_' + str(self.instance) + '/traceplots'
+        if not os.path.exists(traceplot_folder):
+            os.mkdir(traceplot_folder)
+
+        for chain in range(self.num_chains):
+            if self.num_chains == 1:
+                title = 'MCMC samples'
+            else:
+                title = 'MCMC samples for chain ' + str(chain + 1)
+            full_path = traceplot_folder + '/traceplot_' + str(chain + 1) + '.png'
+            if os.path.exists(full_path):
+                print('Traceplot ' + str(chain + 1) + ' already exists')
+            else:
+                samples_of_chain = self.chain_samples[self.chain_samples['chain'] == chain + 1].drop(columns = ['chain', 'sample_index'])
+                tp = self.traceplots(samples_of_chain.values, xnames = self.samples.columns, title = title)
+                tp.savefig(full_path)
 
     def traceplots(self, x, xnames = None, title = None):
         _, d = x.shape
@@ -308,16 +327,31 @@ class Visualiser:
         full_path = self.data_path + '/instance_' + str(self.instance) + '/samples.csv'
         if type(self.samples) == list and self.samples == []:
             raise Exception('Samples data is empty!')    
-        print(pd.DataFrame(self.samples))
         pd.DataFrame(self.samples).to_csv(full_path)
+        if type(self.chain_samples) != int or self.chain_samples != -1:
+            chain_full_path = self.data_path + '/instance_' + str(self.instance) + '/chain_samples.csv'
+            if type(self.chain_samples) == list and self.chain_samples == []:
+                raise Exception('Samples data is empty!')    
+            pd.DataFrame(self.chain_samples).to_csv(chain_full_path)
         
-    def load_samples(self):
-        full_path = self.data_path + '/instance_' + str(self.instance) + '/samples.csv'
-        if os.path.exists(full_path):
-            print('Loading Samples...')
-            return pd.read_csv(full_path)
+    def load_samples(self, chain = False):
+        if chain:
+            chain_full_path = self.data_path + '/instance_' + str(self.instance) + '/chain_samples.csv'
+            if os.path.exists(chain_full_path):
+                print('Loading Chain Samples...')
+                return pd.read_csv(chain_full_path)
+            else:
+                raise Exception('Chain samples file does not exist!')
         else:
-            raise Exception('Samples file does not exist!')
+            full_path = self.data_path + '/instance_' + str(self.instance) + '/samples.csv'
+            if os.path.exists(full_path):
+                print('Loading Samples...')
+                return pd.read_csv(full_path)
+            else:
+                raise Exception('Samples file does not exist!')
+        
+
+
 
     def get_autocorrelations(self):
         full_path = self.data_path + '/instance_' + str(self.instance) + '/autocorrelations.png'
