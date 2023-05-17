@@ -65,14 +65,9 @@ class Visualiser:
             mean_test_actual_C = self.test_data['Concentration']
             self.RMSE = np.sqrt(np.mean((mean_test_pred_C-mean_test_actual_C)**2))
 
-        self.save_samples()
+        self.calculate_autocorrs()
 
-    # def recover_acceptance_rates(self, chain = False):
-    #     acceptance_rates = []
-    #     if chain:
-    #         for chain_num in range(self.num_chains):
-    #             samples = self.chain_samples[self.chain_samples['chain'] == chain_num + 1].drop(columns = ['chain', 'sample_index'])
-    #             print('x')
+        self.save_samples()
 
     def get_traceplot(self):
         traceplot_folder = self.data_path + '/instance_' + str(self.instance) + '/traceplots'
@@ -396,44 +391,51 @@ class Visualiser:
             
             if self.num_chains == 1:
                 title = 'MCMC autocorrelations'
-                samples = self.samples
             else:
                 title = 'MCMC autocorrelations for chain ' + str(chain + 1)
-                samples = self.chain_samples[self.chain_samples['chain'] == chain + 1].drop(columns = ['chain', 'sample_index'])
 
             if os.path.exists(full_path):
                 print('Traceplot ' + str(chain + 1) + ' already exists')
             else:
-                ac = self.autocorr(samples.values, self.samples.columns, title = title)
+                ac = self.autocorr_fig(chain, title = title)
                 ac.savefig(full_path)
-
-
     
-    def autocorr(self, x, x_names, title, D=-1):
-        if D == -1:
-            D = int(x.shape[0])
-        xp = np.atleast_2d(x)
-        z = (xp-np.mean(xp, axis=0))/np.std(xp, axis=0)
-        Ct = np.ones((D, z.shape[1]))
-        Ct[1:,:] = np.array([np.mean(z[i:]*z[:-i], axis=0) for i in range(1,D)])
-
-        tau_hat = 1 + 2*np.cumsum(Ct, axis=0)
-
-        Mrange = np.arange(len(tau_hat))
-        tau = np.argmin(Mrange[:,None] - 5*tau_hat, axis=0)
-
+    def autocorr_fig(self, chain_num = 1, title = ''):
         fig = plt.figure(figsize=(6,4))
-        
-        for i in range(x.shape[1]):
-            autocorrelation = Ct[:,i]
-            plt.plot(autocorrelation, label = x_names[i])
-        
+        for param in self.samples.columns:
+            autocorrelations = self.autocorrs['chain_' + str(chain_num + 1)][param]['Ct']
+            tau = self.autocorrs['chain_' + str(chain_num + 1)][param]['tau']
+            plt.plot(autocorrelations, label = param + ', tau = ' + str(tau))
         plt.legend()
         plt.xlabel('Sample number')
         plt.ylabel('Autocorrelation')
-        plt.title(title + '\nDiscrete Autocorrelation ($\\tau = {:.1f}$)'.format(np.mean(tau)))
+        plt.title(title + '\nDiscrete Autocorrelation')
 
         return fig
+    
+    def calculate_autocorrs(self, D=-1):
+        self.autocorrs = {}
+        for chain_num in range(self.num_chains):
+            if self.num_chains > 1:
+                samples = self.chain_samples[self.chain_samples['chain'] == chain_num + 1].drop(columns = ['chain', 'sample_index'])
+            else:
+                samples = self.samples
+
+            if D == -1:
+                D = int(samples.shape[0])
+            xp = np.atleast_2d(samples)
+            z = (xp-np.mean(xp, axis=0))/np.std(xp, axis=0)
+            Ct = np.ones((D, z.shape[1]))
+            Ct[1:,:] = np.array([np.mean(z[i:]*z[:-i], axis=0) for i in range(1,D)])
+            tau_hat = 1 + 2*np.cumsum(Ct, axis=0)
+            Mrange = np.arange(len(tau_hat))
+            tau = np.argmin(Mrange[:,None] - 5*tau_hat, axis=0)
+
+            self.autocorrs['chain_' + str(chain_num+1)] = {}
+            for i, param in enumerate(self.samples.columns):
+                self.autocorrs['chain_' + str(chain_num+1)][param] = {}
+                self.autocorrs['chain_' + str(chain_num+1)][param]['tau'] = tau[i]
+                self.autocorrs['chain_' + str(chain_num+1)][param]['Ct'] = Ct[:,i]
     
     def get_ag_samples(self,samples, q_val):
         ags = pd.Series({},dtype='float64')
@@ -460,6 +462,9 @@ class Visualiser:
                     summary['chain_' + str(chain_num + 1)][param]['lower'] = params_lower[param]
                     summary['chain_' + str(chain_num + 1)][param]['mean'] = params_mean[param]
                     summary['chain_' + str(chain_num + 1)][param]['upper'] = params_upper[param]
+                    
+                    summary['chain_' + str(chain_num + 1)][param]['tau'] = self.autocorrs['chain_' + str(chain_num + 1)][param]['tau']
+                    
             
         overall_samples = self.samples
         summary['overall'] = {}
@@ -473,6 +478,10 @@ class Visualiser:
             summary['overall'][param]['lower'] = overall_params_lower[param]
             summary['overall'][param]['mean'] = overall_params_mean[param]
             summary['overall'][param]['upper'] = overall_params_upper[param]
+
+            if not self.chain_data_inputted:
+                summary['overall'][param]['tau'] = self.autocorrs['chain_' + str(1)][param]['tau']
+
         
         with open(self.data_path + '/instance_' + str(self.instance) + '/summary.json', "w") as fp:
             json.dump(summary,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)

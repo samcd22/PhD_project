@@ -59,10 +59,9 @@ class Sampler:
             mcmc_obj = numpyro.infer.MCMC(kernel, num_warmup=self.n_warmup, num_samples=self.n_samples, num_chains=self.n_chains, thinning=self.thinning_rate)
             mcmc_obj.run(rng_key=rng_key, init_params = jnp.array(init_params))
             samples = mcmc_obj.get_samples(group_by_chain=True)
-            acceptance_rates = mcmc_obj.get_extra_fields(group_by_chain=True)
-            return *self.format_samples(samples), acceptance_rates
+            return self.format_samples(samples)
         else:
-            return [], [], 0
+            return [], []
         
     def format_samples(self, samples):
         chain_new_samples = pd.DataFrame({}, dtype='float64')
