@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
-import matplotlib
-# matplotlib.use('Qt5Agg')
+
 from matplotlib import pyplot as plt
 import os
 import json
@@ -9,37 +8,71 @@ from numpyencoder import NumpyEncoder
 import imageio
 from matplotlib.gridspec import GridSpec
 
-from inference_toolbox.parameter import Parameter
 
 class Visualiser:
-    def __init__(self, test_data, samples, model, hyperparams, chain_samples = -1, previous_instance = -1, data_path = 'results/inference'):
+    def __init__(self, test_data, samples, model, hyperparams, chain_samples = -1, previous_instance = -1, data_path = 'results/inference', include_test_points = True):
         self.test_data = test_data
 
         self.model = model
         self.model_func = model.get_model()
         self.hyperparams = hyperparams
-        self.acceptance_rate = 0.5
+        # self.acceptance_rates = acceptance_rates
         self.data_path = data_path
         self.instance = self.get_instance(previous_instance)
         self.save_hyperparams()
         self.num_chains = 1
+        self.include_test_points = include_test_points
+
+
+        self.sample_data_generated = True
+        self.chain_data_generated = True
+        self.chain_data_inputted = True
 
         if type(samples) == list and samples == []:
+            self.sample_data_generated = False
+
+        if type(chain_samples) == list and chain_samples == []:
+            self.chain_data_generated = False
+
+        if type(chain_samples) == int and chain_samples == -1:
+            self.chain_data_inputted = False
+        
+        if self.chain_data_inputted:
+            if not self.chain_data_generated:
+                self.chain_samples = self.load_samples(chain=True)
+            else:
+                self.chain_samples = chain_samples
+            self.num_chains = int(np.max(self.chain_samples['chain'].unique()))
+
+        if not self.sample_data_generated:
             self.samples = self.load_samples()
         else:
             self.samples = samples
 
-        if type(chain_samples) == list and chain_samples == []:
-            self.chain_samples = self.load_samples(chain = True)
-        else:
-            self.chain_samples = chain_samples
+        # if not self.sample_data_generated and not self.chain_data_inputted:
+        #     self.recover_acceptance_rates()
 
-        if type(self.chain_samples) != int or self.chain_samples != -1:
-            self.num_chains = int(np.max(self.chain_samples['chain'].unique()))
+        # if not self.chain_data_generated and self.chain_data_inputted:
+        #     self.recover_acceptance_rates(chain=True)
 
         self.params_lower = self.get_ag_samples(self.samples, 0.05)
         self.params_mean = self.get_ag_samples(self.samples, 0.5)
         self.params_upper = self.get_ag_samples(self.samples, 0.95)
+
+        self.RMSE = 'n/a'
+        if self.include_test_points:
+            mean_test_pred_C = self.model_func(self.params_mean, self.test_data['x'], self.test_data['y'], self.test_data['z'])
+            mean_test_actual_C = self.test_data['Concentration']
+            self.RMSE = np.sqrt(np.mean((mean_test_pred_C-mean_test_actual_C)**2))
+
+        self.save_samples()
+
+    # def recover_acceptance_rates(self, chain = False):
+    #     acceptance_rates = []
+    #     if chain:
+    #         for chain_num in range(self.num_chains):
+    #             samples = self.chain_samples[self.chain_samples['chain'] == chain_num + 1].drop(columns = ['chain', 'sample_index'])
+    #             print('x')
 
     def get_traceplot(self):
         traceplot_folder = self.data_path + '/instance_' + str(self.instance) + '/traceplots'
@@ -47,16 +80,18 @@ class Visualiser:
             os.mkdir(traceplot_folder)
 
         for chain in range(self.num_chains):
+            full_path = traceplot_folder + '/traceplot_' + str(chain + 1) + '.png'
             if self.num_chains == 1:
                 title = 'MCMC samples'
+                samples = self.samples
             else:
                 title = 'MCMC samples for chain ' + str(chain + 1)
-            full_path = traceplot_folder + '/traceplot_' + str(chain + 1) + '.png'
+                samples = self.chain_samples[self.chain_samples['chain'] == chain + 1].drop(columns = ['chain', 'sample_index'])
+            
             if os.path.exists(full_path):
                 print('Traceplot ' + str(chain + 1) + ' already exists')
             else:
-                samples_of_chain = self.chain_samples[self.chain_samples['chain'] == chain + 1].drop(columns = ['chain', 'sample_index'])
-                tp = self.traceplots(samples_of_chain.values, xnames = self.samples.columns, title = title)
+                tp = self.traceplots(samples.values, xnames = self.samples.columns, title = title)
                 tp.savefig(full_path)
 
     def traceplots(self, x, xnames = None, title = None):
@@ -95,7 +130,7 @@ class Visualiser:
             ax_hist.set_xlim([xlim[0], 1.1*xlim[1]])
         return fig
 
-    def visualise_results(self, domain, name, plot_type = '3D', include_test_points = True, log_results = True, title = 'Concentration of Droplets'):
+    def visualise_results(self, domain, name, plot_type = '3D', log_results = True, title = 'Concentration of Droplets'):
         points = domain.create_domain()
         if os.path.exists(self.data_path + '/instance_' + str(self.instance) + '/' + name):
             print('Plots already exist!')
@@ -108,9 +143,9 @@ class Visualiser:
 
             results_df = pd.DataFrame({'x': X.flatten(), 'y': Y.flatten(), 'z': Z.flatten(), 'C_lower': C_lower, 'C_mean': C_mean,'C_upper': C_upper})
 
-            self.threeD_plots(results_df, name, include_test_points = include_test_points, log_results=log_results, title=title)
+            self.threeD_plots(results_df, name, log_results=log_results, title=title)
 
-    def threeD_plots(self, results, name, q=10, include_test_points = True, log_results = True, title = 'Concentration of Droplets'):
+    def threeD_plots(self, results, name, q=10, log_results = True, title = 'Concentration of Droplets'):
 
         X = results.x
         Y = results.y
@@ -156,7 +191,7 @@ class Visualiser:
 
         # I NEED TO EDIT THIS TO IT CHANGES FOR EACH PLOT!!!!!!
         # Calculates the percentage differances and RMSE if the test points are set to be included
-        if include_test_points:
+        if self.include_test_points:
             lower_test_pred_C = self.model_func(self.params_lower, self.test_data['x'], self.test_data['y'], self.test_data['z'])
             lower_test_actual_C = self.test_data['Concentration']
             lower_percentage_difference = 2*np.abs(lower_test_actual_C-lower_test_pred_C)/(lower_test_actual_C + lower_test_pred_C) * 100
@@ -169,9 +204,7 @@ class Visualiser:
             upper_test_actual_C = self.test_data['Concentration']
             upper_percentage_difference = 2*np.abs(lower_test_actual_C-upper_test_pred_C)/(upper_test_actual_C + upper_test_pred_C) * 100
 
-            RMSE = np.sqrt(np.mean((mean_test_pred_C-mean_test_actual_C)**2))
-        else:
-            RMSE = 'n/a'     
+     
             
         # Creates a directory for the instance if the save parameter is selected
         os.mkdir(self.data_path + '/instance_' + str(self.instance) + '/' + str(name))
@@ -221,7 +254,7 @@ class Visualiser:
             ax3.set_zlim(np.min(Z), np.max(Z))
 
             # Generates the test point data on each graph
-            if include_test_points:
+            if self.include_test_points:
                 pd_min = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
                 pd_max = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
 
@@ -229,10 +262,10 @@ class Visualiser:
                 ax2.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 10*np.log10(mean_test_pred_C), c = mean_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
                 ax3.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 10*np.log10(upper_test_pred_C), c = upper_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
                 formatter = "{:.2e}" 
-                if  np.floor(np.log10(RMSE)) < 2: formatter = "{:.2f}" 
-                sampling_data_string = 'RMSE = ' + formatter.format(RMSE) + '\nAcceptance Rate = ' + "{:.2f}".format(self.acceptance_rate) + '%' 
+                if  np.floor(np.log10(self.RMSE)) < 2: formatter = "{:.2f}" 
+                sampling_data_string = 'RMSE = ' + formatter.format(self.RMSE)# + '\nAcceptance Rate = ' + "{:.2f}".format(self.acceptance_rate) + '%' 
             else:
-                sampling_data_string = 'RMSE = n/a\nAcceptance Rate = ' + "{:.2f}".format(self.acceptance_rate) + '%' 
+                sampling_data_string = 'RMSE = n/a'#\nAcceptance Rate = ' + "{:.2f}".format(self.acceptance_rate) + '%' 
 
             # Creates an axis to display the parameter values
             ax4 = fig.add_subplot(gs[-2:,:3])
@@ -327,12 +360,15 @@ class Visualiser:
         full_path = self.data_path + '/instance_' + str(self.instance) + '/samples.csv'
         if type(self.samples) == list and self.samples == []:
             raise Exception('Samples data is empty!')    
-        pd.DataFrame(self.samples).to_csv(full_path)
-        if type(self.chain_samples) != int or self.chain_samples != -1:
+        pd.DataFrame(self.samples).to_csv(full_path, index=False)
+        if self.chain_data_inputted:
             chain_full_path = self.data_path + '/instance_' + str(self.instance) + '/chain_samples.csv'
             if type(self.chain_samples) == list and self.chain_samples == []:
                 raise Exception('Samples data is empty!')    
-            pd.DataFrame(self.chain_samples).to_csv(chain_full_path)
+            pd.DataFrame(self.chain_samples).to_csv(chain_full_path, index=False)
+            # if 'Unnamed: 0' in chain_samples.columns
+            #     chain_samples.drop(columns=['Unnamed: 0'])
+            # chain_samples.to_csv(chain_full_path)
         
     def load_samples(self, chain = False):
         if chain:
@@ -349,20 +385,31 @@ class Visualiser:
                 return pd.read_csv(full_path)
             else:
                 raise Exception('Samples file does not exist!')
-        
-
-
 
     def get_autocorrelations(self):
-        full_path = self.data_path + '/instance_' + str(self.instance) + '/autocorrelations.png'
-        if os.path.exists(full_path):
-            print('Autocorrelations plot already exists')
-        else:
-            ap = self.autocorr(self.samples.values, self.samples.columns)
-            ap.savefig(full_path)
+        autocorr_folder = self.data_path + '/instance_' + str(self.instance) + '/autocorrelations'
+        if not os.path.exists(autocorr_folder):
+            os.mkdir(autocorr_folder)
+
+        for chain in range(self.num_chains):
+            full_path = autocorr_folder + '/autocorrelations_' + str(chain + 1) + '.png'
+            
+            if self.num_chains == 1:
+                title = 'MCMC autocorrelations'
+                samples = self.samples
+            else:
+                title = 'MCMC autocorrelations for chain ' + str(chain + 1)
+                samples = self.chain_samples[self.chain_samples['chain'] == chain + 1].drop(columns = ['chain', 'sample_index'])
+
+            if os.path.exists(full_path):
+                print('Traceplot ' + str(chain + 1) + ' already exists')
+            else:
+                ac = self.autocorr(samples.values, self.samples.columns, title = title)
+                ac.savefig(full_path)
+
 
     
-    def autocorr(self, x, x_names, D=-1):
+    def autocorr(self, x, x_names, title, D=-1):
         if D == -1:
             D = int(x.shape[0])
         xp = np.atleast_2d(x)
@@ -384,7 +431,7 @@ class Visualiser:
         plt.legend()
         plt.xlabel('Sample number')
         plt.ylabel('Autocorrelation')
-        plt.title('Discrete Autocorrelation ($\\tau = {:.1f}$)'.format(np.mean(tau)))
+        plt.title(title + '\nDiscrete Autocorrelation ($\\tau = {:.1f}$)'.format(np.mean(tau)))
 
         return fig
     
@@ -395,3 +442,37 @@ class Visualiser:
             ag = np.quantile(param_samples, q_val)
             ags[col] = ag
         return ags
+    
+    def get_summary(self):
+        summary = {}
+        summary['RMSE'] = self.RMSE
+        if self.chain_data_inputted:
+            for chain_num in range(self.num_chains):
+                summary['chain_' + str(chain_num + 1)] = {}
+                samples = self.chain_samples[self.chain_samples['chain'] == chain_num + 1].drop(columns = ['chain', 'sample_index'])
+                params_lower = self.get_ag_samples(samples, 0.05)
+                params_mean = self.get_ag_samples(samples, 0.5)
+                params_upper = self.get_ag_samples(samples, 0.95)
+
+                for param in self.samples.columns:
+                    summary['chain_' + str(chain_num + 1)][param] = {}
+                    
+                    summary['chain_' + str(chain_num + 1)][param]['lower'] = params_lower[param]
+                    summary['chain_' + str(chain_num + 1)][param]['mean'] = params_mean[param]
+                    summary['chain_' + str(chain_num + 1)][param]['upper'] = params_upper[param]
+            
+        overall_samples = self.samples
+        summary['overall'] = {}
+
+        overall_params_lower = self.get_ag_samples(overall_samples, 0.05)
+        overall_params_mean = self.get_ag_samples(overall_samples, 0.5)
+        overall_params_upper = self.get_ag_samples(overall_samples, 0.95)
+        for param in self.samples.columns:
+            summary['overall'][param] = {}
+
+            summary['overall'][param]['lower'] = overall_params_lower[param]
+            summary['overall'][param]['mean'] = overall_params_mean[param]
+            summary['overall'][param]['upper'] = overall_params_upper[param]
+        
+        with open(self.data_path + '/instance_' + str(self.instance) + '/summary.json', "w") as fp:
+            json.dump(summary,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
