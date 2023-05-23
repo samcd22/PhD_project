@@ -10,7 +10,7 @@ from matplotlib.gridspec import GridSpec
 
 
 class Visualiser:
-    def __init__(self, test_data, samples, model, hyperparams, chain_samples = -1, previous_instance = -1, data_path = 'results/inference', include_test_points = True):
+    def __init__(self, test_data, samples, model, hyperparams, chain_samples = -1, fields = {}, previous_instance = -1, data_path = 'results/inference', include_test_points = True):
         self.test_data = test_data
 
         self.model = model
@@ -22,6 +22,7 @@ class Visualiser:
         self.save_hyperparams()
         self.num_chains = 1
         self.include_test_points = include_test_points
+        self.fields = fields
 
 
         self.sample_data_generated = True
@@ -123,6 +124,7 @@ class Visualiser:
             plt.setp(ax_hist.get_yticklabels(), visible=False)
             xlim = ax_hist.get_xlim()
             ax_hist.set_xlim([xlim[0], 1.1*xlim[1]])
+            plt.close()
         return fig
 
     def visualise_results(self, domain, name, plot_type = '3D', log_results = True, title = 'Concentration of Droplets'):
@@ -291,6 +293,7 @@ class Visualiser:
             full_path = self.data_path + '/instance_' + str(self.instance) + '/' + name + '/figures/' + fig_name
             if not os.path.exists(full_path):
                 fig.savefig(full_path)
+                plt.close()
             else:
                 plt.show()
 
@@ -410,6 +413,7 @@ class Visualiser:
         plt.xlabel('Sample number')
         plt.ylabel('Autocorrelation')
         plt.title(title + '\nDiscrete Autocorrelation')
+        plt.close()
 
         return fig
     
@@ -436,6 +440,12 @@ class Visualiser:
                 self.autocorrs['chain_' + str(chain_num+1)][param] = {}
                 self.autocorrs['chain_' + str(chain_num+1)][param]['tau'] = tau[i]
                 self.autocorrs['chain_' + str(chain_num+1)][param]['Ct'] = Ct[:,i]
+        
+        self.autocorrs['overall'] = {}
+        for param in self.samples.columns:
+            tau_overall = np.mean([self.autocorrs['chain_' + str(x + 1)][param]['tau'] for x in range(self.num_chains)])
+            self.autocorrs['overall'][param] = {}
+            self.autocorrs['overall'][param]['tau'] = tau_overall
     
     def get_ag_samples(self,samples, q_val):
         ags = pd.Series({},dtype='float64')
@@ -445,43 +455,69 @@ class Visualiser:
             ags[col] = ag
         return ags
     
+    def get_fields(self, chain_num):
+        output = {}
+        if self.fields.keys() != []:
+            for key in self.fields.keys():
+                field_output = self.fields[key][chain_num]
+                if key == 'diverging':
+                    field_output = sum(field_output.tolist())
+
+                output[key] = field_output
+        return output
+
     def get_summary(self):
         summary = {}
-        summary['RMSE'] = self.RMSE
-        if self.chain_data_inputted:
-            for chain_num in range(self.num_chains):
-                summary['chain_' + str(chain_num + 1)] = {}
-                samples = self.chain_samples[self.chain_samples['chain'] == chain_num + 1].drop(columns = ['chain', 'sample_index'])
-                params_lower = self.get_ag_samples(samples, 0.05)
-                params_mean = self.get_ag_samples(samples, 0.5)
-                params_upper = self.get_ag_samples(samples, 0.95)
+        full_path = self.data_path + '/instance_' + str(self.instance) + '/summary.json'
+        if os.path.exists(full_path):
+            f = open(full_path)
+            summary = json.load(f)
+            f.close()
+        else:
+            summary['RMSE'] = self.RMSE
+            if self.chain_data_inputted:
+                for chain_num in range(self.num_chains):
+                    summary['chain_' + str(chain_num + 1)] = {}
+                    samples = self.chain_samples[self.chain_samples['chain'] == chain_num + 1].drop(columns = ['chain', 'sample_index'])
+                    params_lower = self.get_ag_samples(samples, 0.05)
+                    params_mean = self.get_ag_samples(samples, 0.5)
+                    params_upper = self.get_ag_samples(samples, 0.95)
 
-                for param in self.samples.columns:
-                    summary['chain_' + str(chain_num + 1)][param] = {}
-                    
-                    summary['chain_' + str(chain_num + 1)][param]['lower'] = params_lower[param]
-                    summary['chain_' + str(chain_num + 1)][param]['mean'] = params_mean[param]
-                    summary['chain_' + str(chain_num + 1)][param]['upper'] = params_upper[param]
-                    
-                    summary['chain_' + str(chain_num + 1)][param]['tau'] = self.autocorrs['chain_' + str(chain_num + 1)][param]['tau']
-                    
-            
-        overall_samples = self.samples
-        summary['overall'] = {}
+                    summary['chain_' + str(chain_num + 1)]['fields'] = self.get_fields(chain_num)
 
-        overall_params_lower = self.get_ag_samples(overall_samples, 0.05)
-        overall_params_mean = self.get_ag_samples(overall_samples, 0.5)
-        overall_params_upper = self.get_ag_samples(overall_samples, 0.95)
-        for param in self.samples.columns:
-            summary['overall'][param] = {}
+                    for param in self.samples.columns:
+                        summary['chain_' + str(chain_num + 1)][param] = {}
+                        
+                        summary['chain_' + str(chain_num + 1)][param]['lower'] = params_lower[param]
+                        summary['chain_' + str(chain_num + 1)][param]['mean'] = params_mean[param]
+                        summary['chain_' + str(chain_num + 1)][param]['upper'] = params_upper[param]
+                        
+                        summary['chain_' + str(chain_num + 1)][param]['tau'] = self.autocorrs['chain_' + str(chain_num + 1)][param]['tau']
+                        
+                
+            overall_samples = self.samples
+            summary['overall'] = {}
 
-            summary['overall'][param]['lower'] = overall_params_lower[param]
-            summary['overall'][param]['mean'] = overall_params_mean[param]
-            summary['overall'][param]['upper'] = overall_params_upper[param]
+            overall_params_lower = self.get_ag_samples(overall_samples, 0.05)
+            overall_params_mean = self.get_ag_samples(overall_samples, 0.5)
+            overall_params_upper = self.get_ag_samples(overall_samples, 0.95)
 
-            if not self.chain_data_inputted:
-                summary['overall'][param]['tau'] = self.autocorrs['chain_' + str(1)][param]['tau']
+            summary['chain_' + str(chain_num + 1)]['fields'] = self.get_fields(0)
 
-        
-        with open(self.data_path + '/instance_' + str(self.instance) + '/summary.json', "w") as fp:
-            json.dump(summary,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
+            for param in self.samples.columns:
+                summary['overall'][param] = {}
+
+                summary['overall'][param]['lower'] = overall_params_lower[param]
+                summary['overall'][param]['mean'] = overall_params_mean[param]
+                summary['overall'][param]['upper'] = overall_params_upper[param]
+
+
+                if self.chain_data_inputted:
+                    summary['overall'][param]['tau'] = self.autocorrs['overall'][param]['tau']
+                else:
+                    summary['overall'][param]['tau'] = self.autocorrs['chain_' + str(1)][param]['tau']
+
+            with open(self.data_path + '/instance_' + str(self.instance) + '/summary.json', "w") as fp:
+                json.dump(summary,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
+
+        return summary

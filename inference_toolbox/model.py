@@ -45,7 +45,7 @@ class Model:
             
             return Q / (tmp*jnp.pi)*(jnp.exp(-(y**2)/tmp))*(jnp.exp(-(z-H)**2/tmp)+jnp.exp(-(z+H)**2/tmp))
 
-        if self.model_select == "GPM_norm":
+        if self.model_select == "gpm_norm":
             return GPM_norm
         
         def GPM_alt_norm(params, x, y, z):
@@ -61,7 +61,7 @@ class Model:
             
             return Q/(jnp.pi*I_y*I_z*x**2)*jnp.exp(-y**2/(2*I_y**2*x**2))*(jnp.exp(-(z-H)**2/(2*I_z**2*x**2))+jnp.exp(-(z+H)**2/(2*I_z**2*x**2)))
         
-        if self.model_select == "GPM_alt_norm":
+        if self.model_select == "gpm_alt_norm":
             return GPM_alt_norm
         
         def GPM_alt_norm_log_Q(params, x, y, z):
@@ -76,7 +76,7 @@ class Model:
             H = self.model_params.H
             return 10**log_10_Q/(jnp.pi*I_y*I_z*x**2)*jnp.exp(-y**2/(2*I_y**2*x**2))*(jnp.exp(-(z-H)**2/(2*I_z**2*x**2))+jnp.exp(-(z+H)**2/(2*I_z**2*x**2)))
         
-        if self.model_select == "GPM_alt_norm_log_Q":
+        if self.model_select == "gpm_alt_norm_log_Q":
             return GPM_alt_norm_log_Q
         
         def log_GPM_alt_norm(params, x, y, z):
@@ -91,5 +91,5 @@ class Model:
             H = self.model_params.H
             return jnp.log10(Q/(jnp.pi*I_y*I_z*x**2)*jnp.exp(-y**2/(2*I_y**2*x**2))*(jnp.exp(-(z-H)**2/(2*I_z**2*x**2))+jnp.exp(-(z+H)**2/(2*I_z**2*x**2))))
         
-        if self.model_select == "log_GPM_alt_norm":
+        if self.model_select == "log_gpm_alt_norm":
             return log_GPM_alt_norm

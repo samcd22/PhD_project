@@ -29,6 +29,8 @@ class Sampler:
         self.sample_info_rows = []
         self.instance = -1
 
+        self.get_hyperparams()
+
         # if self.show_sample_info:
         # sample_info_row = {}
         # sample_info_row['current_params'] = [x.val for x in self.current_params]
@@ -59,9 +61,10 @@ class Sampler:
             mcmc_obj = numpyro.infer.MCMC(kernel, num_warmup=self.n_warmup, num_samples=self.n_samples, num_chains=self.n_chains, thinning=self.thinning_rate)
             mcmc_obj.run(rng_key=rng_key, init_params = jnp.array(init_params))
             samples = mcmc_obj.get_samples(group_by_chain=True)
-            return self.format_samples(samples)
+            fields = mcmc_obj.get_extra_fields(group_by_chain=True)
+            return *self.format_samples(samples), fields
         else:
-            return [], []
+            return [], [], {}
         
     def format_samples(self, samples):
         chain_new_samples = pd.DataFrame({}, dtype='float64')
