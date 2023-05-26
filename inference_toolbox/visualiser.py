@@ -10,7 +10,21 @@ from matplotlib.gridspec import GridSpec
 
 
 class Visualiser:
-    def __init__(self, test_data, samples, model, hyperparams, chain_samples = -1, fields = {}, previous_instance = -1, data_path = 'results/inference', include_test_points = True):
+    def __init__(self, 
+                 test_data,
+                 samples, 
+                 model, 
+                 hyperparams, 
+                 chain_samples = -1, 
+                 fields = {}, 
+                 previous_instance = -1, 
+                 data_path = 'results/inference/general_instances', 
+                 include_test_points = True, 
+                 suppress_prints = False,
+                 actual_values = []):
+        
+
+        self.suppress_prints = suppress_prints
         self.test_data = test_data
 
         self.model = model
@@ -23,7 +37,6 @@ class Visualiser:
         self.num_chains = 1
         self.include_test_points = include_test_points
         self.fields = fields
-
 
         self.sample_data_generated = True
         self.chain_data_generated = True
@@ -50,11 +63,12 @@ class Visualiser:
         else:
             self.samples = samples
 
-        # if not self.sample_data_generated and not self.chain_data_inputted:
-        #     self.recover_acceptance_rates()
-
-        # if not self.chain_data_generated and self.chain_data_inputted:
-        #     self.recover_acceptance_rates(chain=True)
+        self.actual_values = {}
+        for i, param in enumerate(self.samples.columns):
+            if actual_values == []:
+                self.actual_values[param] = 'NaN'
+            else:
+                self.actual_values[param] = actual_values[i]
 
         self.params_lower = self.get_ag_samples(self.samples, 0.05)
         self.params_mean = self.get_ag_samples(self.samples, 0.5)
@@ -85,7 +99,8 @@ class Visualiser:
                 samples = self.chain_samples[self.chain_samples['chain'] == chain + 1].drop(columns = ['chain', 'sample_index'])
             
             if os.path.exists(full_path):
-                print('Traceplot ' + str(chain + 1) + ' already exists')
+                if not self.suppress_prints:
+                    print('Traceplot ' + str(chain + 1) + ' already exists')
             else:
                 tp = self.traceplots(samples.values, xnames = self.samples.columns, title = title)
                 tp.savefig(full_path)
@@ -130,7 +145,8 @@ class Visualiser:
     def visualise_results(self, domain, name, plot_type = '3D', log_results = True, title = 'Concentration of Droplets'):
         points = domain.create_domain()
         if os.path.exists(self.data_path + '/instance_' + str(self.instance) + '/' + name):
-            print('Plots already exist!')
+            if not self.suppress_prints:
+                print('Plots already exist!')
 
         elif plot_type == '3D':
             X, Y, Z = points[:,0], points[:,1], points[:,2]
@@ -329,7 +345,8 @@ class Visualiser:
 
         instance_path = self.data_path + '/instance_' + str(instance)
         if not os.path.exists(instance_path):
-            print('Creating instance')
+            if not self.suppress_prints:
+                print('Creating instance')
             os.mkdir(instance_path)
         return instance
 
@@ -342,9 +359,11 @@ class Visualiser:
         gif_name = name + '.gif'
         gif_path = self.data_path + '/' + 'instance_' + str(self.instance) + '/' + name + '/' + gif_name
         if not os.path.exists(self.data_path + '/' + folder_name):
-            print('Images for animation do not exist')
+            if not self.suppress_prints:
+                print('Images for animation do not exist')
         elif os.path.exists(gif_path):
-            print('Animation already exist!')
+            if not self.suppress_prints:
+                print('Animation already exist!')
         else:
             files = os.listdir(self.data_path + '/' + folder_name)
 
@@ -372,14 +391,16 @@ class Visualiser:
         if chain:
             chain_full_path = self.data_path + '/instance_' + str(self.instance) + '/chain_samples.csv'
             if os.path.exists(chain_full_path):
-                print('Loading Chain Samples...')
+                if not self.suppress_prints:
+                    print('Loading Chain Samples...')
                 return pd.read_csv(chain_full_path)
             else:
                 raise Exception('Chain samples file does not exist!')
         else:
             full_path = self.data_path + '/instance_' + str(self.instance) + '/samples.csv'
             if os.path.exists(full_path):
-                print('Loading Samples...')
+                if not self.suppress_prints:
+                    print('Loading Samples...')
                 return pd.read_csv(full_path)
             else:
                 raise Exception('Samples file does not exist!')
@@ -398,7 +419,8 @@ class Visualiser:
                 title = 'MCMC autocorrelations for chain ' + str(chain + 1)
 
             if os.path.exists(full_path):
-                print('Traceplot ' + str(chain + 1) + ' already exists')
+                if not self.suppress_prints:
+                    print('Traceplot ' + str(chain + 1) + ' already exists')
             else:
                 ac = self.autocorr_fig(chain, title = title)
                 ac.savefig(full_path)
@@ -494,6 +516,11 @@ class Visualiser:
                         
                         summary['chain_' + str(chain_num + 1)][param]['tau'] = self.autocorrs['chain_' + str(chain_num + 1)][param]['tau']
                         
+                        if self.actual_values[param] !='NaN':
+                            proposed = params_mean[param]
+                            actual = self.actual_values[param]
+                            summary['chain_' + str(chain_num + 1)][param]['param_accuracy'] = 200*np.abs(proposed-actual)/(proposed + actual)
+
                 
             overall_samples = self.samples
             summary['overall'] = {}
@@ -511,11 +538,14 @@ class Visualiser:
                 summary['overall'][param]['mean'] = overall_params_mean[param]
                 summary['overall'][param]['upper'] = overall_params_upper[param]
 
-
                 if self.chain_data_inputted:
                     summary['overall'][param]['tau'] = self.autocorrs['overall'][param]['tau']
                 else:
                     summary['overall'][param]['tau'] = self.autocorrs['chain_' + str(1)][param]['tau']
+
+                if self.actual_values[param] !='NaN':
+                    summary['overall'][param]['param_accuracy'] = np.abs(overall_params_mean[param]-self.actual_values[param])/np.mean([overall_params_mean[param],self.actual_values[param]])*100
+
 
             with open(self.data_path + '/instance_' + str(self.instance) + '/summary.json', "w") as fp:
                 json.dump(summary,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)

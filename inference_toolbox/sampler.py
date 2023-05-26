@@ -8,7 +8,7 @@ import jax.numpy as jnp
 from jax import random
 
 class Sampler:
-    def __init__(self, params, model, likelihood, data, n_samples, n_warmup = -1, n_chains = 1, thinning_rate = 1, show_sample_info = False, data_path = 'results/inference'):
+    def __init__(self, params, model, likelihood, data, n_samples, n_warmup = -1, n_chains = 1, thinning_rate = 1, show_sample_info = False, data_path = 'results/inference/general_instances'):
         self.params = params
         self.model = model
         self.model_func = model.get_model()
@@ -138,6 +138,7 @@ class Sampler:
             
     def check_data_exists(self):
         data_exists = False
+        x=os.listdir(self.data_path)
         for instance_folder in os.listdir(self.data_path):
             folder_path = self.data_path + '/' + instance_folder
             f = open(folder_path + '/hyperparams.json')
@@ -146,5 +147,5 @@ class Sampler:
             if self.hyperparams == instance_hyperparams:
                 data_exists = True
                 self.instance = int(instance_folder.split('_')[1])
-            return data_exists
+        return data_exists
             

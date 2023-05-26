@@ -13,7 +13,8 @@ class Parameter:
         
     def alpha(self,mu,sigma): return mu**2/sigma**2
 
-    def beta(self,mu,sigma): return mu/sigma**2
+    def beta(self,mu,sigma):
+        return mu/(sigma**2)
 
     def add_prior_param(self, name, val):
         self.prior_params[name] = val
