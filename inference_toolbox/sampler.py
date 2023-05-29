@@ -49,9 +49,6 @@ class Sampler:
     def sample_all(self, rng_key = random.PRNGKey(2120)):
         data_exists = self.check_data_exists()
         sample_info_file_name = 'most_recent_sample_info.csv'
-        init_params = []
-        for param in self.params.index:
-            init_params.append(self.params[param].init_val)
 
         if os.path.exists(sample_info_file_name):
             os.remove(sample_info_file_name)
@@ -59,7 +56,7 @@ class Sampler:
         if not data_exists:
             kernel = numpyro.infer.NUTS(self.sample_one)
             mcmc_obj = numpyro.infer.MCMC(kernel, num_warmup=self.n_warmup, num_samples=self.n_samples, num_chains=self.n_chains, thinning=self.thinning_rate)
-            mcmc_obj.run(rng_key=rng_key, init_params = jnp.array(init_params))
+            mcmc_obj.run(rng_key=rng_key)
             samples = mcmc_obj.get_samples(group_by_chain=True)
             fields = mcmc_obj.get_extra_fields(group_by_chain=True)
             return *self.format_samples(samples), fields
@@ -103,7 +100,6 @@ class Sampler:
             self.hyperparams['params'][param_ind] = {}
             self.hyperparams['params'][param_ind]['prior_func'] = self.params[param_ind].prior_select
             self.hyperparams['params'][param_ind]['prior_params'] = {}
-            self.hyperparams['params'][param_ind]['init_val'] = self.params[param_ind].init_val
             for prior_param_ind in self.params[param_ind].prior_params.index:
                 self.hyperparams['params'][param_ind]['prior_params'][prior_param_ind] = self.params[param_ind].prior_params[prior_param_ind]
 

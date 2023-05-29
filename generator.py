@@ -217,20 +217,25 @@ class Generator:
         return self.generate_from_inputs(inputs)
     
     def vary_one_parameter(self, parameter_name, values, plot = True, xscale = 'log'):
-        inputs = pd.DataFrame(columns=[self.par_to_col[x] for x in self.default_values.index])
-        for val in values:
-            one_row = self.default_values
-            one_row = pd.Series(index = [self.par_to_col[x] for x in self.default_values.index], data = self.default_values.values)
-            one_row[self.par_to_col[parameter_name]] = val
-            inputs = pd.concat([inputs, one_row.to_frame().T], ignore_index=True)
-        inputs.columns = pd.MultiIndex.from_tuples(inputs.columns)
-        inputs.index += 1
-        
         results_path = self.data_path + '/varying_' + parameter_name
         if not os.path.exists(results_path):
             os.mkdir(results_path)
 
-        results = self.generate_from_inputs(inputs, results_path)
+        if os.path.exists(results_path +'/results.xlsx'):
+            results = pd.read_excel(results_path +'/results.xlsx', header=[0,1,2], index_col=0)
+        else:
+        
+            inputs = pd.DataFrame(columns=[self.par_to_col[x] for x in self.default_values.index])
+            for val in values:
+                one_row = self.default_values
+                one_row = pd.Series(index = [self.par_to_col[x] for x in self.default_values.index], data = self.default_values.values)
+                one_row[self.par_to_col[parameter_name]] = val
+                inputs = pd.concat([inputs, one_row.to_frame().T], ignore_index=True)
+            inputs.columns = pd.MultiIndex.from_tuples(inputs.columns)
+            inputs.index += 1
+            results = self.generate_from_inputs(inputs, results_path)
+
+        
         if plot:
             self.plot_varying_one(results, parameter_name, results_path, xscale = xscale)
 
@@ -241,27 +246,32 @@ class Generator:
         if parameter_name_1 == parameter_name_2:
             Exception('Varying parameters must be different!')
 
-        V1, V2 = np.meshgrid(values_1, values_2)
-        V1_flattened = V1.flatten()
-        V2_flattened = V2.flatten()
-
-        for i in range(V1_flattened.size):
-            val1 = V1_flattened[i]
-            val2 = V2_flattened[i]
-            one_row = self.default_values
-            one_row = pd.Series(index = [self.par_to_col[x] for x in self.default_values.index], data = self.default_values.values)
-            one_row[self.par_to_col[parameter_name_1]] = val1
-            one_row[self.par_to_col[parameter_name_2]] = val2
-
-            inputs = pd.concat([inputs, one_row.to_frame().T], ignore_index=True)
-        inputs.columns = pd.MultiIndex.from_tuples(inputs.columns)
-        inputs.index += 1
-        
         results_path = self.data_path + '/varying_' + parameter_name_1 + '_and_' + parameter_name_2
         if not os.path.exists(results_path):
             os.mkdir(results_path)
 
-        results = self.generate_from_inputs(inputs, results_path)
+        if os.path.exists(results_path +'/results.xlsx'):
+            results = pd.read_excel(results_path +'/results.xlsx', header=[0,1,2], index_col=0)
+        else:
+
+            V1, V2 = np.meshgrid(values_1, values_2)
+            V1_flattened = V1.flatten()
+            V2_flattened = V2.flatten()
+
+            for i in range(V1_flattened.size):
+                val1 = V1_flattened[i]
+                val2 = V2_flattened[i]
+                one_row = self.default_values
+                one_row = pd.Series(index = [self.par_to_col[x] for x in self.default_values.index], data = self.default_values.values)
+                one_row[self.par_to_col[parameter_name_1]] = val1
+                one_row[self.par_to_col[parameter_name_2]] = val2
+
+                inputs = pd.concat([inputs, one_row.to_frame().T], ignore_index=True)
+            inputs.columns = pd.MultiIndex.from_tuples(inputs.columns)
+            inputs.index += 1
+    
+            results = self.generate_from_inputs(inputs, results_path)
+
         if plot:
             self.plot_varying_two(results, parameter_name_1, parameter_name_2, results_path, scale_1 = scale_1, scale_2 = scale_2)
 
@@ -291,7 +301,6 @@ class Generator:
         Q_param_accuracy_results = results[Q_param_accuracy].values.astype('float64')
         
         tau_av = np.around(np.mean([I_y_tau_results, I_z_tau_results, Q_tau_results], axis=0))
-        print(tau_av)
         param_accuracy_av = np.mean([I_y_param_accuracy_results, I_z_param_accuracy_results, Q_param_accuracy_results], axis=0)
 
         new_shape = (np.unique(varying_parameter_1).size, np.unique(varying_parameter_2).size)
@@ -303,51 +312,53 @@ class Generator:
         tau_av = np.reshape([tau_av], new_shape)
         param_accuracy_av = np.reshape([param_accuracy_av], new_shape)
 
+        if scale_1 == 'log':
+            scaled_varying_parameter_1 = np.log10(varying_parameter_1)
+            x_label = 'log ' + parameter_name_1
+        else:
+            x_label = parameter_name_1
+            scaled_varying_parameter_1 = varying_parameter_1
+
+        if scale_2 == 'log':
+            scaled_varying_parameter_2 = np.log10(varying_parameter_2)
+            y_label = 'log ' + parameter_name_2
+        else:
+            y_label = parameter_name_2
+            scaled_varying_parameter_2 = varying_parameter_2
+
         fig1 = plt.figure()
-        plt.xlabel(parameter_name_1)
-        plt.ylabel(parameter_name_2)
-        plt.pcolor(varying_parameter_1, varying_parameter_2, RMSE_results, cmap='jet')
-        plt.xscale(scale_1)
-        plt.yscale(scale_2)
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
+        plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, RMSE_results, cmap='jet')
         plt.title('RMSE of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
         plt.colorbar()
-        plt.show()
         fig1.savefig(results_path + '/RMSE_plot.png')
         plt.close()
 
         fig2 = plt.figure()
-        plt.xlabel(parameter_name_1)
-        plt.ylabel(parameter_name_2)
-        plt.pcolor(varying_parameter_1, varying_parameter_2, diverging_results, cmap='jet')
-        plt.xscale(scale_1)
-        plt.yscale(scale_2)
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
+        plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, diverging_results, cmap='jet')
         plt.title('Number of divergences of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
         plt.colorbar()
-        plt.show()
         fig2.savefig(results_path + '/divergence_plot.png')
         plt.close()
 
         fig3 = plt.figure()
-        plt.xlabel(parameter_name_1)
-        plt.ylabel(parameter_name_2)
-        plt.pcolor(varying_parameter_1, varying_parameter_2, tau_av, cmap='jet')
-        plt.xscale(scale_1)
-        plt.yscale(scale_2)
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
+        plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, tau_av, cmap='jet')
         plt.title('Tau convergence of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
         plt.colorbar()
-        plt.show()
         fig3.savefig(results_path + '/convergance_variation.png')
         plt.close()
 
         fig4 = plt.figure()
-        plt.xlabel(parameter_name_1)
-        plt.ylabel(parameter_name_2)
-        plt.pcolor(varying_parameter_1, varying_parameter_2, param_accuracy_av, cmap='jet')
-        plt.xscale(scale_1)
-        plt.yscale(scale_2)
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
+        plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, param_accuracy_av, cmap='jet')
         plt.title('Average parameter percentage error for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
         plt.colorbar()
-        plt.show()
         fig4.savefig(results_path + '/param_accuracy_plot.png')
         plt.close()
 
@@ -393,6 +404,7 @@ class Generator:
         plt.plot(varying_parameter, results[Q_param_accuracy], label = Q_param_accuracy[1])
         plt.xscale(xscale)
         plt.title('Average parameter percentage error for varying ' + parameter_name)
+        plt.legend()
         fig3.savefig(results_path + '/param_accuracy_plot.png')
         plt.close()
 
