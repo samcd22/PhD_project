@@ -11,3 +11,7 @@ def print_all_distances_and_heights(data):
         for distance in selected_data.Distance.unique():
             distance_data = selected_data[selected_data.Distance == distance]
             print(distance, distance_data.Height.unique())
+
+
+def data_param_not_exist():
+    Exception('Invalid data parameters')

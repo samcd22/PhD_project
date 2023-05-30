@@ -9,7 +9,7 @@ from inference_toolbox.model import Model
 from inference_toolbox.likelihood import Likelihood
 from inference_toolbox.sampler import Sampler
 from inference_toolbox.visualiser import Visualiser
-from generate_dummy_data import generate_dummy_data
+from data_processing.generate_dummy_data import generate_dummy_data
 
 import warnings
 
@@ -128,12 +128,30 @@ class Generator:
             num_chains = int(inputs[('parameters','sampler','n_chains')].values[instance-1])
             thinning_rate = int(inputs[('parameters','sampler','thinning_rate')].values[instance-1])
 
-            dummy_data = generate_dummy_data(likelihood_sigma,
-                                              log=self.log_data, 
-                                              H=model_H, 
-                                              I_y=self.default_values['I_y_mean'],
-                                              I_z=self.default_values['I_z_mean'],
-                                              Q=self.default_values['Q_mean'])
+
+            dummy_data_model_params = {
+                'model_params':{
+                    'H': 10
+                },
+                'inference_params':{
+                    'I_y': self.default_values['I_y_mean'],
+                    'I_z': self.default_values['I_z_mean'],
+                    'Q': self.default_values['Q_mean']
+                },
+            }
+            dummy_data_domain_params = {
+                'domain_select': 'cone_from_source_z_limited', 
+                'resolution': 20,
+                'domain_params':{
+                    'r': 100,
+                    'theta': np.pi/8,
+                    'source': [0,0,10]}
+            }
+
+            dummy_data = generate_dummy_data(likelihood_sigma, 
+                                             self.default_values['model_type'], 
+                                             model_params = dummy_data_model_params, 
+                                             domain_params=dummy_data_domain_params)
             
             training_data, testing_data = train_test_split(dummy_data, test_size=0.2)
 
@@ -313,18 +331,18 @@ class Generator:
         param_accuracy_av = np.reshape([param_accuracy_av], new_shape)
 
         if scale_1 == 'log':
-            scaled_varying_parameter_1 = np.log10(varying_parameter_1)
+            scaled_varying_parameter_1 = np.log10(varying_parameter_1.astype(np.float64))
             x_label = 'log ' + parameter_name_1
         else:
             x_label = parameter_name_1
-            scaled_varying_parameter_1 = varying_parameter_1
+            scaled_varying_parameter_1 = varying_parameter_1.astype(np.float64)
 
         if scale_2 == 'log':
-            scaled_varying_parameter_2 = np.log10(varying_parameter_2)
+            scaled_varying_parameter_2 = np.log10(varying_parameter_2.astype(np.float64))
             y_label = 'log ' + parameter_name_2
         else:
             y_label = parameter_name_2
-            scaled_varying_parameter_2 = varying_parameter_2
+            scaled_varying_parameter_2 = varying_parameter_2.astype(np.float64)
 
         fig1 = plt.figure()
         plt.xlabel(x_label)
