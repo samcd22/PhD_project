@@ -9,6 +9,7 @@ class Model:
 
     def add_model_param(self,name,val):
         self.model_params[name] = val
+        return self
     
     # Model Function
     def get_model(self, sample = False):

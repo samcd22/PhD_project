@@ -34,5 +34,9 @@ def get_data(data_type = 'dummy', params = {}):
         normalised_data = normaliser.normalise_data(selected_experiments)
         
         box_gridder = BoxGridder(normalised_data)
-        
-        return box_gridder.get_averages([200,200,50], target = False)
+
+        data = box_gridder.get_averages([200,200,50], target = False)
+
+        if params['log']:
+            data['Concentration'] = np.log10(data['Concentration'])
+        return data

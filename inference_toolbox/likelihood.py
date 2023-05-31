@@ -13,6 +13,7 @@ class Likelihood:
 
     def add_likelihood_param(self,name,val):
         self.likelihood_params[name] = val
+        return self
 
     def get_likelihood_function(self):
         if self.likelihood_select == 'gaussian_fixed_sigma':

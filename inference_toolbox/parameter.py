@@ -4,12 +4,11 @@ import numpyro
 
 class Parameter:
 
-    def __init__(self, name, init_val, prior_select = "gaussian"):
+    def __init__(self, name, prior_select = "gaussian", default_value = 'NaN'):
         self.prior_params = pd.Series({},dtype='float64')
-        self.val = 0        
         self.name = name
         self.prior_select = prior_select
-        self.init_val = init_val
+        self.default_value = default_value
         
     def alpha(self,mu,sigma): return mu**2/sigma**2
 
@@ -18,6 +17,7 @@ class Parameter:
 
     def add_prior_param(self, name, val):
         self.prior_params[name] = val
+        return self
 
     def get_prior_function(self):
         if self.prior_select == 'gaussian':
