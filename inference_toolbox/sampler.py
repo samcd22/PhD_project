@@ -134,6 +134,8 @@ class Sampler:
             
     def check_data_exists(self):
         data_exists = False
+        if not os.path.exists(self.data_path):
+            os.makedirs(self.data_path)
         x=os.listdir(self.data_path)
         for instance_folder in os.listdir(self.data_path):
             folder_path = self.data_path + '/' + instance_folder

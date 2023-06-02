@@ -262,7 +262,7 @@ class Generator:
     def vary_two_parameters(self, parameter_name_1, parameter_name_2, values_1, values_2, plot = True, scale_1 = 'log', scale_2 = 'log'):
         inputs = pd.DataFrame(columns=[self.par_to_col[x] for x in self.default_values.index])
         if parameter_name_1 == parameter_name_2:
-            Exception('Varying parameters must be different!')
+            raise Exception('Varying parameters must be different!')
 
         results_path = self.data_path + '/varying_' + parameter_name_1 + '_and_' + parameter_name_2
         if not os.path.exists(results_path):

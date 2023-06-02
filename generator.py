@@ -3,6 +3,8 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 import os
 from matplotlib import pyplot as plt
+import json
+from numpyencoder import NumpyEncoder
 
 from inference_toolbox.parameter import Parameter
 from inference_toolbox.model import Model
@@ -145,8 +147,59 @@ class Generator:
 
         for likelihood_param in likelihood.likelihood_params.index:
             self.default_values['likelihood_' + likelihood_param] = likelihood.likelihood_params[likelihood_param]
-            self.par_to_col['likelihood_' + likelihood_param] = ('parameters', 'model', likelihood_param)
+            self.par_to_col['likelihood_' + likelihood_param] = ('parameters', 'likelihood', likelihood_param)
 
+        construction = self.get_generator_constriction()
+        if os.path.exists(full_data_path + '/construction.json'):
+            f = open(full_data_path + '/construction.json')
+            saved_construction = json.load(f)
+            f.close()
+            print(saved_construction)
+            print(construction)
+
+            if saved_construction != construction:
+                raise Exception('Default generator parameters do not match for this folder name!')
+        else:
+            with open(full_data_path + '/construction.json', "w") as fp:
+                json.dump(construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
+
+    def get_generator_constriction(self):
+        return {
+            'infered_params':{
+                'model_params':{
+                    param_name: {
+                        'prior_func': self.generator_defaults['infered_params']['model_params'][param_name].prior_select,
+                        'prior_params': {
+                            prior_param_name: self.generator_defaults['infered_params']['model_params'][param_name].prior_params[prior_param_name] for prior_param_name in self.generator_defaults['infered_params']['model_params'][param_name].prior_params.index
+                        },
+                        'x':0
+                    } for param_name in self.generator_defaults['infered_params']['model_params'].keys()
+                },
+                'likelihood_params':{
+                    param_name: {
+                        'prior_func': self.generator_defaults['infered_params']['likelihood_params'][param_name].prior_select,
+                        'prior_params': {
+                            prior_param_name: self.generator_defaults['infered_params']['likelihood_params'][param_name].prior_params[prior_param_name] for prior_param_name in self.generator_defaults['infered_params']['likelihood_params'][param_name].prior_params.index
+                        }
+                    } for param_name in self.generator_defaults['infered_params']['likelihood_params'].keys()
+                }
+            },
+            'model':{
+                'model_type': self.generator_defaults['model'].model_select,
+                'model_params': {
+                    model_param_name: self.generator_defaults['model'].model_params[model_param_name] for model_param_name in self.generator_defaults['model'].model_params.index
+                }            
+            },
+            'likelihood':{
+                'likelihood_type': self.generator_defaults['likelihood'].likelihood_select,
+                'likelihood_params': {
+                    likelihood_param_name: self.generator_defaults['likelihood'].model_params[likelihood_param_name] for likelihood_param_name in self.generator_defaults['likelihood'].likelihood_params.index
+                }
+            },
+            'sampler': self.generator_defaults['sampler'],
+            'data': self.data_params
+        }
+    
     def generate_from_inputs(self, inputs, results_path):
         instances_path = results_path + '/instances'
         if not os.path.exists(instances_path):
@@ -194,7 +247,7 @@ class Generator:
             if self.data_params['data_type'] == 'dummy':
                 if self.data_params['sigma'] == 'NaN':
                     if 'sigma' not in likelihood.likelihood_params:
-                        Exception('Either define your noise level with a fixed sigma in the likelihood, or set the noise level!')
+                        raise Exception('Either define your noise level with a fixed sigma in the likelihood, or set the noise level!')
                     self.data_params['sigma'] = likelihood.likelihood_params['sigma']
 
 
@@ -239,7 +292,7 @@ class Generator:
 
             # inputs.columns=inputs.sort_index(axis=1,level=[0,1,2],ascending=[True,False, False]).columns
 
-            inputs.to_excel(results_path + '/results.xlsx')
+        inputs.to_excel(results_path + '/results.xlsx')
 
         return inputs
 
@@ -250,7 +303,7 @@ class Generator:
     def vary_one_parameter(self, parameter_name, values, plot = True, xscale = 'log'):
         results_path = self.data_path + '/varying_' + parameter_name
         if not os.path.exists(results_path):
-            os.mkdir(results_path)
+            os.makedirs(results_path)
 
         if os.path.exists(results_path +'/results.xlsx'):
             results = pd.read_excel(results_path +'/results.xlsx', header=[0,1,2], index_col=0)
@@ -274,7 +327,7 @@ class Generator:
     def vary_two_parameters(self, parameter_name_1, parameter_name_2, values_1, values_2, plot = True, scale_1 = 'log', scale_2 = 'log'):
         inputs = pd.DataFrame(columns=[self.par_to_col[x] for x in self.default_values.index])
         if parameter_name_1 == parameter_name_2:
-            Exception('Varying parameters must be different!')
+            raise Exception('Varying parameters must be different!')
 
         results_path = self.data_path + '/varying_' + parameter_name_1 + '_and_' + parameter_name_2
         if not os.path.exists(results_path):
@@ -308,6 +361,7 @@ class Generator:
         return results
     
     def plot_varying_two(self, results, parameter_name_1, parameter_name_2, results_path, scale_1 = 'log', scale_2 = 'log'):
+
         results = results.sort_values([self.par_to_col[parameter_name_1], self.par_to_col[parameter_name_2]])
 
         param_taus = pd.Series({})
@@ -318,7 +372,7 @@ class Generator:
 
         inference_param_names = [*model_inference_param_names, *likelihood_inference_param_names]
 
-        param_accuracy_conditional = len(self.data_params['model']['inference_params']) == len(inference_param_names)
+        param_accuracy_conditional = 'model' in self.data_params and len(self.data_params['model']['inference_params']) == len(inference_param_names)
 
         for param_name in inference_param_names:
             param_taus[param_name] = results[self.par_to_col[param_name + '_tau']].values.astype('float64')
@@ -333,7 +387,6 @@ class Generator:
         diverging_results = np.around(results[self.par_to_col['av_divergence']].values.astype('float64'))
         
         tau_av = np.around(np.mean(param_taus.values, axis=0))
-        param_accuracy_av = np.mean([param_accuracies.values], axis=0)
 
         new_shape = (np.unique(varying_parameter_1).size, np.unique(varying_parameter_2).size)
 
@@ -342,7 +395,10 @@ class Generator:
         RMSE_results = np.reshape([RMSE_results], new_shape)
         diverging_results = np.reshape([diverging_results], new_shape)
         tau_av = np.reshape([tau_av], new_shape)
-        param_accuracy_av = np.reshape([param_accuracy_av], new_shape)
+
+        if param_accuracy_conditional:
+            param_accuracy_av = np.mean(param_accuracies.values, axis=0)
+            param_accuracy_av = np.reshape([param_accuracy_av], new_shape)
 
         if scale_1 == 'log':
             scaled_varying_parameter_1 = np.log10(varying_parameter_1.astype(np.float64))
@@ -395,7 +451,6 @@ class Generator:
             fig4.savefig(results_path + '/param_accuracy_plot.png')
             plt.close()
 
-
     def plot_varying_one(self, results, parameter_name, results_path, xscale = 'log'):
 
         results = results.sort_values(self.par_to_col[parameter_name])
@@ -408,7 +463,7 @@ class Generator:
 
         inference_param_names = [*model_inference_param_names, *likelihood_inference_param_names]
 
-        param_accuracy_conditional = len(self.data_params['model']['inference_params']) == len(inference_param_names)
+        param_accuracy_conditional = 'model' in self.data_params and len(self.data_params['model']['inference_params']) == len(inference_param_names)
 
         for param_name in inference_param_names:
             param_taus[param_name] = results[self.par_to_col[param_name + '_tau']].values.astype('float64')

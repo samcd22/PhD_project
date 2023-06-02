@@ -14,4 +14,4 @@ def print_all_distances_and_heights(data):
 
 
 def data_param_not_exist():
-    Exception('Invalid data parameters')
+    raise Exception('Invalid data parameters')
