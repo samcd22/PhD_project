@@ -51,7 +51,7 @@ def generate_dummy_data(sigma, model_select, noise_dist = "gaussian", model_para
     elif noise_dist == 'no_noise':
         C = mu
     else:
-        Exception('Noise distribution invalid!')
+        raise Exception('Noise distribution invalid!')
 
     data = pd.DataFrame({'x': points[:,0], 'y': points[:,1], 'z': points[:,2], output_header: C})
 

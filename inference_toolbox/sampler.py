@@ -2,19 +2,20 @@ import numpy as np
 import pandas as pd
 import os
 import json
-from inference_toolbox.parameter import Parameter
+from numpyro.infer import log_likelihood
 import numpyro
 import jax.numpy as jnp
 from jax import random
 
 class Sampler:
-    def __init__(self, params, model, likelihood, data, n_samples, n_warmup = -1, n_chains = 1, thinning_rate = 1, show_sample_info = False, data_path = 'results/inference/general_instances'):
+    def __init__(self, params, model, likelihood, training_data, testing_data, n_samples, n_warmup = -1, n_chains = 1, thinning_rate = 1, show_sample_info = False, data_path = 'results/inference/general_instances'):
         self.params = params
         self.model = model
         self.model_func = model.get_model()
         self.likelihood = likelihood
         self.likelihood_func = likelihood.get_likelihood_function()
-        self.data = data
+        self.data = training_data
+        self.test_data = testing_data
         self.n_samples = n_samples
         self.n_chains = n_chains
         self.n_warmup = n_warmup
@@ -55,12 +56,18 @@ class Sampler:
 
         if not data_exists:
             kernel = numpyro.infer.NUTS(self.sample_one)
-            mcmc_obj = numpyro.infer.MCMC(kernel, num_warmup=self.n_warmup, num_samples=self.n_samples, num_chains=self.n_chains, thinning=self.thinning_rate)
-            mcmc_obj.run(rng_key=rng_key)
-            samples = mcmc_obj.get_samples(group_by_chain=True)
-            fields = mcmc_obj.get_extra_fields(group_by_chain=True)
-            return *self.format_samples(samples), fields
+            self.mcmc_obj = numpyro.infer.MCMC(kernel, num_warmup=self.n_warmup, num_samples=self.n_samples, num_chains=self.n_chains, thinning=self.thinning_rate)
+            self.mcmc_obj.run(rng_key=rng_key)
+            samples = self.mcmc_obj.get_samples(group_by_chain=True)
+            self.fields = self.mcmc_obj.get_extra_fields(group_by_chain=True)
+            
+            self.samples, self.chain_samples = self.format_samples(samples)
+
+            return self.samples, self.chain_samples, self.fields
         else:
+            self.samples = []
+            self.chain_samples = []
+            self.fields = {}
             return [], [], {}
         
     def format_samples(self, samples):
@@ -80,7 +87,7 @@ class Sampler:
         chain_new_samples['chain'] = chain_array
         chain_new_samples['sample_index'] = sample_index_array
 
-        return chain_new_samples.groupby('sample_index').mean().drop(columns = ['chain']), chain_new_samples
+        return chain_new_samples.sort_values(['sample_index']).reset_index().drop(columns=['chain', 'sample_index','index']), chain_new_samples
     
     def sample_one(self):
         current_params_sample ={}

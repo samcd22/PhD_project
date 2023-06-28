@@ -110,6 +110,7 @@ class BoxGridder:
             plt.xlabel('Distance Downwind')
             plt.ylabel('Distance Crosswind')
             plt.title('Slice of plume data at a height of ' + str(z) + 'm')
+            plt.tight_layout()
             plt.show()
 
     def visualise_average_data(self, averaged_df):
@@ -120,4 +121,5 @@ class BoxGridder:
         ax.set_ylabel('Distance Crosswind')
         ax.set_title('Average log concentration across all experiments')
         fig.colorbar(p)
+        plt.tight_layout()
         plt.show()

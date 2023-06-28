@@ -69,12 +69,8 @@ class Generator:
 
         full_data_path = data_path + '/' + data_name + '/inference/auto_gen_results'
 
-        if not os.path.exists(data_path + '/' + data_name):
-            os.mkdir(data_path + '/' + data_name)
-            if not os.path.exists(data_path + '/' + data_name + '/inference'):
-                os.mkdir(data_path + '/' + data_name + '/inference')
-                if not os.path.exists(full_data_path):
-                    os.mkdir(full_data_path)
+        if not os.path.exists(full_data_path):
+            os.makedirs(full_data_path)
         
         self.generator_defaults = generator_defaults
 
@@ -82,11 +78,13 @@ class Generator:
 
         self.default_values = pd.Series({
             'RMSE': 'NaN',
+            'AIC': 'NaN',
             'av_divergence': 'NaN'
         })
     
         self.par_to_col = {
             'RMSE': ('results','misc', 'RMSE'),
+            'AIC': ('results','misc','AIC'),
             'av_divergence': ('results','misc', 'average_diverging'),
         }
 
@@ -172,7 +170,6 @@ class Generator:
                         'prior_params': {
                             prior_param_name: self.generator_defaults['infered_params']['model_params'][param_name].prior_params[prior_param_name] for prior_param_name in self.generator_defaults['infered_params']['model_params'][param_name].prior_params.index
                         },
-                        'x':0
                     } for param_name in self.generator_defaults['infered_params']['model_params'].keys()
                 },
                 'likelihood_params':{
@@ -200,7 +197,7 @@ class Generator:
             'data': self.data_params
         }
     
-    def generate_from_inputs(self, inputs, results_path):
+    def generate(self, inputs, results_path):
         instances_path = results_path + '/instances'
         if not os.path.exists(instances_path):
             os.mkdir(instances_path)
@@ -265,13 +262,11 @@ class Generator:
                     actual_values.append(self.data_params['model']['inference_params'][inference_param])
 
             # Run sampler and visualiser
-            sampler = Sampler(params, model, likelihood, training_data, num_samples, show_sample_info = True, n_chains=num_chains, thinning_rate=thinning_rate, data_path = instances_path)
-            params_samples, chain_samples, fields = sampler.sample_all()
+            sampler = Sampler(params, model, likelihood, training_data, testing_data, num_samples, show_sample_info = True, n_chains=num_chains, thinning_rate=thinning_rate, data_path = instances_path)
+            sampler.sample_all()
             visualiser = Visualiser(testing_data, 
-                                    params_samples, 
-                                    model, sampler.hyperparams, 
-                                    chain_samples=chain_samples,
-                                    fields = fields, 
+                                    sampler, 
+                                    model, 
                                     previous_instance = sampler.instance, 
                                     data_path = instances_path, 
                                     suppress_prints = True, 
@@ -283,6 +278,8 @@ class Generator:
             inputs = output_param_results(self.generator_defaults['infered_params']['likelihood_params'],inputs, instance)
 
             inputs.loc[instance,self.par_to_col['RMSE']] = summary['RMSE']
+            inputs.loc[instance,self.par_to_col['AIC']] = summary['AIC']
+
 
             divergences = []
             for i in range(visualiser.num_chains):
@@ -317,7 +314,7 @@ class Generator:
                 inputs = pd.concat([inputs, one_row.to_frame().T], ignore_index=True)
             inputs.columns = pd.MultiIndex.from_tuples(inputs.columns)
             inputs.index += 1
-            results = self.generate_from_inputs(inputs, results_path)
+            results = self.generate(inputs, results_path)
 
         if plot:
             self.plot_varying_one(results, parameter_name, results_path, xscale = xscale)
@@ -353,7 +350,7 @@ class Generator:
             inputs.columns = pd.MultiIndex.from_tuples(inputs.columns)
             inputs.index += 1
     
-            results = self.generate_from_inputs(inputs, results_path)
+            results = self.generate(inputs, results_path)
 
         if plot:
             self.plot_varying_two(results, parameter_name_1, parameter_name_2, results_path, scale_1 = scale_1, scale_2 = scale_2)
@@ -384,6 +381,7 @@ class Generator:
         varying_parameter_2 = results[self.par_to_col[parameter_name_2]]
 
         RMSE_results = results[self.par_to_col['RMSE']].values.astype('float64')
+        AIC_results = results[self.par_to_col['AIC']].values.astype('float64')
         diverging_results = np.around(results[self.par_to_col['av_divergence']].values.astype('float64'))
         
         tau_av = np.around(np.mean(param_taus.values, axis=0))
@@ -393,6 +391,8 @@ class Generator:
         varying_parameter_1 = np.reshape([varying_parameter_1], new_shape)
         varying_parameter_2 = np.reshape([varying_parameter_2], new_shape)
         RMSE_results = np.reshape([RMSE_results], new_shape)
+        AIC_results = np.reshape([AIC_results], new_shape)
+
         diverging_results = np.reshape([diverging_results], new_shape)
         tau_av = np.reshape([tau_av], new_shape)
 
@@ -420,35 +420,49 @@ class Generator:
         plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, RMSE_results, cmap='jet')
         plt.title('RMSE of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
         plt.colorbar()
+        plt.tight_layout()
         fig1.savefig(results_path + '/RMSE_plot.png')
         plt.close()
 
         fig2 = plt.figure()
         plt.xlabel(x_label)
         plt.ylabel(y_label)
-        plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, diverging_results, cmap='jet')
-        plt.title('Number of divergences of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
+        plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, AIC_results, cmap='jet')
+        plt.title('AIC of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
         plt.colorbar()
-        fig2.savefig(results_path + '/divergence_plot.png')
+        plt.tight_layout()
+        fig2.savefig(results_path + '/AIC_plot.png')
         plt.close()
 
         fig3 = plt.figure()
         plt.xlabel(x_label)
         plt.ylabel(y_label)
+        plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, diverging_results, cmap='jet')
+        plt.title('Number of divergences of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
+        plt.colorbar()
+        plt.tight_layout()
+        fig3.savefig(results_path + '/divergence_plot.png')
+        plt.close()
+
+        fig4 = plt.figure()
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
         plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, tau_av, cmap='jet')
         plt.title('Tau convergence of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
         plt.colorbar()
-        fig3.savefig(results_path + '/convergance_variation.png')
+        plt.tight_layout()
+        fig4.savefig(results_path + '/convergance_variation.png')
         plt.close()
 
         if param_accuracy_conditional:
-            fig4 = plt.figure()
+            fig5 = plt.figure()
             plt.xlabel(x_label)
             plt.ylabel(y_label)
             plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, param_accuracy_av, cmap='jet')
             plt.title('Average parameter percentage error for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
             plt.colorbar()
-            fig4.savefig(results_path + '/param_accuracy_plot.png')
+            plt.tight_layout()
+            fig5.savefig(results_path + '/param_accuracy_plot.png')
             plt.close()
 
     def plot_varying_one(self, results, parameter_name, results_path, xscale = 'log'):
@@ -472,6 +486,8 @@ class Generator:
 
 
         RMSE_results = results[self.par_to_col['RMSE']].values.astype('float64')
+        AIC_results = results[self.par_to_col['AIC']].values.astype('float64')
+
         diverging_results = np.around(results[self.par_to_col['av_divergence']].values.astype('float64'))
         
         varying_parameter = results[self.par_to_col[parameter_name]]
@@ -482,19 +498,31 @@ class Generator:
         plt.plot(varying_parameter, RMSE_results)
         plt.xscale(xscale)
         plt.title('RMSE of the algorithm for varying ' + parameter_name)
+        plt.tight_layout()
         fig1.savefig(results_path + '/RMSE_plot.png')
         plt.close()
 
         fig2 = plt.figure()
         plt.xlabel(parameter_name)
+        plt.ylabel('AIC')
+        plt.plot(varying_parameter, AIC_results)
+        plt.xscale(xscale)
+        plt.title('AIC of the algorithm for varying ' + parameter_name)
+        plt.tight_layout()
+        fig2.savefig(results_path + '/AIC_plot.png')
+        plt.close()
+
+        fig3 = plt.figure()
+        plt.xlabel(parameter_name)
         plt.ylabel('Divergences')
         plt.plot(varying_parameter, diverging_results)
         plt.xscale(xscale)
         plt.title('Number of divergences of the algorithm for varying ' + parameter_name)
-        fig2.savefig(results_path + '/divergence_plot.png')
+        plt.tight_layout()
+        fig3.savefig(results_path + '/divergence_plot.png')
         plt.close()
 
-        fig3 = plt.figure()
+        fig4 = plt.figure()
         plt.xlabel(parameter_name)
         plt.ylabel('Tau')
         for param_name in param_taus.index:
@@ -503,11 +531,12 @@ class Generator:
         plt.xscale(xscale)
         plt.title('Convergence of the algorithm for varying ' + parameter_name)
         plt.legend()
-        fig3.savefig(results_path + '/convergance_variation.png')
+        plt.tight_layout()
+        fig4.savefig(results_path + '/convergance_variation.png')
         plt.close()
 
         if param_accuracy_conditional:
-            fig4 = plt.figure()
+            fig5 = plt.figure()
             plt.xlabel(parameter_name)
             plt.ylabel('Parameter percentage error (%)')
             for param_name in param_accuracies.index:
@@ -516,7 +545,8 @@ class Generator:
             plt.xscale(xscale)
             plt.title('Average parameter percentage error for varying ' + parameter_name)
             plt.legend()
-            fig4.savefig(results_path + '/param_accuracy_plot.png')
+            plt.tight_layout()
+            fig5.savefig(results_path + '/param_accuracy_plot.png')
             plt.close()
 
 
