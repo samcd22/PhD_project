@@ -7,6 +7,8 @@ import json
 from numpyencoder import NumpyEncoder
 from matplotlib import pyplot as plt
 
+from drivers.driver import Driver
+
 from inference_toolbox.parameter import Parameter
 from inference_toolbox.model import Model
 from inference_toolbox.likelihood import Likelihood
@@ -16,9 +18,10 @@ from inference_toolbox.domain import Domain
 
 from data_processing.get_data import get_data
 
-class Optimiser:
-    def __init__(self, 
-                optimiser_defaults = {
+class Optimiser(Driver):
+    def __init__(self,
+                 results_name = 'name_placeholder',
+                 default_params = {
                     'infered_params':pd.Series({
                         'model_params':pd.Series({
                             'I_y': Parameter('I_y', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
@@ -61,20 +64,10 @@ class Optimiser:
                     },
                     'output_header': 'Concentration'
                 },
-                data_path = 'results',
-                data_name = 'simulated_data_1'):
+                results_path = 'results'):
         
-
-        
-        generator_path = data_path + '/' + data_name + '/optimisers/'
-
-        if not os.path.exists(generator_path):
-            os.makedirs(generator_path)
+        super().__init__(results_name, default_params, data_params, results_path)
                     
-        self.optimiser_defaults = optimiser_defaults
-
-        self.generator_path = generator_path
-
         self.default_values = pd.Series({
             'RMSE': 'NaN',
             'AIC': 'NaN',
@@ -82,13 +75,14 @@ class Optimiser:
         })
     
         self.par_to_col = {
+            'AIC': ('results','misc', 'AIC'),
             'RMSE': ('results','misc', 'RMSE'),
             'av_divergence': ('results','misc', 'average_diverging'),
         }
 
         self.data_params = data_params
 
-        sampler_info = optimiser_defaults['sampler']
+        sampler_info = default_params['sampler']
 
         self.default_values['n_samples'] = sampler_info['n_samples']
         self.par_to_col['n_samples'] = ('parameters','sampler','n_samples')
@@ -123,13 +117,13 @@ class Optimiser:
                 self.default_values[param+'_param_accuracy'] = 'NaN'
                 self.par_to_col[param+'_param_accuracy'] = ('results', param, 'param_accuracy')
         
-        infered_model_params = optimiser_defaults['infered_params']['model_params']
-        infered_likelihood_params = optimiser_defaults['infered_params']['likelihood_params']
+        infered_model_params = default_params['infered_params']['model_params']
+        infered_likelihood_params = default_params['infered_params']['likelihood_params']
 
         set_param_default_values(infered_model_params)
         set_param_default_values(infered_likelihood_params)
 
-        model = optimiser_defaults['model']
+        model = default_params['model']
         self.default_values['model_type'] = model.model_select
         self.par_to_col['model_type'] = ('parameters', 'model', 'type')
 
@@ -137,7 +131,7 @@ class Optimiser:
             self.default_values['model_' + model_param] = model.model_params[model_param]
             self.par_to_col['model_' + model_param] = ('parameters', 'model', model_param)
 
-        likelihood = optimiser_defaults['likelihood']
+        likelihood = default_params['likelihood']
         self.default_values['likelihood_type'] = likelihood.likelihood_select
         self.par_to_col['likelihood_type'] = ('parameters', 'likelihood', 'type')
 
@@ -145,59 +139,49 @@ class Optimiser:
             self.default_values['likelihood_' + likelihood_param] = likelihood.likelihood_params[likelihood_param]
             self.par_to_col['likelihood_' + likelihood_param] = ('parameters', 'likelihood', likelihood_param)
 
-        construction = self.get_generator_constriction()
-        if os.path.exists(generator_path + '/construction.json'):
-            f = open(generator_path + '/construction.json')
+        construction = self.get_constriction()
+        self.init_construction(construction)
+
+    def init_construction(self, construction):         
+        self.construction_results_path = self.results_path + '/' + self.results_name
+        self.full_results_path = self.construction_results_path + '/optimisers/'
+
+        if not os.path.exists(self.construction_results_path):
+            os.makedirs(self.construction_results_path)
+        
+        if os.path.exists(self.construction_results_path + '/construction.json'):
+            f = open(self.construction_results_path + '/construction.json')
             saved_construction = json.load(f)
             f.close()
 
             if saved_construction != construction:
                 raise Exception('Default generator parameters do not match for this folder name!')
         else:
-            with open(generator_path + '/construction.json', "w") as fp:
+            with open(self.construction_results_path + '/construction.json', "w") as fp:
                 json.dump(construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
 
-    def get_generator_constriction(self):
-        return {
-            'infered_params':{
-                'model_params':{
-                    param_name: {
-                        'prior_func': self.optimiser_defaults['infered_params']['model_params'][param_name].prior_select,
-                        'prior_params': {
-                            prior_param_name: self.optimiser_defaults['infered_params']['model_params'][param_name].prior_params[prior_param_name] for prior_param_name in self.optimiser_defaults['infered_params']['model_params'][param_name].prior_params.index
-                        },
-                    } for param_name in self.optimiser_defaults['infered_params']['model_params'].keys()
-                },
-                'likelihood_params':{
-                    param_name: {
-                        'prior_func': self.optimiser_defaults['infered_params']['likelihood_params'][param_name].prior_select,
-                        'prior_params': {
-                            prior_param_name: self.optimiser_defaults['infered_params']['likelihood_params'][param_name].prior_params[prior_param_name] for prior_param_name in self.optimiser_defaults['infered_params']['likelihood_params'][param_name].prior_params.index
-                        }
-                    } for param_name in self.optimiser_defaults['infered_params']['likelihood_params'].keys()
-                }
-            },
-            'model':{
-                'model_type': self.optimiser_defaults['model'].model_select,
-                'model_params': {
-                    model_param_name: self.optimiser_defaults['model'].model_params[model_param_name] for model_param_name in self.optimiser_defaults['model'].model_params.index
-                }            
-            },
-            'likelihood':{
-                'likelihood_type': self.optimiser_defaults['likelihood'].likelihood_select,
-                'likelihood_params': {
-                    likelihood_param_name: self.optimiser_defaults['likelihood'].likelihood_params[likelihood_param_name] for likelihood_param_name in self.optimiser_defaults['likelihood'].likelihood_params.index
-                }
-            },
-            'sampler': self.optimiser_defaults['sampler'],
-            'data': self.data_params
-        }
-    
     def get_optimiser_construction(self):
         return {
             'parameter': self.optimising_parameters, 
             'index_name': self.index_name
             }
+    
+    def init_optimiser(self, optimiser_construction):
+        self.optimiser_path = self.full_results_path + '/' + self.optimiser_name
+        if not os.path.exists(self.optimiser_path):
+            os.makedirs(self.optimiser_path)
+
+        self.instances_path = self.optimiser_path + '/instances' 
+        if os.path.exists(self.optimiser_path + '/varying_parameters.json'):
+            f = open(self.optimiser_path + '/varying_parameters.json')
+            saved_construction = json.load(f)
+            f.close()
+            
+            if saved_construction != optimiser_construction:
+                raise Exception('These optimiser parameters do not match for this folder name!')
+        else:
+            with open(self.optimiser_path + '/varying_parameters.json', "w") as fp:
+                json.dump(optimiser_construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
     
     def run(self, n_trials = 100, optimising_parameters = {
                     'I_y_mu': [1e-2, 10],
@@ -215,24 +199,7 @@ class Optimiser:
         self.index_name = index_name
 
         construction = self.get_optimiser_construction()
-
-        self.optimiser_path = self.generator_path + '/' + optimiser_name
-        if not os.path.exists(self.optimiser_path):
-            os.makedirs(self.optimiser_path)
-
-        self.instances_path = self.optimiser_path + '/instances' 
-        if os.path.exists(self.optimiser_path + '/varying_parameters.json'):
-            f = open(self.optimiser_path + '/varying_parameters.json')
-            saved_construction = json.load(f)
-            f.close()
-            print(saved_construction)
-            print(construction)
-
-            if saved_construction != construction:
-                raise Exception('These optimiser parameters do not match for this folder name!')
-        else:
-            with open(self.optimiser_path + '/varying_parameters.json', "w") as fp:
-                json.dump(construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
+        self.init_optimiser(construction)
 
         self.all_inputs = pd.DataFrame(columns=[self.par_to_col[x] for x in self.default_values.index])
 
@@ -271,9 +238,9 @@ class Optimiser:
         training_data, testing_data = train_test_split(data, test_size=0.2, random_state = 1)
         
         # Sampler
-        num_samples = self.optimiser_defaults['sampler']['n_samples']
-        num_chains = self.optimiser_defaults['sampler']['n_chains']
-        thinning_rate = self.optimiser_defaults['sampler']['thinning_rate']
+        num_samples = self.default_params['sampler']['n_samples']
+        num_chains = self.default_params['sampler']['n_chains']
+        thinning_rate = self.default_params['sampler']['thinning_rate']
 
         sampler = Sampler(params, model, likelihood, training_data, testing_data, num_samples, show_sample_info = True, n_chains=num_chains, thinning_rate=thinning_rate, data_path = self.instances_path)
         sampler.sample_all()
@@ -287,7 +254,7 @@ class Optimiser:
         
         summary = visualiser.get_summary()
 
-        for param in self.optimiser_defaults['infered_params']['model_params'].index:
+        for param in self.default_params['infered_params']['model_params'].index:
             self.one_row[self.par_to_col[param + '_lower']] = summary['overall'][param]['lower']
             self.one_row[self.par_to_col[param + '_mean']] = summary['overall'][param]['mean']
             self.one_row[self.par_to_col[param + '_upper']] = summary['overall'][param]['upper']
@@ -295,7 +262,7 @@ class Optimiser:
             if 'param_accuracy' in summary['overall'][param]:
                 self.one_row[self.par_to_col[param + '_param_accuracy']] = summary['overall'][param]['param_accuracy']
 
-        for param in self.optimiser_defaults['infered_params']['likelihood_params'].index:
+        for param in self.default_params['infered_params']['likelihood_params'].index:
             self.one_row[self.par_to_col[param + '_lower']] = summary['overall'][param]['lower']
             self.one_row[self.par_to_col[param + '_mean']] = summary['overall'][param]['mean']
             self.one_row[self.par_to_col[param + '_upper']] = summary['overall'][param]['upper']
@@ -329,7 +296,7 @@ class Optimiser:
         params = pd.Series({},dtype='float64')
 
         # Model infered parameters
-        for param_name in self.optimiser_defaults['infered_params']['model_params'].keys():
+        for param_name in self.default_params['infered_params']['model_params'].keys():
 
             if param_name + '_prior' in self.optimising_parameters:
                 if results:
@@ -338,11 +305,11 @@ class Optimiser:
                     prior_select = trial.suggest_categorical(param_name + '_prior', [*self.optimising_parameters[param_name + '_prior']])
                     self.one_row[self.par_to_col[param_name + '_prior']] = prior_select
             else:
-                prior_select = self.optimiser_defaults['infered_params']['model_params'][param_name].prior_select
+                prior_select = self.default_params['infered_params']['model_params'][param_name].prior_select
 
             params[param_name] = Parameter(name = param_name, prior_select=prior_select)
             
-            for prior_param_name in self.optimiser_defaults['infered_params']['model_params'][param_name].prior_params.index:
+            for prior_param_name in self.default_params['infered_params']['model_params'][param_name].prior_params.index:
                 
                 if param_name + '_' + prior_param_name in self.optimising_parameters:
                     if results:
@@ -351,12 +318,12 @@ class Optimiser:
                         prior_param = trial.suggest_float(param_name + '_' + prior_param_name, *self.optimising_parameters[param_name + '_' + prior_param_name])
                         self.one_row[self.par_to_col[param_name + '_' + prior_param_name]] = prior_param
                 else:
-                    prior_param = self.optimiser_defaults['infered_params']['model_params'][param_name].prior_params[prior_param_name]
+                    prior_param = self.default_params['infered_params']['model_params'][param_name].prior_params[prior_param_name]
 
                 params[param_name].add_prior_param(prior_param_name, prior_param)
 
         # Likelihood infered parameters
-        for param_name in self.optimiser_defaults['infered_params']['likelihood_params'].keys():
+        for param_name in self.default_params['infered_params']['likelihood_params'].keys():
             
             if param_name + '_prior' in self.optimising_parameters:
                 if results:
@@ -365,10 +332,10 @@ class Optimiser:
                     prior_select = trial.suggest_categorical(param_name + '_prior', [*self.optimising_parameters[param_name + '_prior']])
                     self.one_row[self.par_to_col[param_name + '_prior']] = prior_select
             else:
-                prior_select = self.optimiser_defaults['infered_params']['likelihood_params'][param_name].prior_select
+                prior_select = self.default_params['infered_params']['likelihood_params'][param_name].prior_select
 
             params[param_name] = Parameter(name = param_name, prior_select=prior_select)
-            for prior_param_name in self.optimiser_defaults['infered_params']['likelihood_params'][param_name].prior_params.index:
+            for prior_param_name in self.default_params['infered_params']['likelihood_params'][param_name].prior_params.index:
                 
                 if param_name + '_' + prior_param_name in self.optimising_parameters:
                     if results:
@@ -377,7 +344,7 @@ class Optimiser:
                         prior_param = trial.suggest_float(param_name + '_' + prior_param_name, *self.optimising_parameters[param_name + '_' + prior_param_name])
                         self.one_row[self.par_to_col[param_name + '_' + prior_param_name]] = prior_param
                 else:
-                    prior_param = self.optimiser_defaults['infered_params']['likelihood_params'][param_name].prior_params[prior_param_name]
+                    prior_param = self.default_params['infered_params']['likelihood_params'][param_name].prior_params[prior_param_name]
 
                 params[param_name].add_prior_param(prior_param_name, prior_param)
 
@@ -389,11 +356,11 @@ class Optimiser:
                 likelihood_type = trial.suggest_catagorical('likelihood_type', [*self.optimising_parameters['likelihood_type']])
                 self.one_row[self.par_to_col['likelihood_type']] = likelihood_type
         else:
-            likelihood_type = self.optimiser_defaults['likelihood'].likelihood_select
+            likelihood_type = self.default_params['likelihood'].likelihood_select
 
         likelihood = Likelihood(likelihood_type)
         
-        for likelihood_param_name in self.optimiser_defaults['likelihood'].likelihood_params.index:
+        for likelihood_param_name in self.default_params['likelihood'].likelihood_params.index:
             if 'likelihood_' + likelihood_param_name in self.optimising_parameters:
                 if results:
                     likelihood_param = results['likelihood_' + likelihood_param_name]
@@ -401,7 +368,7 @@ class Optimiser:
                     likelihood_param = trial.suggest_float('likelihood_' + likelihood_param_name, *self.optimising_parameters['likelihood_' + likelihood_param_name])
                     self.one_row[self.par_to_col['likelihood_' + likelihood_param_name]] = likelihood_param
             else:
-                likelihood_param = self.optimiser_defaults['likelihood'].likelihood_params[likelihood_param_name]
+                likelihood_param = self.default_params['likelihood'].likelihood_params[likelihood_param_name]
             
             likelihood.add_likelihood_param(likelihood_param_name, likelihood_param)
 
@@ -413,11 +380,11 @@ class Optimiser:
                 model_type = trial.suggest_catagorical('model_type', [*self.optimising_parameters['model_type']])
                 self.one_row[self.par_to_col['model_type']] = model_type
         else:
-            model_type = self.optimiser_defaults['model'].model_select
+            model_type = self.default_params['model'].model_select
 
         model = Model(model_type)
         
-        for model_param_name in self.optimiser_defaults['model'].model_params.index:
+        for model_param_name in self.default_params['model'].model_params.index:
             if 'model_' + model_param_name in self.optimising_parameters:
                 if results:
                     model_param = results['model_' + model_param_name]
@@ -425,7 +392,7 @@ class Optimiser:
                     model_param = trial.suggest_float('model_' + model_param_name, *self.optimising_parameters['model_' + model_param_name])
                     self.one_row[self.par_to_col['model_' + model_param_name]] = model_param
             else:
-                model_param = self.optimiser_defaults['model'].model_params[model_param_name]
+                model_param = self.default_params['model'].model_params[model_param_name]
             
             model.add_model_param(model_param_name, model_param)
 
@@ -459,9 +426,9 @@ class Optimiser:
         training_data, testing_data = train_test_split(data, test_size=0.2, random_state = 1)
         
         # Sampler
-        num_samples = self.optimiser_defaults['sampler']['n_samples']
-        num_chains = self.optimiser_defaults['sampler']['n_chains']
-        thinning_rate = self.optimiser_defaults['sampler']['thinning_rate']
+        num_samples = self.default_params['sampler']['n_samples']
+        num_chains = self.default_params['sampler']['n_chains']
+        thinning_rate = self.default_params['sampler']['thinning_rate']
 
         best_instance_path = self.optimiser_path + '/best_instance'
         if not os.path.exists(best_instance_path):
@@ -488,82 +455,3 @@ class Optimiser:
 
         visualiser.visualise_results(domain = domain, name = 'small_scale_3D_plots', title='Log Concentration of Droplets', log_results=False)
         visualiser.animate(name = 'small_scale_3D_plots')      
-
-  
-
-data_params = {
-    'data_type': 'gridded',
-    'output_header': 'Concentration',
-    'log':True,
-    'grid_size': [200,200,50],
-    'target': False,
-    'data_path':'data'
-}
-
-optimiser_defaults = {
-    'infered_params':{
-        'model_params':pd.Series({
-            'I_y': Parameter('I_y', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
-            'I_z': Parameter('I_z', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
-            'Q': Parameter('Q', prior_select = 'gamma', default_value=3e13).add_prior_param('mu', 3e13).add_prior_param('sigma',1e13),
-        }),
-        'likelihood_params':pd.Series({
-            # 'sigma': Parameter('sigma', prior_select = 'gamma', default_value=1).add_prior_param('mu', 1).add_prior_param('sigma',1),
-        })
-    },
-    'model':Model('log_gpm_alt_norm').add_model_param('H',10),
-    'likelihood': Likelihood('gaussian_fixed_sigma').add_likelihood_param('sigma',1),
-    'sampler': {
-        'n_samples': 10000,
-        'n_chains': 1,
-        'thinning_rate': 1
-    }
-}
-
-# # Set up data
-# data_params = {
-#     'data_type': 'dummy',
-#     'data_path': 'data',
-#     'sigma': 'NaN',
-#     'model_select': 'log_gpm_alt_norm',
-#     'noise_dist': 'gaussian',
-#     'model': {
-#         'model_params':{
-#             'H': 10
-#         },
-#         'inference_params':{
-#             'I_y': 0.1,
-#             'I_z': 0.1,
-#             'Q': 3e13,
-#             # 'sigma':1
-#         },
-#     },
-#     'domain': {
-#         'domain_select': 'cone_from_source_z_limited', 
-#         'resolution': 20,
-#         'domain_params':{
-#             'r': 100,
-#             'theta': np.pi/8,
-#             'source': [0,0,10]}
-#     },
-#     'output_header': 'Concentration'
-# }
-
-
-optimising_parameters = {
-                    'I_y_mu': [1e-2, 10],
-                    'I_y_sigma': [1e-2, 10],
-                    'I_z_mu': [1e-2, 10],
-                    'I_z_sigma': [1e-2, 10],
-                    'Q_mu': [1e9, 1e18],
-                    'Q_sigma': [1e9, 1e18],
-                    'sigma_mu': [0.2, 2],
-                    'sigma_sigma': [0.2, 2]
-                }
-
-optimiser = Optimiser(optimiser_defaults = optimiser_defaults, data_name='gridded_drone_data_1', data_params=data_params)
-
-study = optimiser.run(n_trials=1, optimiser_name='optimiser_2', optimising_parameters=optimising_parameters, index_name='aic')
-# optimiser.get_plots(study)
-
-optimiser.run_best_params(study)

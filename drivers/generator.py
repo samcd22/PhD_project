@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 import json
 from numpyencoder import NumpyEncoder
 
+from drivers.driver import Driver
 from inference_toolbox.parameter import Parameter
 from inference_toolbox.model import Model
 from inference_toolbox.likelihood import Likelihood
@@ -19,9 +20,10 @@ import warnings
 warnings.simplefilter("ignore")
 
 
-class Generator:
+class Generator(Driver):
     def __init__(self, 
-                generator_defaults = {
+                 results_name = 'name_placeholder',
+                 default_params = {
                     'infered_params':pd.Series({
                         'model_params':pd.Series({
                             'I_y': Parameter('I_y', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
@@ -38,7 +40,7 @@ class Generator:
                         'thinning_rate': 1
                     }
                 },
-                data_params = {
+                 data_params = {
                     'data_type': 'dummy',
                     'data_path': 'data',
                     'sigma': 'NaN',
@@ -64,17 +66,8 @@ class Generator:
                     },
                     'output_header': 'Concentration'
                 },
-                data_path = 'results',
-                data_name = 'simulated_data_1'):
-
-        full_data_path = data_path + '/' + data_name + '/inference/auto_gen_results'
-
-        if not os.path.exists(full_data_path):
-            os.makedirs(full_data_path)
-        
-        self.generator_defaults = generator_defaults
-
-        self.data_path = full_data_path
+                results_path = 'results'):
+        super().__init__(results_name, default_params, data_params, results_path)
 
         self.default_values = pd.Series({
             'RMSE': 'NaN',
@@ -88,9 +81,7 @@ class Generator:
             'av_divergence': ('results','misc', 'average_diverging'),
         }
 
-        self.data_params = data_params
-
-        sampler_info = generator_defaults['sampler']
+        sampler_info = default_params['sampler']
 
         self.default_values['n_samples'] = sampler_info['n_samples']
         self.par_to_col['n_samples'] = ('parameters','sampler','n_samples')
@@ -125,13 +116,13 @@ class Generator:
                 self.default_values[param+'_param_accuracy'] = 'NaN'
                 self.par_to_col[param+'_param_accuracy'] = ('results', param, 'param_accuracy')
         
-        infered_model_params = generator_defaults['infered_params']['model_params']
-        infered_likelihood_params = generator_defaults['infered_params']['likelihood_params']
+        infered_model_params = default_params['infered_params']['model_params']
+        infered_likelihood_params = default_params['infered_params']['likelihood_params']
 
         set_param_default_values(infered_model_params)
         set_param_default_values(infered_likelihood_params)
 
-        model = generator_defaults['model']
+        model = default_params['model']
         self.default_values['model_type'] = model.model_select
         self.par_to_col['model_type'] = ('parameters', 'model', 'type')
 
@@ -139,7 +130,7 @@ class Generator:
             self.default_values['model_' + model_param] = model.model_params[model_param]
             self.par_to_col['model_' + model_param] = ('parameters', 'model', model_param)
 
-        likelihood = generator_defaults['likelihood']
+        likelihood = default_params['likelihood']
         self.default_values['likelihood_type'] = likelihood.likelihood_select
         self.par_to_col['likelihood_type'] = ('parameters', 'likelihood', 'type')
 
@@ -147,56 +138,32 @@ class Generator:
             self.default_values['likelihood_' + likelihood_param] = likelihood.likelihood_params[likelihood_param]
             self.par_to_col['likelihood_' + likelihood_param] = ('parameters', 'likelihood', likelihood_param)
 
-        construction = self.get_generator_constriction()
-        if os.path.exists(full_data_path + '/construction.json'):
-            f = open(full_data_path + '/construction.json')
+        construction = self.get_constriction()
+        self.init_construction(construction)
+        
+
+    def init_construction(self, construction):
+
+        self.construction_results_path = self.results_path + '/' + self.results_name
+        self.full_results_path = self.construction_results_path + '/inference/auto_gen_results'
+
+        if not os.path.exists(self.construction_results_path):
+            os.makedirs(self.construction_results_path)
+
+        if not os.path.exists(self.full_results_path):
+            os.makedirs(self.full_results_path)
+
+        if os.path.exists(self.construction_results_path + '/construction.json'):
+            f = open(self.construction_results_path + '/construction.json')
             saved_construction = json.load(f)
             f.close()
-            print(saved_construction)
-            print(construction)
 
             if saved_construction != construction:
                 raise Exception('Default generator parameters do not match for this folder name!')
         else:
-            with open(full_data_path + '/construction.json', "w") as fp:
+            with open(self.full_results_path + '/construction.json', "w") as fp:
                 json.dump(construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
 
-    def get_generator_constriction(self):
-        return {
-            'infered_params':{
-                'model_params':{
-                    param_name: {
-                        'prior_func': self.generator_defaults['infered_params']['model_params'][param_name].prior_select,
-                        'prior_params': {
-                            prior_param_name: self.generator_defaults['infered_params']['model_params'][param_name].prior_params[prior_param_name] for prior_param_name in self.generator_defaults['infered_params']['model_params'][param_name].prior_params.index
-                        },
-                    } for param_name in self.generator_defaults['infered_params']['model_params'].keys()
-                },
-                'likelihood_params':{
-                    param_name: {
-                        'prior_func': self.generator_defaults['infered_params']['likelihood_params'][param_name].prior_select,
-                        'prior_params': {
-                            prior_param_name: self.generator_defaults['infered_params']['likelihood_params'][param_name].prior_params[prior_param_name] for prior_param_name in self.generator_defaults['infered_params']['likelihood_params'][param_name].prior_params.index
-                        }
-                    } for param_name in self.generator_defaults['infered_params']['likelihood_params'].keys()
-                }
-            },
-            'model':{
-                'model_type': self.generator_defaults['model'].model_select,
-                'model_params': {
-                    model_param_name: self.generator_defaults['model'].model_params[model_param_name] for model_param_name in self.generator_defaults['model'].model_params.index
-                }            
-            },
-            'likelihood':{
-                'likelihood_type': self.generator_defaults['likelihood'].likelihood_select,
-                'likelihood_params': {
-                    likelihood_param_name: self.generator_defaults['likelihood'].model_params[likelihood_param_name] for likelihood_param_name in self.generator_defaults['likelihood'].likelihood_params.index
-                }
-            },
-            'sampler': self.generator_defaults['sampler'],
-            'data': self.data_params
-        }
-    
     def generate(self, inputs, results_path):
         instances_path = results_path + '/instances'
         if not os.path.exists(instances_path):
@@ -209,7 +176,7 @@ class Generator:
                                                prior_select=inputs[self.par_to_col[param_name + '_prior']].values[instance-1])
                 for prior_param_name in input_params[param_name].prior_params.index:
                     params[param_name].add_prior_param(prior_param_name, 
-                                                       np.float64(inputs[self.par_to_col[param_name + '_' + prior_param_name]].values[instance-1]))
+                                                        np.float64(inputs[self.par_to_col[param_name + '_' + prior_param_name]].values[instance-1]))
             return params
         
         def output_param_results(input_params, inputs, instance):
@@ -225,19 +192,19 @@ class Generator:
         for instance in inputs.index:
             print('Generating instance ' +str(instance) + '...')
             
-            infered_model_params = assign_parameters(self.generator_defaults['infered_params']['model_params'], inputs, instance)
-            infered_likelihood_params = assign_parameters(self.generator_defaults['infered_params']['likelihood_params'], inputs, instance)
+            infered_model_params = assign_parameters(self.default_params['infered_params']['model_params'], inputs, instance)
+            infered_likelihood_params = assign_parameters(self.default_params['infered_params']['likelihood_params'], inputs, instance)
             params = pd.concat([infered_model_params, infered_likelihood_params], axis = 0)
 
             # Model Assignment
             model = Model(inputs[self.par_to_col['model_type']].values[instance-1])
-            for model_param_name in self.generator_defaults['model'].model_params.index:
+            for model_param_name in self.default_params['model'].model_params.index:
                 model.add_model_param(model_param_name, 
                                       np.float64(inputs[self.par_to_col['model_' + model_param_name]].values[instance-1]))
                 
 
             likelihood = Likelihood(inputs[self.par_to_col['likelihood_type']].values[instance-1])
-            for likelihood_param_name in self.generator_defaults['likelihood'].likelihood_params.index:
+            for likelihood_param_name in self.default_params['likelihood'].likelihood_params.index:
                 likelihood.add_likelihood_param(likelihood_param_name, 
                                                 np.float64(inputs[self.par_to_col['likelihood_' + likelihood_param_name]].values[instance-1]))
 
@@ -274,8 +241,8 @@ class Generator:
             summary = visualiser.get_summary()
             visualiser.get_traceplot()
 
-            inputs = output_param_results(self.generator_defaults['infered_params']['model_params'],inputs, instance)
-            inputs = output_param_results(self.generator_defaults['infered_params']['likelihood_params'],inputs, instance)
+            inputs = output_param_results(self.default_params['infered_params']['model_params'],inputs, instance)
+            inputs = output_param_results(self.default_params['infered_params']['likelihood_params'],inputs, instance)
 
             inputs.loc[instance,self.par_to_col['RMSE']] = summary['RMSE']
             inputs.loc[instance,self.par_to_col['AIC']] = summary['AIC']
@@ -298,7 +265,7 @@ class Generator:
         return self.generate_from_inputs(inputs)
     
     def vary_one_parameter(self, parameter_name, values, plot = True, xscale = 'log'):
-        results_path = self.data_path + '/varying_' + parameter_name
+        results_path = self.full_results_path + '/varying_' + parameter_name
         if not os.path.exists(results_path):
             os.makedirs(results_path)
 
@@ -326,7 +293,7 @@ class Generator:
         if parameter_name_1 == parameter_name_2:
             raise Exception('Varying parameters must be different!')
 
-        results_path = self.data_path + '/varying_' + parameter_name_1 + '_and_' + parameter_name_2
+        results_path = self.full_results_path + '/varying_' + parameter_name_1 + '_and_' + parameter_name_2
         if not os.path.exists(results_path):
             os.mkdir(results_path)
 
@@ -364,8 +331,8 @@ class Generator:
         param_taus = pd.Series({})
         param_accuracies = pd.Series({})
 
-        model_inference_param_names = self.generator_defaults['infered_params']['model_params'].index
-        likelihood_inference_param_names = self.generator_defaults['infered_params']['likelihood_params'].index
+        model_inference_param_names = self.default_params['infered_params']['model_params'].index
+        likelihood_inference_param_names = self.default_params['infered_params']['likelihood_params'].index
 
         inference_param_names = [*model_inference_param_names, *likelihood_inference_param_names]
 
@@ -472,8 +439,8 @@ class Generator:
         param_taus = pd.Series({})
         param_accuracies = pd.Series({})
 
-        model_inference_param_names = self.generator_defaults['infered_params']['model_params'].index
-        likelihood_inference_param_names = self.generator_defaults['infered_params']['likelihood_params'].index
+        model_inference_param_names = self.default_params['infered_params']['model_params'].index
+        likelihood_inference_param_names = self.default_params['infered_params']['likelihood_params'].index
 
         inference_param_names = [*model_inference_param_names, *likelihood_inference_param_names]
 
