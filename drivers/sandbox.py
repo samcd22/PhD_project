@@ -64,10 +64,9 @@ class Sandbox(Driver):
                     },
                     'output_header': 'Concentration'
                 },
-                results_path = 'results',
-                show_log = False):
+                results_path = 'results'):
         super().__init__(results_name, default_params, data_params, results_path)
-        self.show_log = show_log
+
         construction = self.get_constriction()
         self.init_construction(construction)
         
@@ -97,7 +96,7 @@ class Sandbox(Driver):
     def run(self):
         data = get_data(self.data_params['data_type'], self.data_params)
         training_data, testing_data = train_test_split(data, test_size=0.2, random_state=1)
-        params = pd.concat([self.default_params['infered_params']['model_params'], *self.default_params['infered_params']['likelihood_params']])
+        params = pd.concat([self.default_params['infered_params']['model_params'], self.default_params['infered_params']['likelihood_params']])
         likelihood = self.default_params['likelihood']
         model = self.default_params['model']
         n_samples = self.default_params['sampler']['n_samples']
@@ -110,7 +109,7 @@ class Sandbox(Driver):
                           training_data, 
                           testing_data,
                           n_samples, 
-                          show_sample_info = self.show_log, 
+                          show_sample_info = True, 
                           n_chains=n_chains, 
                           thinning_rate=thinning_rate,  
                           data_path = self.full_results_path)
