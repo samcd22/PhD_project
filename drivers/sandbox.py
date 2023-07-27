@@ -13,12 +13,9 @@ from inference_toolbox.sampler import Sampler
 from inference_toolbox.visualiser import Visualiser
 from data_processing.get_data import get_data
 
-import warnings
-
-# Filter all warnings
-warnings.simplefilter("ignore")
-
+# Sandbox class - used for generating one instance of the sampler and visualising its results
 class Sandbox(Driver):
+    # Initialises the Sandbox class saving all relevant variables and performing some initialising tasks
     def __init__(self, 
                  results_name = 'name_placeholder',
                  default_params = {
@@ -28,7 +25,7 @@ class Sandbox(Driver):
                             'I_z': Parameter('I_z', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
                             'Q': Parameter('Q', prior_select = 'gamma', default_value=3e13).add_prior_param('mu', 3e13).add_prior_param('sigma',1e13),
                         }),
-                        'likelihood_params':pd.Series({})
+                        'likelihood_params':pd.Series({},dtype='float64')
                     }),
                     'model':Model('log_gpm_alt_norm').add_model_param('H',10),
                     'likelihood': Likelihood('gaussian_fixed_sigma').add_likelihood_param('sigma',1),
@@ -65,14 +62,24 @@ class Sandbox(Driver):
                     'output_header': 'Concentration'
                 },
                 results_path = 'results'):
+        
+        # Inherits methods and attributes from parent Driver class
         super().__init__(results_name, default_params, data_params, results_path)
 
+        # Actual parameter values are saved if they are available
+        self.actual_values = []
+        if self.data_params['data_type'] == 'dummy':
+            for inference_param in self.data_params['model']['inference_params'].keys():
+                self.actual_values.append(self.data_params['model']['inference_params'][inference_param])
+
+        # Generates the construction object
         construction = self.get_constriction()
+
+        # Initialises the construction
         self.init_construction(construction)
         
-
+    # Initialises the construction using the construction object, checking and creating all relevant files and folders
     def init_construction(self, construction):
-
         self.construction_results_path = self.results_path + '/' + self.results_name
         self.full_results_path = self.construction_results_path + '/inference/general_instances'
 
@@ -93,9 +100,13 @@ class Sandbox(Driver):
             with open(self.construction_results_path + '/construction.json', "w") as fp:
                 json.dump(construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
 
+    # Creates an instance of the sampler and visualiser, outputting the visualiser
     def run(self):
+        # Generates the data
         data = get_data(self.data_params['data_type'], self.data_params)
         training_data, testing_data = train_test_split(data, test_size=0.2, random_state=1)
+
+        # Assigns the parameter, likelihood, model and sampler specification variables
         params = pd.concat([self.default_params['infered_params']['model_params'], self.default_params['infered_params']['likelihood_params']])
         likelihood = self.default_params['likelihood']
         model = self.default_params['model']
@@ -103,24 +114,26 @@ class Sandbox(Driver):
         n_chains = self.default_params['sampler']['n_chains']
         thinning_rate = self.default_params['sampler']['thinning_rate']
         
+        # Initialises the a sampler object
         sampler = Sampler(params, 
                           model, 
                           likelihood, 
                           training_data, 
                           testing_data,
                           n_samples, 
-                          show_sample_info = True, 
                           n_chains=n_chains, 
                           thinning_rate=thinning_rate,  
                           data_path = self.full_results_path)
-
+        
+        # Runs the sampler for the allotted number of samples
         sampler.sample_all()
 
+        # Initialises the sampler object
         visualiser = Visualiser(testing_data,
                                 sampler,
                                 model,
                                 previous_instance=sampler.instance,
-                                data_path = self.full_results_path)
-        
+                                data_path = self.full_results_path,
+                                actual_values = self.actual_values)
         return visualiser
 

@@ -7,8 +7,10 @@ import numpyro
 import jax.numpy as jnp
 from jax import random
 
+# Sampler class - samples inference parameters
 class Sampler:
-    def __init__(self, params, model, likelihood, training_data, testing_data, n_samples, n_warmup = -1, n_chains = 1, thinning_rate = 1, show_sample_info = False, data_path = 'results/inference/general_instances'):
+    # Initialises the Sampler class saving all relavant variables and generating a hyperparameters object
+    def __init__(self, params, model, likelihood, training_data, testing_data, n_samples, n_warmup = -1, n_chains = 1, thinning_rate = 1, data_path = 'results/inference/general_instances'):
         self.params = params
         self.model = model
         self.model_func = model.get_model()
@@ -26,37 +28,18 @@ class Sampler:
         if self.n_warmup == -1:
             self.n_warmup = int(0.25*n_samples)
 
-        self.show_sample_info = show_sample_info
-        self.sample_info_rows = []
         self.instance = -1
 
         self.get_hyperparams()
 
-        # if self.show_sample_info:
-        # sample_info_row = {}
-        # sample_info_row['current_params'] = [x.val for x in self.current_params]
-        # sample_info_row['proposed_params'] = [x.val for x in self.proposed_params]
-        # sample_info_row['current_log_likelihood'] = curr_log_lhood
-        # sample_info_row['proposed_log_likelihood'] = prop_log_lhood
-        # sample_info_row['step_forward_log_probs'] = step_forward_log_prob
-        # sample_info_row['step_backward_log_probs'] = step_backward_log_prob
-        # sample_info_row['current_log_posterior'] = curr_log_posterior
-        # sample_info_row['proposed_log_posterior'] = prop_log_posterior
-        # sample_info_row['alpha'] = alpha
-        # sample_info_row['accepted'] = accepted
-
-        # self.sample_info_rows.append(pd.Series(sample_info_row))
-
+    # Generates the allotted number of samples
     def sample_all(self, rng_key = random.PRNGKey(2120)):
         data_exists = self.check_data_exists()
-        sample_info_file_name = 'most_recent_sample_info.csv'
 
-        if os.path.exists(sample_info_file_name):
-            os.remove(sample_info_file_name)
-
+        # If data does not already exist, then generate samples
         if not data_exists:
             kernel = numpyro.infer.NUTS(self.sample_one)
-            self.mcmc_obj = numpyro.infer.MCMC(kernel, num_warmup=self.n_warmup, num_samples=self.n_samples, num_chains=self.n_chains, thinning=self.thinning_rate)
+            self.mcmc_obj = numpyro.infer.MCMC(kernel, num_warmup=self.n_warmup, num_samples=self.n_samples, num_chains=self.n_chains, thinning=self.thinning_rate, chain_method = 'sequential')
             self.mcmc_obj.run(rng_key=rng_key)
             samples = self.mcmc_obj.get_samples(group_by_chain=True)
             self.fields = self.mcmc_obj.get_extra_fields(group_by_chain=True)
@@ -70,6 +53,7 @@ class Sampler:
             self.fields = {}
             return [], [], {}
         
+    # Puts the samples into the correct format - splitting samples into "all samples" and "chain samples"
     def format_samples(self, samples):
         chain_new_samples = pd.DataFrame({}, dtype='float64')
         for param in self.params.index:
@@ -89,6 +73,7 @@ class Sampler:
 
         return chain_new_samples.sort_values(['sample_index']).reset_index().drop(columns=['chain', 'sample_index','index']), chain_new_samples
     
+    # Generates one sample of the infered parameters
     def sample_one(self):
         current_params_sample ={}
         for param_ind in self.params.index:
@@ -99,6 +84,7 @@ class Sampler:
         numpyro.deterministic('mu', mu)
         observations_modelled = numpyro.sample('obs', self.likelihood_func(mu, current_params_sample), obs=jnp.array(self.data.Concentration))
 
+    # Generates the hyperparamaters object and saves it to the Sampler class
     def get_hyperparams(self):
         self.hyperparams = {}
         # Adding Parameter related hyperparameters
@@ -133,12 +119,15 @@ class Sampler:
 
         return self.hyperparams
         
+    # Creates a copy of all of the inputted parameters
     def copy_params(self,params):
         new_params = params.copy()
         for ind in params.index:
             new_params[ind] = new_params[ind].copy()
         return new_params
-            
+
+    # Function for checking whether a sampler of this configuration has altready been run by 
+    # looking through the list of instances and comparing the hyperparameter objects   
     def check_data_exists(self):
         data_exists = False
         if not os.path.exists(self.data_path):

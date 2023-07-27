@@ -1,19 +1,22 @@
 import jax.numpy as jnp
-
 import pandas as pd
 
+# Model class - used for generating the model function
 class Model:
+    # Initialises the Model class saving all relevant variables
     def __init__(self, model_select):
         self.model_params = pd.Series({},dtype='float64')
         self.model_select = model_select
 
+    # Saves a named parameter to the Model class before generating the model function
     def add_model_param(self,name,val):
         self.model_params[name] = val
         return self
     
-    # Model Function
-    def get_model(self, sample = False):
+    # Generates the selected model function using the model parameters
+    def get_model(self):
 
+        # Gaussian Plume Model
         def GPM(params, x, y, z):
             a = params['a']
             b = params['b']
@@ -32,6 +35,7 @@ class Model:
         if self.model_select == "GPM":
             return GPM
         
+        # Wind speed normalised Gaussian Plume Model
         def GPM_norm(params, x, y, z):
             a = params['a']
             b = params['b']
@@ -49,6 +53,7 @@ class Model:
         if self.model_select == "gpm_norm":
             return GPM_norm
         
+        # Wind speed normalised Gaussian Plume Model, alternative form
         def GPM_alt_norm(params, x, y, z):
             I_y = params['I_y']
             I_z = params['I_z']
@@ -65,6 +70,7 @@ class Model:
         if self.model_select == "gpm_alt_norm":
             return GPM_alt_norm
         
+        # Wind speed normalised Gaussian Plume Model, alternative form, with logged Q
         def GPM_alt_norm_log_Q(params, x, y, z):
             I_y = params['I_y']
             I_z = params['I_z']
@@ -80,6 +86,7 @@ class Model:
         if self.model_select == "gpm_alt_norm_log_Q":
             return GPM_alt_norm_log_Q
         
+        #Wind speed normalised, logged Gaussian Plume Model, alternative form
         def log_GPM_alt_norm(params, x, y, z):
             I_y = params['I_y']
             I_z = params['I_z']

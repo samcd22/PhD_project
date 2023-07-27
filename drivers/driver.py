@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import os
 from sklearn.model_selection import train_test_split
 
 from inference_toolbox.parameter import Parameter
@@ -8,22 +9,18 @@ from inference_toolbox.likelihood import Likelihood
 from inference_toolbox.sampler import Sampler
 from inference_toolbox.visualiser import Visualiser
 from inference_toolbox.domain import Domain
-
 from data_processing.get_data import get_data
-import os
 
-current_directory = os.getcwd()
-if current_directory != '/project/':
-    os.chdir('/project/')
-
+# Driver class - parent class of Sandbox, Generator and Optimiser
 class Driver():
+    # Initialises the Driver class saving all relevant variables
     def __init__(self, results_name, default_params, data_params, results_path):
-
         self.results_name = results_name
         self.default_params = default_params
         self.data_params = data_params
         self.results_path = results_path
         
+    # Generates a conctruction object which includes all info on how the system has been constructed, including data generation and all hyperparameters
     def get_constriction(self):
         return {
             'infered_params':{
@@ -60,5 +57,6 @@ class Driver():
             'data': self.data_params
         }
     
+    # Placeholder for initialising the construction
     def init_construction(self, construction):
         print('No driver assigned')

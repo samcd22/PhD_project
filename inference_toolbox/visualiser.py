@@ -1,16 +1,17 @@
 import numpy as np
 import pandas as pd
-
 from matplotlib import pyplot as plt
 import os
 import json
 from numpyencoder import NumpyEncoder
-import imageio
+import imageio.v2 as imageio
 from matplotlib.gridspec import GridSpec
 from fractions import Fraction
+np.seterr(divide='ignore', invalid='ignore')
 
-
+# Visualiser class - Used for processing and visualising the results from the sampler
 class Visualiser:
+    # Initialises the Visualiser class saving all relevant variables and performing some initialising tasks
     def __init__(self, 
                  test_data,
                  sampler, 
@@ -21,42 +22,45 @@ class Visualiser:
                  suppress_prints = False,
                  actual_values = []):
         
-
+        # Save variables
         self.suppress_prints = suppress_prints
         self.test_data = test_data
-
         self.model = model
         self.model_func = model.get_model()
         self.hyperparams = sampler.hyperparams
-        # self.acceptance_rates = acceptance_rates
         self.data_path = data_path
         self.instance = self.get_instance(previous_instance)
-        self.save_hyperparams()
         self.num_chains = 1
         self.include_test_points = include_test_points
         self.fields = sampler.fields
         self.sampler = sampler
 
+        # Save the hyperparameter object
+        self.save_hyperparams()
+
+        # Defines some variables for saving and loading the samples
         self.sample_data_generated = True
         self.chain_data_generated = True
-
         if type(sampler.samples) == list and sampler.samples == []:
             self.sample_data_generated = False
 
         if type(sampler.chain_samples) == list and sampler.chain_samples == []:
             self.chain_data_generated = False
         
+        # Decides whether to load the chain samples or not
         if not self.chain_data_generated:
             self.chain_samples = self.load_samples(chain=True)
         else:
             self.chain_samples = sampler.chain_samples
         self.num_chains = int(np.max(self.chain_samples['chain'].unique()))
 
+        # Decides whether to load the samples or not
         if not self.sample_data_generated:
             self.samples = self.load_samples()
         else:
             self.samples = sampler.samples
 
+        # If parameters' actual values are inputted, then they are saved 
         self.actual_values = {}
         for i, param in enumerate(self.samples.columns):
             if actual_values == []:
@@ -64,23 +68,30 @@ class Visualiser:
             else:
                 self.actual_values[param] = actual_values[i]
 
+        # Calculates the lower, median and upper bound parameters from the samples
         self.params_lower = self.get_ag_samples(self.samples, 0.05)
         self.params_mean = self.get_ag_samples(self.samples, 0.5)
         self.params_upper = self.get_ag_samples(self.samples, 0.95)
 
+        # Calculates the Root Mean Squared Error
         self.RMSE = 'n/a'
         if self.include_test_points:
             mean_test_pred_C = self.model_func(self.params_mean, self.test_data['x'], self.test_data['y'], self.test_data['z'])
             mean_test_actual_C = self.test_data['Concentration']
             self.RMSE = np.sqrt(np.mean((mean_test_pred_C-mean_test_actual_C)**2))
 
+        # Calculates other success metrics
         self.log_likelihood = self.get_log_likelihood(self.test_data, self.params_mean)
         self.AIC = 2*self.params_mean.size - self.log_likelihood
+        self.BIC = self.params_mean.size*np.log(self.test_data.shape[0]) - 2*self.log_likelihood
 
+        # Calculates the autocorrelations
         self.calculate_autocorrs()
 
+        # Saves the samples
         self.save_samples()
 
+    # Checks whether traceplots exist, if they don't they are generated and saved
     def get_traceplot(self):
         traceplot_folder = self.data_path + '/instance_' + str(self.instance) + '/traceplots'
         if not os.path.exists(traceplot_folder):
@@ -102,6 +113,7 @@ class Visualiser:
                 tp = self.traceplots(samples.values, xnames = self.samples.columns, title = title)
                 tp.savefig(full_path)
 
+    # Calculates the log likelihood based on inputted data and parameters and selected likelihood and model functions
     def get_log_likelihood(self, data, params):
         likelihood_func = self.sampler.likelihood_func
         model_func = self.model_func
@@ -110,9 +122,9 @@ class Visualiser:
         test_vals = data.Concentration
 
         log_likelihoods = likelihood_func(mu, params).log_prob(test_vals)
-
         return np.sum(log_likelihoods)
 
+    # Generates a traceplot based on inputted samples
     def traceplots(self, x, xnames = None, title = None):
         _, d = x.shape
         fig = plt.figure()
@@ -152,15 +164,21 @@ class Visualiser:
             plt.setp(ax_hist.get_yticklabels(), visible=False)
             xlim = ax_hist.get_xlim()
             ax_hist.set_xlim([xlim[0], 1.1*xlim[1]])
-            plt.close()
+        plt.close()
         return fig
 
+    # Outputs the plots for visualising the modelled system based on the concluded lower, median and upper bound parameters and an inputted domain
+    # There are multiple ways of visualising these results
     def visualise_results(self, domain, name, plot_type = '3D', log_results = True, title = 'Concentration of Droplets'):
+        # Generates domain plots
         points = domain.create_domain()
+
+        # Checks whether plots exist
         if os.path.exists(self.data_path + '/instance_' + str(self.instance) + '/' + name):
             if not self.suppress_prints:
                 print('Plots already exist!')
 
+        # Output plots are 3D
         elif plot_type == '3D':
             X, Y, Z = points[:,0], points[:,1], points[:,2]
             C_lower = self.model_func(self.params_lower, X,Y,Z)
@@ -171,8 +189,8 @@ class Visualiser:
 
             self.threeD_plots(results_df, name, log_results=log_results, title=title)
 
+    # Plotting function for 3D plots
     def threeD_plots(self, results, name, q=10, log_results = True, title = 'Concentration of Droplets'):
-
         X = results.x
         Y = results.y
         Z = results.z
@@ -215,7 +233,6 @@ class Visualiser:
         min_val = np.percentile([C_lower, C_mean, C_upper],10)
         max_val = np.percentile([C_lower, C_mean, C_upper],90)
 
-        # I NEED TO EDIT THIS TO IT CHANGES FOR EACH PLOT!!!!!!
         # Calculates the percentage differances and RMSE if the test points are set to be included
         if self.include_test_points:
             lower_test_pred_C = self.model_func(self.params_lower, self.test_data['x'], self.test_data['y'], self.test_data['z'])
@@ -229,9 +246,7 @@ class Visualiser:
             upper_test_pred_C = self.model_func(self.params_upper, self.test_data['x'], self.test_data['y'], self.test_data['z'])
             upper_test_actual_C = self.test_data['Concentration']
             upper_percentage_difference = 2*np.abs(lower_test_actual_C-upper_test_pred_C)/(upper_test_actual_C + upper_test_pred_C) * 100
-
-     
-            
+ 
         # Creates a directory for the instance if the save parameter is selected
         os.mkdir(self.data_path + '/instance_' + str(self.instance) + '/' + str(name))
         os.mkdir(self.data_path + '/instance_' + str(self.instance) + '/' + str(name) + '/figures')
@@ -307,10 +322,13 @@ class Visualiser:
                 if  np.floor(np.log10(self.RMSE)) < 2: formatter = "{:.2f}" 
                 RMSE_string = 'RMSE = ' + formatter.format(self.RMSE)
                 AIC_string = 'AIC = ' + formatter.format(self.AIC)
+                BIC_string = 'BIC = ' + formatter.format(self.BIC)
+
                 
             else:
                 RMSE_string = 'RMSE = n/a'
                 AIC_string = 'AIC = n/a'
+                BIC_string = 'BIC = n/a'
 
             # Creates an axis to display the parameter values
             param_string = self.get_param_string()
@@ -321,7 +339,7 @@ class Visualiser:
             param_accuracy_string = self.get_param_accuracy_string()
 
             # Creates an axis to display the sampling information
-            ax5.text(0.5,0.5, RMSE_string + ',   ' + AIC_string + '\n' + param_accuracy_string, fontsize = 30, va = "center", ha = 'center')
+            ax5.text(0.5,0.5, RMSE_string + ',   ' + AIC_string + ',   ' + BIC_string + '\n' + param_accuracy_string, fontsize = 30, va = "center", ha = 'center')
             ax5.set_xticks([])
             ax5.set_yticks([])
 
@@ -343,6 +361,7 @@ class Visualiser:
                 fig.savefig(full_path)
             plt.close()
 
+    # Generates a string of all parameter accuracy results
     def get_param_accuracy_string(self):
         param_accuracy_string_array = []
         for param in self.samples.columns:
@@ -351,6 +370,7 @@ class Visualiser:
                 param_accuracy_string_array.append(param + ' error = ' + f'{percentage_error:.3}' + '%')
         return ('\n').join(param_accuracy_string_array)
 
+    # Generates a string of all of the parameter results
     def get_param_string(self):
         param_string_array = []
         for param in self.params_mean.index:
@@ -366,6 +386,7 @@ class Visualiser:
 
         return ('\n').join(param_string_array)
         
+    # Outputs the next available instance number and generates a folder for that instance
     def get_instance(self, previous_instance):
         if previous_instance != -1:
             instance = previous_instance
@@ -388,10 +409,12 @@ class Visualiser:
             os.mkdir(instance_path)
         return instance
 
+    # Saves the hyperparameter object
     def save_hyperparams(self):
         with open(self.data_path + '/instance_' + str(self.instance) + '/hyperparams.json', "w") as fp:
             json.dump(self.hyperparams,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
         
+    # Gathers all of the figures under the inputted name, creates an animation of them and saves that animation
     def animate(self, name, frame_dur = 500):
         folder_name = 'instance_' + str(self.instance) + '/' + name + '/figures'
         gif_name = name + '.gif'
@@ -411,6 +434,7 @@ class Visualiser:
 
             imageio.mimsave(gif_path, images, duration = frame_dur, loop=0)
     
+    # Saves the samples and chain samples objects
     def save_samples(self):
         full_path = self.data_path + '/instance_' + str(self.instance) + '/samples.csv'
         if type(self.samples) == list and self.samples == []:
@@ -422,6 +446,7 @@ class Visualiser:
             raise Exception('Samples data is empty!')    
         pd.DataFrame(self.chain_samples).to_csv(chain_full_path, index=False)
         
+    # Loads either the chain samples of samples object
     def load_samples(self, chain = False):
         if chain:
             chain_full_path = self.data_path + '/instance_' + str(self.instance) + '/chain_samples.csv'
@@ -440,6 +465,7 @@ class Visualiser:
             else:
                 raise Exception('Samples file does not exist!')
 
+    # Checks whether autocorrelation plots exist, if they don't they are generated and saved
     def get_autocorrelations(self):
         autocorr_folder = self.data_path + '/instance_' + str(self.instance) + '/autocorrelations'
         if not os.path.exists(autocorr_folder):
@@ -460,6 +486,7 @@ class Visualiser:
                 ac = self.autocorr_fig(chain, title = title)
                 ac.savefig(full_path)
     
+    # Generates a autocorrelation plots based on the samples
     def autocorr_fig(self, chain_num = 1, title = ''):
         fig = plt.figure(figsize=(6,4))
         for param in self.samples.columns:
@@ -475,6 +502,7 @@ class Visualiser:
 
         return fig
     
+    # Calculates the autocorrelations based on the samples and saves them to an object
     def calculate_autocorrs(self, D=-1):
         self.autocorrs = {}
         for chain_num in range(self.num_chains):
@@ -485,8 +513,10 @@ class Visualiser:
 
             if D == -1:
                 D = int(samples.shape[0])
+            
             xp = np.atleast_2d(samples)
             z = (xp-np.mean(xp, axis=0))/np.std(xp, axis=0)
+
             Ct = np.ones((D, z.shape[1]))
             Ct[1:,:] = np.array([np.mean(z[i:]*z[:-i], axis=0) for i in range(1,D)])
             tau_hat = 1 + 2*np.cumsum(Ct, axis=0)
@@ -505,6 +535,7 @@ class Visualiser:
             self.autocorrs['overall'][param] = {}
             self.autocorrs['overall'][param]['tau'] = tau_overall
     
+    # Outputs the specified quantile of the parameter samples
     def get_ag_samples(self,samples, q_val):
         ags = pd.Series({},dtype='float64')
         for col in samples.columns:
@@ -513,6 +544,7 @@ class Visualiser:
             ags[col] = ag
         return ags
     
+    # Outputs the fields object from the sampler
     def get_fields(self, chain_num):
         output = {}
         if self.fields.keys() != []:
@@ -524,6 +556,7 @@ class Visualiser:
                 output[key] = field_output
         return output
 
+    # Generates an object which summarises the results of the sampler and saves it
     def get_summary(self):
         summary = {}
         full_path = self.data_path + '/instance_' + str(self.instance) + '/summary.json'
