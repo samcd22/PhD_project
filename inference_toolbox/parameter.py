@@ -1,73 +1,43 @@
 import numpy as np
 import pandas as pd
-import scipy.stats as stats
+import numpyro
 
+# Parameter class - used for generating the infered parameters in our sampler
 class Parameter:
-
-    def __init__(self, init_val, step_select = "" ,step_size = 1, prior_select = ""):
+    # Initialises the Likelihood class saving all relevant variables
+    def __init__(self, name, prior_select = "gaussian", default_value = 'NaN'):
         self.prior_params = pd.Series({},dtype='float64')
-        self.val = 0        
-        self.init_val = init_val
-        self.val = init_val
-        self.step_select = step_select
-        self.step_size = step_size
+        self.name = name
         self.prior_select = prior_select
+        self.default_value = default_value
         
+    # Utility function for converting mean and stdev to alpha in a Gamma distribution 
+    def alpha(self,mu,sigma): return mu**2/sigma**2
+
+    # Utility function for converting mean and stdev to beta in a Gamma distribution 
+    def beta(self,mu,sigma): return mu/(sigma**2)
+
+    # Saves a named prior hyperparameters to the Parameter class before generating the parameter's prior distribution
     def add_prior_param(self, name, val):
         self.prior_params[name] = val
-        
-    # Step Function
-    def get_step_function(self):
-        # Probability of step
-        def log_p_step_multivariate_gaussian(val, mu):
-            return stats.multivariate_normal.logpdf(val, mean=mu, cov=self.step_size**2)
-        
-        def log_p_step_gamma(val, mu):
-            beta = mu/self.step_size**2
-            a = mu**2/self.step_size**2
-            return stats.gamma.logpdf(val, a, scale=1/beta)
-        
-        # The step itself
-        def step_multivariate_positive_gaussian(mu):
-            stepped_val = -1
-            while stepped_val <= 0:
-                stepped_val = stats.multivariate_normal.rvs(mean=mu,cov=self.step_size**2)
-            return stepped_val
-        
-        def step_multivariate_gaussian(mu):
-            return stats.multivariate_normal.rvs(mean=mu,cov=self.step_size**2)
-        
-        def step_gamma(mu):
-            beta = mu/self.step_size**2
-            a = mu**2/self.step_size**2
-            return stats.gamma.rvs(a,scale=1/beta)
-        
-        
-        if self.step_select == "positive gaussian":
-            return log_p_step_multivariate_gaussian, step_multivariate_positive_gaussian
-        
-        elif self.step_select == 'gamma':
-            return log_p_step_gamma, step_gamma
-        
-        elif self.step_select == 'gaussian':
-            return log_p_step_multivariate_gaussian, step_multivariate_gaussian
-            
+        return self
 
-    # Priors
-    def get_log_prior(self):
-        def log_gaussian_prior(val):
-            return -(val-self.prior_params.mu)**2/(2*self.prior_params.sigma**2)
-        def log_gamma_prior(val):
-            return (self.prior_params.k - 1)*np.log(val)-val/self.prior_params.theta
-        def no_prior(val):
-            return 0
-
-        if self.prior_select == "gaussian":
-            return log_gaussian_prior
-        elif self.prior_select == "gamma":
-            return log_gamma_prior
-        elif self.prior_select == "no prior":
-            return no_prior
+    # Generates the selected prior distribution using the prior hyperparameters
+    def get_prior_function(self):
+        # Gaussian Prior
+        if self.prior_select == 'gaussian':
+            return numpyro.distributions.Normal(self.prior_params.mu, self.prior_params.sigma)
         
+        # Gamma Prior
+        elif self.prior_select == 'gamma':
+            return numpyro.distributions.Gamma(self.alpha(self.prior_params.mu,self.prior_params.sigma), self.beta(self.prior_params.mu,self.prior_params.sigma))
+    
+    # Generates a sample for this parameter
+    def sample_param(self):
+        prior_func = self.get_prior_function()
+        a = numpyro.sample(self.name, prior_func)
+        return a            
+    
+    # Copy function for the Parameter Class
     def copy(self):
         return Parameter(self.val, self.step_select, self.step_size, self.prior_select)

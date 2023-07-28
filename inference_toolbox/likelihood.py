@@ -1,42 +1,48 @@
-import numpy as np
 import pandas as pd
-import scipy.stats as stats
+import numpyro
 
-# Likelihood Function
+# Likelihood class - used for generating a likelihood function
 class Likelihood:
+    # Initialises the Likelihood class saving all relevant variables
     def __init__(self, likelihood_select):
         self.likelihood_params = pd.Series({},dtype='float64')
         self.likelihood_select = likelihood_select
 
+    # Utility function for converting mean and stdev to alpha in a Gamma distribution 
+    def alpha(self,mu,sigma): return mu**2/sigma**2
+
+    # Utility function for converting mean and stdev to beta in a Gamma distribution 
+    def beta(self,mu,sigma): return mu/sigma**2
+
+    # Saves a named parameter to the Likelihood class before generating the likelihood function
     def add_likelihood_param(self,name,val):
         self.likelihood_params[name] = val
-    
-    def get_log_likelihood_func(self):
-        def gaussian_log_likelihood_fixed_sigma(modeled_vals, measured_vals):
-            return -np.sum((modeled_vals-measured_vals)**2)/(2*self.likelihood_params.sigma**2) - modeled_vals.size*np.log(np.sqrt(2*np.pi)*self.likelihood_params.sigma)
+        return self
 
-        def gaussian_log_likelihood_hetroscedastic_fixed_sigma(modeled_vals, measured_vals):
-            res = abs(modeled_vals-measured_vals)
-            trans_res = ((res+self.likelihood_params.lambda_2)**self.likelihood_params.lambda_1-1)/self.likelihood_params.lambda_1
-            return -sum(trans_res**2)/(2*self.likelihood_params.lambda_1**2*self.likelihood_params.sigma**2)
-        
-        def gamma_log_likelihood_fixed_sigma(modeled_vals, measured_vals):
-            log_likelihood = 0
-            for i in range(len(modeled_vals)):
+    # Generates the selected likelihood function using the likelihood parameters
+    def get_likelihood_function(self):
 
-                mu = modeled_vals.values[i]
-                val = measured_vals.values[i]
-                beta = mu/self.likelihood_params.sigma**2
-                a = mu**2/self.likelihood_params.sigma**2
-                llhood = stats.gamma.logpdf(val, a, scale=1/beta)
-                log_likelihood += llhood
-            return log_likelihood
-
-        if self.likelihood_select == "gaussian_fixed_sigma":
-            return gaussian_log_likelihood_fixed_sigma
+        # Gaussian likelihood with non-inferred sigma
+        if self.likelihood_select == 'gaussian_fixed_sigma':
+            def gaussian_likelihood_fixed_sigma(mu, params):
+                return numpyro.distributions.Normal(mu, self.likelihood_params.sigma)
+            return gaussian_likelihood_fixed_sigma
         
-        if self.likelihood_select == "gaussian_hetroscedastic_fixed_sigma":
-            return gaussian_log_likelihood_hetroscedastic_fixed_sigma
+        # Gaussian likelihood with inferred sigma
+        elif self.likelihood_select == 'gaussian':
+            def gaussian_likelihood(mu, params):
+                return numpyro.distributions.Normal(mu, params['sigma'])
+            return gaussian_likelihood
         
-        if self.likelihood_select == "gamma_fixed_sigma":
-            return gamma_log_likelihood_fixed_sigma
+        # Gamma likelihood with non-infered sigma
+        elif self.likelihood_select == 'gamma_fixed_sigma':
+            def gamma_likelihood_fixed_sigma(mu, params):
+                return numpyro.distributions.Gamma(self.alpha(mu,self.likelihood_params.sigma), self.beta(mu, self.likelihood_params.sigma))
+            return gamma_likelihood_fixed_sigma
+        
+        # Gamma likelihood with infered sigma
+        elif self.likelihood_select == 'gamma':
+            def gamma_likelihood(mu, params):
+                sigma = params['sigma']
+                return numpyro.distributions.Gamma(self.alpha(mu,sigma), 1/self.beta(mu,sigma))
+            return gamma_likelihood

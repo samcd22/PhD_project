@@ -168,6 +168,7 @@ class GaussianProcessor:
             ax1.set_xlim(min_x, max_x)
             ax1.set_ylim(min_y, max_y)
             ax1.set_zlim(min_z, max_z)
+            plt.tight_layout()
             plt.colorbar(plot_1)
 
             ax2 = fig.add_subplot(132, projection = '3d')
@@ -179,6 +180,7 @@ class GaussianProcessor:
             ax2.set_xlim(min_x, max_x)
             ax2.set_ylim(min_y, max_y)
             ax2.set_zlim(min_z, max_z)
+            plt.tight_layout()
             plt.colorbar(plot_2)
 
             ax3 = fig.add_subplot(133, projection = '3d')
@@ -190,7 +192,9 @@ class GaussianProcessor:
             ax3.set_xlim(min_x, max_x)
             ax3.set_ylim(min_y, max_y)
             ax3.set_zlim(min_z, max_z)
+            plt.tight_layout()
             plt.colorbar(plot_3)
+
             plt.suptitle('Gaussian process using the ' + self.normaliser_dict[self.data_normaliser] + ' concentration data and the ' + self.kernel_dict[self.kernel] + ' kernel, plot ' + str(int(bin_num+1)) + ' of ' + str(q))
             if save:
                 path = 'results/gaussian_process/'
@@ -263,6 +267,7 @@ class GaussianProcessor:
             ax1.set_title('Log mean - 2σ concentration')
             ax1.set_xlabel('x')
             ax1.set_ylabel('y')
+            plt.tight_layout()
             plt.colorbar(plot_1)
 
             ax2 = fig.add_subplot(2,2,2)
@@ -270,6 +275,7 @@ class GaussianProcessor:
             ax2.set_title('Log mean concentration')
             ax2.set_xlabel('x')
             ax2.set_ylabel('y')
+            plt.tight_layout()
             plt.colorbar(plot_2)
 
             ax3 = fig.add_subplot(2,2,3)
@@ -277,6 +283,7 @@ class GaussianProcessor:
             ax3.set_title('Log mean + 2σ concentration')
             ax3.set_xlabel('x')
             ax3.set_ylabel('y')
+            plt.tight_layout()
             plt.colorbar(plot_3)
 
             ax4 = fig.add_subplot(2,2,4)
@@ -284,6 +291,7 @@ class GaussianProcessor:
             ax4.set_title('Log σ concentration')
             ax4.set_xlabel('x')
             ax4.set_ylabel('y')
+            plt.tight_layout()
             plt.colorbar(plot_4)
             
             plt.suptitle('z = {:.2f}m'.format(z_val))

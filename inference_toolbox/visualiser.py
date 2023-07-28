@@ -1,46 +1,130 @@
 import numpy as np
 import pandas as pd
-import matplotlib
-matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 import os
 import json
 from numpyencoder import NumpyEncoder
-import imageio
+import imageio.v2 as imageio
 from matplotlib.gridspec import GridSpec
+from fractions import Fraction
+np.seterr(divide='ignore', invalid='ignore')
 
-from inference_toolbox.parameter import Parameter
-
+# Visualiser class - Used for processing and visualising the results from the sampler
 class Visualiser:
-    def __init__(self, test_data, samples, model, hyperparams, acceptance_rate, previous_instance = -1, data_path = 'results/inference'):
+    # Initialises the Visualiser class saving all relevant variables and performing some initialising tasks
+    def __init__(self, 
+                 test_data,
+                 sampler, 
+                 model, 
+                 previous_instance = -1, 
+                 data_path = 'results/inference/general_instances', 
+                 include_test_points = True, 
+                 suppress_prints = False,
+                 actual_values = []):
+        
+        # Save variables
+        self.suppress_prints = suppress_prints
         self.test_data = test_data
-
         self.model = model
         self.model_func = model.get_model()
-        self.hyperparams = hyperparams
-        self.acceptance_rate = acceptance_rate
+        self.hyperparams = sampler.hyperparams
         self.data_path = data_path
         self.instance = self.get_instance(previous_instance)
+        self.num_chains = 1
+        self.include_test_points = include_test_points
+        self.fields = sampler.fields
+        self.sampler = sampler
+
+        # Save the hyperparameter object
         self.save_hyperparams()
 
-        if type(samples) == list and samples == []:
+        # Defines some variables for saving and loading the samples
+        self.sample_data_generated = True
+        self.chain_data_generated = True
+        if type(sampler.samples) == list and sampler.samples == []:
+            self.sample_data_generated = False
+
+        if type(sampler.chain_samples) == list and sampler.chain_samples == []:
+            self.chain_data_generated = False
+        
+        # Decides whether to load the chain samples or not
+        if not self.chain_data_generated:
+            self.chain_samples = self.load_samples(chain=True)
+        else:
+            self.chain_samples = sampler.chain_samples
+        self.num_chains = int(np.max(self.chain_samples['chain'].unique()))
+
+        # Decides whether to load the samples or not
+        if not self.sample_data_generated:
             self.samples = self.load_samples()
         else:
-            self.samples = samples
-        
-        self.params_lower = self.get_ag_samples(self.samples, 0.05).apply(lambda x: Parameter(x))
-        self.params_mean = self.get_ag_samples(self.samples, 0.5).apply(lambda x: Parameter(x))
-        self.params_upper = self.get_ag_samples(self.samples, 0.95).apply(lambda x: Parameter(x))
+            self.samples = sampler.samples
 
+        # If parameters' actual values are inputted, then they are saved 
+        self.actual_values = {}
+        for i, param in enumerate(self.samples.columns):
+            if actual_values == []:
+                self.actual_values[param] = 'NaN'
+            else:
+                self.actual_values[param] = actual_values[i]
 
+        # Calculates the lower, median and upper bound parameters from the samples
+        self.params_lower = self.get_ag_samples(self.samples, 0.05)
+        self.params_mean = self.get_ag_samples(self.samples, 0.5)
+        self.params_upper = self.get_ag_samples(self.samples, 0.95)
+
+        # Calculates the Root Mean Squared Error
+        self.RMSE = 'n/a'
+        if self.include_test_points:
+            mean_test_pred_C = self.model_func(self.params_mean, self.test_data['x'], self.test_data['y'], self.test_data['z'])
+            mean_test_actual_C = self.test_data['Concentration']
+            self.RMSE = np.sqrt(np.mean((mean_test_pred_C-mean_test_actual_C)**2))
+
+        # Calculates other success metrics
+        self.log_likelihood = self.get_log_likelihood(self.test_data, self.params_mean)
+        self.AIC = 2*self.params_mean.size - self.log_likelihood
+        self.BIC = self.params_mean.size*np.log(self.test_data.shape[0]) - 2*self.log_likelihood
+
+        # Calculates the autocorrelations
+        self.calculate_autocorrs()
+
+        # Saves the samples
+        self.save_samples()
+
+    # Checks whether traceplots exist, if they don't they are generated and saved
     def get_traceplot(self):
-        full_path = self.data_path + '/instance_' + str(self.instance) + '/traceplot.png'
-        if os.path.exists(full_path):
-            print('Traceplot already exists')
-        else:
-            tp = self.traceplots(self.samples.values, xnames = self.samples.columns, title = 'MCMC samples')
-            tp.savefig(full_path)
+        traceplot_folder = self.data_path + '/instance_' + str(self.instance) + '/traceplots'
+        if not os.path.exists(traceplot_folder):
+            os.mkdir(traceplot_folder)
 
+        for chain in range(self.num_chains):
+            full_path = traceplot_folder + '/traceplot_' + str(chain + 1) + '.png'
+            if self.num_chains == 1:
+                title = 'MCMC samples'
+                samples = self.samples
+            else:
+                title = 'MCMC samples for chain ' + str(chain + 1)
+                samples = self.chain_samples[self.chain_samples['chain'] == chain + 1].drop(columns = ['chain', 'sample_index'])
+            
+            if os.path.exists(full_path):
+                if not self.suppress_prints:
+                    print('Traceplot ' + str(chain + 1) + ' already exists')
+            else:
+                tp = self.traceplots(samples.values, xnames = self.samples.columns, title = title)
+                tp.savefig(full_path)
+
+    # Calculates the log likelihood based on inputted data and parameters and selected likelihood and model functions
+    def get_log_likelihood(self, data, params):
+        likelihood_func = self.sampler.likelihood_func
+        model_func = self.model_func
+        mu = model_func(params, data.x, data.y, data.z)
+        
+        test_vals = data.Concentration
+
+        log_likelihoods = likelihood_func(mu, params).log_prob(test_vals)
+        return np.sum(log_likelihoods)
+
+    # Generates a traceplot based on inputted samples
     def traceplots(self, x, xnames = None, title = None):
         _, d = x.shape
         fig = plt.figure()
@@ -70,18 +154,31 @@ class Visualiser:
                 ax_trace.set_ylabel(xnames[i])
 
             ax_hist = fig.add_axes(rect_hist, sharey=ax_trace)
-            ax_hist.hist(x[:,i], orientation='horizontal', bins=50)
+            try:
+                ax_hist.hist(x[:,i], orientation='horizontal', bins=50)
+            except:
+                if not self.suppress_prints:
+                    print('Traceplot histogram invalid!')
+
             plt.setp(ax_hist.get_xticklabels(), visible=False)
             plt.setp(ax_hist.get_yticklabels(), visible=False)
             xlim = ax_hist.get_xlim()
             ax_hist.set_xlim([xlim[0], 1.1*xlim[1]])
+        plt.close()
         return fig
 
-    def visualise_results(self, domain, name, plot_type = '3D', include_test_points = True, log_results = True, title = 'Concentration of Droplets'):
+    # Outputs the plots for visualising the modelled system based on the concluded lower, median and upper bound parameters and an inputted domain
+    # There are multiple ways of visualising these results
+    def visualise_results(self, domain, name, plot_type = '3D', log_results = True, title = 'Concentration of Droplets'):
+        # Generates domain plots
         points = domain.create_domain()
-        if os.path.exists(self.data_path + '/instance_' + str(self.instance) + '/' + name):
-            print('Plots already exist!')
 
+        # Checks whether plots exist
+        if os.path.exists(self.data_path + '/instance_' + str(self.instance) + '/' + name):
+            if not self.suppress_prints:
+                print('Plots already exist!')
+
+        # Output plots are 3D
         elif plot_type == '3D':
             X, Y, Z = points[:,0], points[:,1], points[:,2]
             C_lower = self.model_func(self.params_lower, X,Y,Z)
@@ -90,10 +187,10 @@ class Visualiser:
 
             results_df = pd.DataFrame({'x': X.flatten(), 'y': Y.flatten(), 'z': Z.flatten(), 'C_lower': C_lower, 'C_mean': C_mean,'C_upper': C_upper})
 
-            return self.threeD_plots(results_df, name, include_test_points = include_test_points, log_results=log_results, title=title)
+            self.threeD_plots(results_df, name, log_results=log_results, title=title)
 
-    def threeD_plots(self, results, name, q=10, include_test_points = True, log_results = True, title = 'Concentration of Droplets'):
-
+    # Plotting function for 3D plots
+    def threeD_plots(self, results, name, q=10, log_results = True, title = 'Concentration of Droplets'):
         X = results.x
         Y = results.y
         Z = results.z
@@ -133,12 +230,11 @@ class Visualiser:
         upper_conc_and_bins.columns=['x', 'y', 'z', 'conc', 'bin']
 
         # Define min and max values for colorbar
-        min_val = np.percentile([C_lower, C_mean, C_upper],5)
-        max_val = np.percentile([C_lower, C_mean, C_upper],95)
+        min_val = np.percentile([C_lower, C_mean, C_upper],10)
+        max_val = np.percentile([C_lower, C_mean, C_upper],90)
 
-        # I NEED TO EDIT THIS TO IT CHANGES FOR EACH PLOT!!!!!!
         # Calculates the percentage differances and RMSE if the test points are set to be included
-        if include_test_points:
+        if self.include_test_points:
             lower_test_pred_C = self.model_func(self.params_lower, self.test_data['x'], self.test_data['y'], self.test_data['z'])
             lower_test_actual_C = self.test_data['Concentration']
             lower_percentage_difference = 2*np.abs(lower_test_actual_C-lower_test_pred_C)/(lower_test_actual_C + lower_test_pred_C) * 100
@@ -150,11 +246,7 @@ class Visualiser:
             upper_test_pred_C = self.model_func(self.params_upper, self.test_data['x'], self.test_data['y'], self.test_data['z'])
             upper_test_actual_C = self.test_data['Concentration']
             upper_percentage_difference = 2*np.abs(lower_test_actual_C-upper_test_pred_C)/(upper_test_actual_C + upper_test_pred_C) * 100
-
-            RMSE = np.sqrt(np.mean((mean_test_pred_C-mean_test_actual_C)**2))
-        else:
-            RMSE = 'n/a'     
-            
+ 
         # Creates a directory for the instance if the save parameter is selected
         os.mkdir(self.data_path + '/instance_' + str(self.instance) + '/' + str(name))
         os.mkdir(self.data_path + '/instance_' + str(self.instance) + '/' + str(name) + '/figures')
@@ -166,13 +258,31 @@ class Visualiser:
             mean_bin_data = mean_conc_and_bins[mean_conc_and_bins['bin'] >= bin_num]
             upper_bin_data = upper_conc_and_bins[upper_conc_and_bins['bin'] >= bin_num]
 
-            fig = plt.figure(figsize = (20,10), layout = 'constrained')
-            gs = GridSpec(10, 6, figure=fig)
+            fin_alpha = len(self.params_mean)*0.75
+
+            y = 12
+            r = 0.8
+            alpha = (1-r)*y
+
+            delta_alpha = fin_alpha - alpha
+
+            y_prime = y + delta_alpha
+            r_prime = r*y/y_prime
+
+            r_prime_frac = Fraction(r_prime)
+
+            fig = plt.figure(constrained_layout = True, figsize = (24,y_prime))
+            spec = GridSpec(2, 6, figure = fig, height_ratios= [r_prime_frac.numerator, r_prime_frac.denominator - r_prime_frac.numerator])
+
+            ax1 = fig.add_subplot(spec[0,:2], projection='3d')
+            ax2 = fig.add_subplot(spec[0,2:4], projection='3d')
+            ax3 = fig.add_subplot(spec[0,4:], projection='3d')
+            ax4 = fig.add_subplot(spec[1,:3])
+            ax5 = fig.add_subplot(spec[1,3:])
             
             # Defines the lower bound subplot
-            ax1 = fig.add_subplot(gs[:-2,:2], projection = '3d')
             plot_1 = ax1.scatter(lower_bin_data.x, lower_bin_data.y, lower_bin_data.z, c = lower_bin_data.conc, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
-            ax1.set_title('Generated by the lower bound parameters')
+            ax1.set_title('Generated by the lower bound parameters', fontsize = 20)
             ax1.set_xlabel('x')
             ax1.set_ylabel('y')
             ax1.set_zlabel('z')
@@ -181,9 +291,8 @@ class Visualiser:
             ax1.set_zlim(np.min(Z), np.max(Z))
 
             # Defines the mean subplot
-            ax2 = fig.add_subplot(gs[:-2,2:4], projection = '3d')
             ax2.scatter(mean_bin_data.x, mean_bin_data.y, mean_bin_data.z, c = mean_bin_data.conc, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
-            ax2.set_title('Generated by the mean parameters')
+            ax2.set_title('Generated by the mean parameters', fontsize = 20)
             ax2.set_xlabel('x')
             ax2.set_ylabel('y')
             ax2.set_zlabel('z')
@@ -192,9 +301,8 @@ class Visualiser:
             ax2.set_zlim(np.min(Z), np.max(Z))
 
             # Defines the upper bound subplot
-            ax3 = fig.add_subplot(gs[:-2,4:], projection = '3d')
             ax3.scatter(upper_bin_data.x, upper_bin_data.y, upper_bin_data.z, c = upper_bin_data.conc, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
-            ax3.set_title('Generated by the upper bound parameters')
+            ax3.set_title('Generated by the upper bound parameters', fontsize = 20)
             ax3.set_xlabel('x')
             ax3.set_ylabel('y')
             ax3.set_zlabel('z')
@@ -203,7 +311,7 @@ class Visualiser:
             ax3.set_zlim(np.min(Z), np.max(Z))
 
             # Generates the test point data on each graph
-            if include_test_points:
+            if self.include_test_points:
                 pd_min = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
                 pd_max = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
 
@@ -211,21 +319,27 @@ class Visualiser:
                 ax2.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 10*np.log10(mean_test_pred_C), c = mean_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
                 ax3.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 10*np.log10(upper_test_pred_C), c = upper_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
                 formatter = "{:.2e}" 
-                if  np.floor(np.log10(RMSE)) < 2: formatter = "{:.2f}" 
-                sampling_data_string = 'RMSE = ' + formatter.format(RMSE) + '\nAcceptance Rate = ' + "{:.2f}".format(self.acceptance_rate) + '%' 
+                if  np.floor(np.log10(self.RMSE)) < 2: formatter = "{:.2f}" 
+                RMSE_string = 'RMSE = ' + formatter.format(self.RMSE)
+                AIC_string = 'AIC = ' + formatter.format(self.AIC)
+                BIC_string = 'BIC = ' + formatter.format(self.BIC)
+
+                
             else:
-                sampling_data_string = 'RMSE = n/a\nAcceptance Rate = ' + "{:.2f}".format(self.acceptance_rate) + '%' 
+                RMSE_string = 'RMSE = n/a'
+                AIC_string = 'AIC = n/a'
+                BIC_string = 'BIC = n/a'
 
             # Creates an axis to display the parameter values
-            ax4 = fig.add_subplot(gs[-2:,:3])
             param_string = self.get_param_string()
             ax4.text(0.5,0.5,param_string, fontsize = 30, va = "center", ha = 'center')
             ax4.set_xticks([])
             ax4.set_yticks([])
 
+            param_accuracy_string = self.get_param_accuracy_string()
+
             # Creates an axis to display the sampling information
-            ax5 = fig.add_subplot(gs[-2:,3:])
-            ax5.text(0.5,0.5, sampling_data_string, fontsize = 30, va = "center", ha = 'center')
+            ax5.text(0.5,0.5, RMSE_string + ',   ' + AIC_string + ',   ' + BIC_string + '\n' + param_accuracy_string, fontsize = 30, va = "center", ha = 'center')
             ax5.set_xticks([])
             ax5.set_yticks([])
 
@@ -238,31 +352,41 @@ class Visualiser:
                 left_bound = 0
             else:
                 left_bound = mean_bin_labs[bin_num].left
-            fig.suptitle(title + '\nValues for mean plot greater than ' + "{:.2f}".format(left_bound), fontsize = 32)
+            fig.suptitle(title + '\nValues for mean plot greater than ' + "{:.2f}".format(left_bound) + '\n', fontsize = 32)
 
             # Saves the figures if required
             fig_name = 'fig_' + str(bin_num + 1) + '_of_' + str(np.max(mean_bin_nums + 1)) + '.png'
             full_path = self.data_path + '/instance_' + str(self.instance) + '/' + name + '/figures/' + fig_name
             if not os.path.exists(full_path):
                 fig.savefig(full_path)
-            else:
-                plt.show()
+            plt.close()
 
+    # Generates a string of all parameter accuracy results
+    def get_param_accuracy_string(self):
+        param_accuracy_string_array = []
+        for param in self.samples.columns:
+            if not self.actual_values[param] == 'NaN':
+                percentage_error = 200*np.abs(self.params_mean[param]-self.actual_values[param])/(self.params_mean[param] + self.actual_values[param])
+                param_accuracy_string_array.append(param + ' error = ' + f'{percentage_error:.3}' + '%')
+        return ('\n').join(param_accuracy_string_array)
+
+    # Generates a string of all of the parameter results
     def get_param_string(self):
         param_string_array = []
         for param in self.params_mean.index:
-            if np.floor(np.log10(self.params_mean[param].val)) < 2:
-                lower_string =  "{:.2f}".format(self.params_lower[param].val)
-                mean_string = "{:.2f}".format(self.params_mean[param].val)
-                upper_string = "{:.2f}".format(self.params_upper[param].val)
+            if np.floor(np.log10(self.params_mean[param])) < 2:
+                lower_string =  "{:.2f}".format(self.params_lower[param])
+                mean_string = "{:.2f}".format(self.params_mean[param])
+                upper_string = "{:.2f}".format(self.params_upper[param])
             else:
-                lower_string =  "{:.2e}".format(self.params_lower[param].val)
-                mean_string = "{:.2e}".format(self.params_mean[param].val)
-                upper_string = "{:.2e}".format(self.params_upper[param].val)
+                lower_string =  "{:.2e}".format(self.params_lower[param])
+                mean_string = "{:.2e}".format(self.params_mean[param])
+                upper_string = "{:.2e}".format(self.params_upper[param])
             param_string_array.append(param + ' = [' + lower_string + ', ' + mean_string + ', ' + upper_string + ']')
 
         return ('\n').join(param_string_array)
         
+    # Outputs the next available instance number and generates a folder for that instance
     def get_instance(self, previous_instance):
         if previous_instance != -1:
             instance = previous_instance
@@ -280,22 +404,27 @@ class Visualiser:
 
         instance_path = self.data_path + '/instance_' + str(instance)
         if not os.path.exists(instance_path):
-            print('Creating instance')
+            if not self.suppress_prints:
+                print('Creating instance')
             os.mkdir(instance_path)
         return instance
 
+    # Saves the hyperparameter object
     def save_hyperparams(self):
         with open(self.data_path + '/instance_' + str(self.instance) + '/hyperparams.json', "w") as fp:
             json.dump(self.hyperparams,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
         
-    def animate(self, name, frame_dur = 1):
+    # Gathers all of the figures under the inputted name, creates an animation of them and saves that animation
+    def animate(self, name, frame_dur = 500):
         folder_name = 'instance_' + str(self.instance) + '/' + name + '/figures'
         gif_name = name + '.gif'
         gif_path = self.data_path + '/' + 'instance_' + str(self.instance) + '/' + name + '/' + gif_name
         if not os.path.exists(self.data_path + '/' + folder_name):
-            print('Images for animation do not exist')
+            if not self.suppress_prints:
+                print('Images for animation do not exist')
         elif os.path.exists(gif_path):
-            print('Animation already exist!')
+            if not self.suppress_prints:
+                print('Animation already exist!')
         else:
             files = os.listdir(self.data_path + '/' + folder_name)
 
@@ -303,57 +432,110 @@ class Visualiser:
             for i in range(len(files))[::-1]:
                 images.append(imageio.imread(self.data_path + '/' + folder_name + '/' + files[i]))
 
-            imageio.mimsave(gif_path, images, duration = frame_dur)
+            imageio.mimsave(gif_path, images, duration = frame_dur, loop=0)
     
+    # Saves the samples and chain samples objects
     def save_samples(self):
         full_path = self.data_path + '/instance_' + str(self.instance) + '/samples.csv'
         if type(self.samples) == list and self.samples == []:
             raise Exception('Samples data is empty!')    
-        self.samples.to_csv(full_path)
-        
-    def load_samples(self):
-        full_path = self.data_path + '/instance_' + str(self.instance) + '/samples.csv'
-        if os.path.exists(full_path):
-            print('Loading Samples...')
-            return pd.read_csv(full_path)
-        else:
-            raise Exception('Samples file does not exist!')
+        pd.DataFrame(self.samples).to_csv(full_path, index=False)
 
+        chain_full_path = self.data_path + '/instance_' + str(self.instance) + '/chain_samples.csv'
+        if type(self.chain_samples) == list and self.chain_samples == []:
+            raise Exception('Samples data is empty!')    
+        pd.DataFrame(self.chain_samples).to_csv(chain_full_path, index=False)
+        
+    # Loads either the chain samples of samples object
+    def load_samples(self, chain = False):
+        if chain:
+            chain_full_path = self.data_path + '/instance_' + str(self.instance) + '/chain_samples.csv'
+            if os.path.exists(chain_full_path):
+                if not self.suppress_prints:
+                    print('Loading Chain Samples...')
+                return pd.read_csv(chain_full_path)
+            else:
+                raise Exception('Chain samples file does not exist!')
+        else:
+            full_path = self.data_path + '/instance_' + str(self.instance) + '/samples.csv'
+            if os.path.exists(full_path):
+                if not self.suppress_prints:
+                    print('Loading Samples...')
+                return pd.read_csv(full_path)
+            else:
+                raise Exception('Samples file does not exist!')
+
+    # Checks whether autocorrelation plots exist, if they don't they are generated and saved
     def get_autocorrelations(self):
-        full_path = self.data_path + '/instance_' + str(self.instance) + '/autocorrelations.png'
-        if os.path.exists(full_path):
-            print('Autocorrelations plot already exists')
-        else:
-            ap = self.autocorr(self.samples.values, self.samples.columns)
-            ap.savefig(full_path)
+        autocorr_folder = self.data_path + '/instance_' + str(self.instance) + '/autocorrelations'
+        if not os.path.exists(autocorr_folder):
+            os.mkdir(autocorr_folder)
 
+        for chain in range(self.num_chains):
+            full_path = autocorr_folder + '/autocorrelations_' + str(chain + 1) + '.png'
+            
+            if self.num_chains == 1:
+                title = 'MCMC autocorrelations'
+            else:
+                title = 'MCMC autocorrelations for chain ' + str(chain + 1)
+
+            if os.path.exists(full_path):
+                if not self.suppress_prints:
+                    print('Autocorrelations plot ' + str(chain + 1) + ' already exists')
+            else:
+                ac = self.autocorr_fig(chain, title = title)
+                ac.savefig(full_path)
     
-    def autocorr(self, x, x_names, D=-1):
-        if D == -1:
-            D = int(x.shape[0])
-        xp = np.atleast_2d(x)
-        z = (xp-np.mean(xp, axis=0))/np.std(xp, axis=0)
-        Ct = np.ones((D, z.shape[1]))
-        Ct[1:,:] = np.array([np.mean(z[i:]*z[:-i], axis=0) for i in range(1,D)])
-
-        tau_hat = 1 + 2*np.cumsum(Ct, axis=0)
-
-        Mrange = np.arange(len(tau_hat))
-        tau = np.argmin(Mrange[:,None] - 5*tau_hat, axis=0)
-
+    # Generates a autocorrelation plots based on the samples
+    def autocorr_fig(self, chain_num = 1, title = ''):
         fig = plt.figure(figsize=(6,4))
-        
-        for i in range(x.shape[1]):
-            autocorrelation = Ct[:,i]
-            plt.plot(autocorrelation, label = x_names[i])
-        
+        for param in self.samples.columns:
+            autocorrelations = self.autocorrs['chain_' + str(chain_num + 1)][param]['Ct']
+            tau = self.autocorrs['chain_' + str(chain_num + 1)][param]['tau']
+            plt.plot(autocorrelations, label = param + ', tau = ' + str(tau))
         plt.legend()
         plt.xlabel('Sample number')
         plt.ylabel('Autocorrelation')
-        plt.title('Discrete Autocorrelation ($\\tau = {:.1f}$)'.format(np.mean(tau)))
+        plt.title(title + '\nDiscrete Autocorrelation')
+        plt.tight_layout()
+        plt.close()
 
         return fig
     
+    # Calculates the autocorrelations based on the samples and saves them to an object
+    def calculate_autocorrs(self, D=-1):
+        self.autocorrs = {}
+        for chain_num in range(self.num_chains):
+            if self.num_chains > 1:
+                samples = self.chain_samples[self.chain_samples['chain'] == chain_num + 1].drop(columns = ['chain', 'sample_index'])
+            else:
+                samples = self.samples
+
+            if D == -1:
+                D = int(samples.shape[0])
+            
+            xp = np.atleast_2d(samples)
+            z = (xp-np.mean(xp, axis=0))/np.std(xp, axis=0)
+
+            Ct = np.ones((D, z.shape[1]))
+            Ct[1:,:] = np.array([np.mean(z[i:]*z[:-i], axis=0) for i in range(1,D)])
+            tau_hat = 1 + 2*np.cumsum(Ct, axis=0)
+            Mrange = np.arange(len(tau_hat))
+            tau = np.argmin(Mrange[:,None] - 5*tau_hat, axis=0)
+
+            self.autocorrs['chain_' + str(chain_num+1)] = {}
+            for i, param in enumerate(self.samples.columns):
+                self.autocorrs['chain_' + str(chain_num+1)][param] = {}
+                self.autocorrs['chain_' + str(chain_num+1)][param]['tau'] = tau[i]
+                self.autocorrs['chain_' + str(chain_num+1)][param]['Ct'] = Ct[:,i]
+        
+        self.autocorrs['overall'] = {}
+        for param in self.samples.columns:
+            tau_overall = np.mean([self.autocorrs['chain_' + str(x + 1)][param]['tau'] for x in range(self.num_chains)])
+            self.autocorrs['overall'][param] = {}
+            self.autocorrs['overall'][param]['tau'] = tau_overall
+    
+    # Outputs the specified quantile of the parameter samples
     def get_ag_samples(self,samples, q_val):
         ags = pd.Series({},dtype='float64')
         for col in samples.columns:
@@ -361,3 +543,76 @@ class Visualiser:
             ag = np.quantile(param_samples, q_val)
             ags[col] = ag
         return ags
+    
+    # Outputs the fields object from the sampler
+    def get_fields(self, chain_num):
+        output = {}
+        if self.fields.keys() != []:
+            for key in self.fields.keys():
+                field_output = self.fields[key][chain_num]
+                if key == 'diverging':
+                    field_output = sum(field_output.tolist())
+
+                output[key] = field_output
+        return output
+
+    # Generates an object which summarises the results of the sampler and saves it
+    def get_summary(self):
+        summary = {}
+        full_path = self.data_path + '/instance_' + str(self.instance) + '/summary.json'
+        if os.path.exists(full_path):
+            f = open(full_path)
+            summary = json.load(f)
+            f.close()
+        else:
+            summary['RMSE'] = self.RMSE
+            summary['AIC'] = self.AIC
+            for chain_num in range(self.num_chains):
+                summary['chain_' + str(chain_num + 1)] = {}
+                samples = self.chain_samples[self.chain_samples['chain'] == chain_num + 1].drop(columns = ['chain', 'sample_index'])
+                params_lower = self.get_ag_samples(samples, 0.05)
+                params_mean = self.get_ag_samples(samples, 0.5)
+                params_upper = self.get_ag_samples(samples, 0.95)
+
+                summary['chain_' + str(chain_num + 1)]['fields'] = self.get_fields(chain_num)
+
+                for param in self.samples.columns:
+                    summary['chain_' + str(chain_num + 1)][param] = {}
+                    
+                    summary['chain_' + str(chain_num + 1)][param]['lower'] = params_lower[param]
+                    summary['chain_' + str(chain_num + 1)][param]['mean'] = params_mean[param]
+                    summary['chain_' + str(chain_num + 1)][param]['upper'] = params_upper[param]
+                    
+                    summary['chain_' + str(chain_num + 1)][param]['tau'] = self.autocorrs['chain_' + str(chain_num + 1)][param]['tau']
+                    
+                    if self.actual_values[param] !='NaN':
+                        proposed = params_mean[param]
+                        actual = self.actual_values[param]
+                        summary['chain_' + str(chain_num + 1)][param]['param_accuracy'] = 200*np.abs(proposed-actual)/(proposed + actual)
+
+                
+            overall_samples = self.samples
+            summary['overall'] = {}
+
+            overall_params_lower = self.get_ag_samples(overall_samples, 0.05)
+            overall_params_mean = self.get_ag_samples(overall_samples, 0.5)
+            overall_params_upper = self.get_ag_samples(overall_samples, 0.95)
+
+            summary['chain_' + str(chain_num + 1)]['fields'] = self.get_fields(0)
+
+            for param in self.samples.columns:
+                summary['overall'][param] = {}
+
+                summary['overall'][param]['lower'] = overall_params_lower[param]
+                summary['overall'][param]['mean'] = overall_params_mean[param]
+                summary['overall'][param]['upper'] = overall_params_upper[param]
+                summary['overall'][param]['tau'] = self.autocorrs['overall'][param]['tau']
+
+                if self.actual_values[param] !='NaN':
+                    summary['overall'][param]['param_accuracy'] = np.abs(overall_params_mean[param]-self.actual_values[param])/np.mean([overall_params_mean[param],self.actual_values[param]])*100
+
+
+            with open(self.data_path + '/instance_' + str(self.instance) + '/summary.json', "w") as fp:
+                json.dump(summary,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
+
+        return summary

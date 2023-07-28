@@ -2,35 +2,99 @@ import numpy as np
 import pandas as pd
 import os
 import json
-from inference_toolbox.parameter import Parameter
+from numpyro.infer import log_likelihood
+import numpyro
+import jax.numpy as jnp
+from jax import random
 
+# Sampler class - samples inference parameters
 class Sampler:
-    def __init__(self, params, model, likelihood, data, joint_pdf = True, show_sample_info = False):
-        self.current_params = params
-        self.proposed_params = self.copy_params(params)
+    # Initialises the Sampler class saving all relavant variables and generating a hyperparameters object
+    def __init__(self, params, model, likelihood, training_data, testing_data, n_samples, n_warmup = -1, n_chains = 1, thinning_rate = 1, data_path = 'results/inference/general_instances'):
+        self.params = params
         self.model = model
         self.model_func = model.get_model()
         self.likelihood = likelihood
-        self.likelihood_func = likelihood.get_log_likelihood_func()
-        self.data = data
-        self.joint_pdf = joint_pdf
-        self.show_sample_info = show_sample_info
-        self.sample_info_rows = []
+        self.likelihood_func = likelihood.get_likelihood_function()
+        self.data = training_data
+        self.test_data = testing_data
+        self.n_samples = n_samples
+        self.n_chains = n_chains
+        self.n_warmup = n_warmup
+        self.thinning_rate = thinning_rate
+
+        self.data_path = data_path
+        
+        if self.n_warmup == -1:
+            self.n_warmup = int(0.25*n_samples)
+
         self.instance = -1
 
+        self.get_hyperparams()
+
+    # Generates the allotted number of samples
+    def sample_all(self, rng_key = random.PRNGKey(2120)):
+        data_exists = self.check_data_exists()
+
+        # If data does not already exist, then generate samples
+        if not data_exists:
+            kernel = numpyro.infer.NUTS(self.sample_one)
+            self.mcmc_obj = numpyro.infer.MCMC(kernel, num_warmup=self.n_warmup, num_samples=self.n_samples, num_chains=self.n_chains, thinning=self.thinning_rate, chain_method = 'sequential')
+            self.mcmc_obj.run(rng_key=rng_key)
+            samples = self.mcmc_obj.get_samples(group_by_chain=True)
+            self.fields = self.mcmc_obj.get_extra_fields(group_by_chain=True)
+            
+            self.samples, self.chain_samples = self.format_samples(samples)
+
+            return self.samples, self.chain_samples, self.fields
+        else:
+            self.samples = []
+            self.chain_samples = []
+            self.fields = {}
+            return [], [], {}
+        
+    # Puts the samples into the correct format - splitting samples into "all samples" and "chain samples"
+    def format_samples(self, samples):
+        chain_new_samples = pd.DataFrame({}, dtype='float64')
+        for param in self.params.index:
+            sample_chains = np.array(samples[param])
+            chains = range(sample_chains.shape[0])
+            chain_array = np.array([])
+            chain_new_samples_array = np.array([])
+            sample_index_array = np.array([])
+            
+            for chain in chains:
+                chain_new_samples_array = np.concatenate((chain_new_samples_array, sample_chains[chain]))
+                chain_array = np.concatenate((chain_array, (chain+1)*np.ones(sample_chains[chain].shape)))
+                sample_index_array = np.concatenate((sample_index_array, np.array(range(sample_chains.shape[1]))+1))
+            chain_new_samples[param] = chain_new_samples_array
+        chain_new_samples['chain'] = chain_array
+        chain_new_samples['sample_index'] = sample_index_array
+
+        return chain_new_samples.sort_values(['sample_index']).reset_index().drop(columns=['chain', 'sample_index','index']), chain_new_samples
+    
+    # Generates one sample of the infered parameters
+    def sample_one(self):
+        current_params_sample ={}
+        for param_ind in self.params.index:
+            s = self.params[param_ind].sample_param()
+            current_params_sample[param_ind] = s
+
+        mu = self.model_func(current_params_sample, self.data.x, self.data.y, self.data.z)
+        numpyro.deterministic('mu', mu)
+        observations_modelled = numpyro.sample('obs', self.likelihood_func(mu, current_params_sample), obs=jnp.array(self.data.Concentration))
+
+    # Generates the hyperparamaters object and saves it to the Sampler class
     def get_hyperparams(self):
         self.hyperparams = {}
         # Adding Parameter related hyperparameters
         self.hyperparams['params'] = {}
-        for param_ind in self.current_params.index:
+        for param_ind in self.params.index:
             self.hyperparams['params'][param_ind] = {}
-            self.hyperparams['params'][param_ind]['init_val'] = self.current_params[param_ind].init_val
-            self.hyperparams['params'][param_ind]['step_func'] = self.current_params[param_ind].step_select
-            self.hyperparams['params'][param_ind]['step_size'] = self.current_params[param_ind].step_size
-            self.hyperparams['params'][param_ind]['prior_func'] = self.current_params[param_ind].prior_select
+            self.hyperparams['params'][param_ind]['prior_func'] = self.params[param_ind].prior_select
             self.hyperparams['params'][param_ind]['prior_params'] = {}
-            for prior_param_ind in self.current_params[param_ind].prior_params.index:
-                self.hyperparams['params'][param_ind]['prior_params'][prior_param_ind] = self.current_params[param_ind].prior_params[prior_param_ind]
+            for prior_param_ind in self.params[param_ind].prior_params.index:
+                self.hyperparams['params'][param_ind]['prior_params'][prior_param_ind] = self.params[param_ind].prior_params[prior_param_ind]
 
         # Adding Model related hyperparameters
         self.hyperparams['model'] = {}
@@ -46,120 +110,36 @@ class Sampler:
         for likelihood_param_ind in self.likelihood.likelihood_params.index:
             self.hyperparams['likelihood']['likelihood_params'][likelihood_param_ind] = self.likelihood.likelihood_params[likelihood_param_ind]
         
+        # Adding Sampler related hyperparameters
+        self.hyperparams['sampler'] = {}
+        self.hyperparams['sampler']['n_samples'] = self.n_samples
+        self.hyperparams['sampler']['n_warmup'] = self.n_warmup
+        self.hyperparams['sampler']['n_chains'] = self.n_chains
+        self.hyperparams['sampler']['thinning_rate'] = self.thinning_rate
+
         return self.hyperparams
         
+    # Creates a copy of all of the inputted parameters
     def copy_params(self,params):
         new_params = params.copy()
         for ind in params.index:
             new_params[ind] = new_params[ind].copy()
         return new_params
-    
-    def accept_params(self, current_log_priors, proposed_log_priors, step_forward_log_prob, step_backward_log_prob):
-        # Calculate the log posterior of the current parameters
-        curr_modelled_vals = self.model_func(self.current_params,self.data['x'],self.data['y'],self.data['z'])
-        curr_log_lhood = self.likelihood_func(curr_modelled_vals, self.data['Concentration'])
-        curr_log_posterior = curr_log_lhood + current_log_priors
-        
-         # Calculate the log posterior of the proposed parameters
-        prop_modelled_vals = self.model_func(self.proposed_params,self.data['x'],self.data['y'],self.data['z'])
-        prop_log_lhood = self.likelihood_func(prop_modelled_vals, self.data['Concentration'])
-        prop_log_posterior = prop_log_lhood + proposed_log_priors
 
-        alpha = np.exp(prop_log_posterior - curr_log_posterior + step_backward_log_prob - step_forward_log_prob)
-        rand_num = np.random.uniform(low = 0, high = 1)
-        accepted = rand_num < np.min([1,alpha])
-
-        if self.show_sample_info:
-            sample_info_row = {}
-            sample_info_row['current_params'] = [x.val for x in self.current_params]
-            sample_info_row['proposed_params'] = [x.val for x in self.proposed_params]
-            sample_info_row['current_log_likelihood'] = curr_log_lhood
-            sample_info_row['proposed_log_likelihood'] = prop_log_lhood
-            sample_info_row['step_forward_log_probs'] = step_forward_log_prob
-            sample_info_row['step_backward_log_probs'] = step_backward_log_prob
-            sample_info_row['current_log_posterior'] = curr_log_posterior
-            sample_info_row['proposed_log_posterior'] = prop_log_posterior
-            sample_info_row['alpha'] = alpha
-            sample_info_row['accepted'] = accepted
-
-            self.sample_info_rows.append(pd.Series(sample_info_row))
-
-        # Acceptance criteria
-
-        # Acceptance criteria.
-        if accepted:
-            self.current_params = self.copy_params(self.proposed_params)
-            return self.copy_params(self.proposed_params), 1
-        else:
-            return self.copy_params(self.current_params), 0
-    
-    def sample_one(self):
-        current_log_priors = []
-        proposed_log_priors = []
-        step_forward_log_probs = []
-        step_backward_log_probs = []
-
-        for i in range(self.current_params.size):
-            # Define current parameter
-            current_param = self.current_params[i]
-            proposed_param = current_param.copy()
-            
-            # Get functions
-            step_log_prob, step_function = current_param.get_step_function()
-            log_prior_func = current_param.get_log_prior()
-            
-            # Step to proposed parameter
-            proposed_param.val = step_function(current_param.val)
-            step_forward_log_probs.append(step_log_prob(proposed_param.val, current_param.val))
-            step_backward_log_probs.append(step_log_prob(current_param.val, proposed_param.val))
-
-            # Add to series of proposed parameters
-            self.proposed_params[i] = proposed_param
-                        
-            # Create a list of log prior probabilities from each current and proposed parameter
-            current_log_priors.append(log_prior_func(current_param.val))
-            proposed_log_priors.append(log_prior_func(proposed_param.val))
-            
-        if self.joint_pdf:
-            return self.accept_params(sum(current_log_priors), sum(proposed_log_priors), sum(step_forward_log_probs), sum(step_backward_log_probs))
-            
-            # Can include non joint PDF here
-            
+    # Function for checking whether a sampler of this configuration has altready been run by 
+    # looking through the list of instances and comparing the hyperparameter objects   
     def check_data_exists(self):
-        data_path = 'results/inference'
         data_exists = False
-        for instance_folder in os.listdir(data_path):
-            folder_path = data_path + '/' + instance_folder
+        if not os.path.exists(self.data_path):
+            os.makedirs(self.data_path)
+        x=os.listdir(self.data_path)
+        for instance_folder in os.listdir(self.data_path):
+            folder_path = self.data_path + '/' + instance_folder
             f = open(folder_path + '/hyperparams.json')
             instance_hyperparams = json.load(f)
             f.close()
             if self.hyperparams == instance_hyperparams:
                 data_exists = True
                 self.instance = int(instance_folder.split('_')[1])
-            return data_exists
+        return data_exists
             
-    def sample_all(self, n_samples):
-        data_exists = self.check_data_exists()
-        acceptance_rate = 0
-        samples = []
-        accepted = []
-        sample_info_file_name = 'most_recent_sample_info.csv'
-        if os.path.exists(sample_info_file_name):
-            os.remove(sample_info_file_name)
-        if not data_exists:
-            for i in range(1,n_samples+1):
-                if (i % 1000 == 0):
-                    print('Running sample ' + str(i) + '...')    # Print progress every 1000th sample.
-                sample, accept = self.sample_one()
-                accepted.append(accept)
-                samples.append(sample)
-            if self.show_sample_info:
-                self.sample_info = pd.concat(self.sample_info_rows, axis=1, ignore_index=True).T
-                self.sample_info.to_csv(sample_info_file_name)
-            acceptance_rate = sum(accepted)/len(accepted)*100
-            samples = pd.DataFrame(samples)
-            for col in samples:
-                samples[col] = samples[col].apply(lambda x: x.val)
-        
-        return samples, acceptance_rate
-    
