@@ -5,36 +5,19 @@ import os
 import json
 from numpyencoder import NumpyEncoder
 
-from drivers.driver import Driver
-from inference_toolbox.parameter import Parameter
-from inference_toolbox.model import Model
-from inference_toolbox.likelihood import Likelihood
-from inference_toolbox.sampler import Sampler
-from inference_toolbox.visualiser import Visualiser
-from data_processing.get_data import get_data
+from controllers.controller import Controller
+from toolboxes.inference_toolbox.parameter import Parameter
+from toolboxes.inference_toolbox.model import Model
+from toolboxes.inference_toolbox.likelihood import Likelihood
+from toolboxes.inference_toolbox.sampler import Sampler
+from toolboxes.inference_toolbox.visualiser import Visualiser
+from toolboxes.data_processing_toolbox.get_data import get_data
 
 # Sandbox class - used for generating one instance of the sampler and visualising its results
-class Sandbox(Driver):
+class Sandbox(Controller):
     # Initialises the Sandbox class saving all relevant variables and performing some initialising tasks
     def __init__(self, 
                  results_name = 'name_placeholder',
-                 default_params = {
-                    'infered_params':pd.Series({
-                        'model_params':pd.Series({
-                            'I_y': Parameter('I_y', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
-                            'I_z': Parameter('I_z', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
-                            'Q': Parameter('Q', prior_select = 'gamma', default_value=3e13).add_prior_param('mu', 3e13).add_prior_param('sigma',1e13),
-                        }),
-                        'likelihood_params':pd.Series({},dtype='float64')
-                    }),
-                    'model':Model('log_gpm_alt_norm').add_model_param('H',10),
-                    'likelihood': Likelihood('gaussian_fixed_sigma').add_likelihood_param('sigma',1),
-                    'sampler': {
-                        'n_samples': 10000,
-                        'n_chains': 3,
-                        'thinning_rate': 1
-                    }
-                },
                  data_params = {
                     'data_type': 'dummy',
                     'data_path': 'data',
@@ -61,10 +44,31 @@ class Sandbox(Driver):
                     },
                     'output_header': 'Concentration'
                 },
-                results_path = 'results'):
+                default_params = {
+                    'infered_params':pd.Series({
+                        'model_params':pd.Series({
+                            'I_y': Parameter('I_y', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
+                            'I_z': Parameter('I_z', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
+                            'Q': Parameter('Q', prior_select = 'gamma', default_value=3e13).add_prior_param('mu', 3e13).add_prior_param('sigma',1e13),
+                        }),
+                        'likelihood_params':pd.Series({},dtype='float64')
+                    }),
+                    'model':Model('log_gpm_alt_norm').add_model_param('H',10),
+                    'likelihood': Likelihood('gaussian_fixed_sigma').add_likelihood_param('sigma',1),
+                    'sampler': {
+                        'n_samples': 10000,
+                        'n_chains': 3,
+                        'thinning_rate': 1
+                    }
+                },
+                results_path = 'results/inference_results'):
         
-        # Inherits methods and attributes from parent Driver class
-        super().__init__(results_name, default_params, data_params, results_path)
+        # Inherits methods and attributes from parent Controller class
+        super().__init__(results_name, data_params, default_params, results_path)
+
+        # Generates results folder
+        if not os.path.exists(results_path):
+            os.makedirs(results_path)
 
         # Actual parameter values are saved if they are available
         self.actual_values = []
@@ -81,7 +85,7 @@ class Sandbox(Driver):
     # Initialises the construction using the construction object, checking and creating all relevant files and folders
     def init_construction(self, construction):
         self.construction_results_path = self.results_path + '/' + self.results_name
-        self.full_results_path = self.construction_results_path + '/inference/general_instances'
+        self.full_results_path = self.construction_results_path + '/general_instances'
 
         if not os.path.exists(self.construction_results_path):
             os.makedirs(self.construction_results_path)

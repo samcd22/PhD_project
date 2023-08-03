@@ -6,36 +6,23 @@ from matplotlib import pyplot as plt
 import json
 from numpyencoder import NumpyEncoder
 
-from drivers.driver import Driver
-from inference_toolbox.parameter import Parameter
-from inference_toolbox.model import Model
-from inference_toolbox.likelihood import Likelihood
-from inference_toolbox.sampler import Sampler
-from inference_toolbox.visualiser import Visualiser
-from data_processing.get_data import get_data
+from controllers.controller import Controller
+from toolboxes.inference_toolbox.parameter import Parameter
+from toolboxes.inference_toolbox.model import Model
+from toolboxes.inference_toolbox.likelihood import Likelihood
+from toolboxes.inference_toolbox.sampler import Sampler
+from toolboxes.inference_toolbox.visualiser import Visualiser
+from toolboxes.data_processing_toolbox.get_data import get_data
+
+from memory_profiler import profile
+import psutil
+
 
 # Generator class - generates multiple instances of the sampler based on varying their default parameters
-class Generator(Driver):
+class Generator(Controller):
     # Initialises the Generator class saving all relevant variables and performing some initialising tasks
     def __init__(self, 
                  results_name = 'name_placeholder',
-                 default_params = {
-                    'infered_params':pd.Series({
-                        'model_params':pd.Series({
-                            'I_y': Parameter('I_y', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
-                            'I_z': Parameter('I_z', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
-                            'Q': Parameter('Q', prior_select = 'gamma', default_value=3e13).add_prior_param('mu', 3e13).add_prior_param('sigma',1e13),
-                        }),
-                        'likelihood_params':pd.Series({},dtype='float64')
-                    }),
-                    'model':Model('log_gpm_alt_norm').add_model_param('H',10),
-                    'likelihood': Likelihood('gaussian_fixed_sigma').add_likelihood_param('sigma',1),
-                    'sampler': {
-                        'n_samples': 10000,
-                        'n_chains': 3,
-                        'thinning_rate': 1
-                    }
-                },
                  data_params = {
                     'data_type': 'dummy',
                     'data_path': 'data',
@@ -62,15 +49,37 @@ class Generator(Driver):
                     },
                     'output_header': 'Concentration'
                 },
-                results_path = 'results'):
+                default_params = {
+                    'infered_params':pd.Series({
+                        'model_params':pd.Series({
+                            'I_y': Parameter('I_y', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
+                            'I_z': Parameter('I_z', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
+                            'Q': Parameter('Q', prior_select = 'gamma', default_value=3e13).add_prior_param('mu', 3e13).add_prior_param('sigma',1e13),
+                        }),
+                        'likelihood_params':pd.Series({},dtype='float64')
+                    }),
+                    'model':Model('log_gpm_alt_norm').add_model_param('H',10),
+                    'likelihood': Likelihood('gaussian_fixed_sigma').add_likelihood_param('sigma',1),
+                    'sampler': {
+                        'n_samples': 10000,
+                        'n_chains': 3,
+                        'thinning_rate': 1
+                    }
+                },
+                results_path = 'results/inference_results'):
         
-        # Inherits methods and attributes from parent Driver class
-        super().__init__(results_name, default_params, data_params, results_path)
+        # Inherits methods and attributes from parent Controller class
+        super().__init__(results_name, data_params, default_params, results_path)
+
+        # Generates results folder
+        if not os.path.exists(results_path):
+            os.makedirs(results_path)
 
         # Initialises the default parameters
         self.default_values = pd.Series({
             'RMSE': 'NaN',
             'AIC': 'NaN',
+            'BIC': 'NaN',
             'av_divergence': 'NaN'
         })
     
@@ -78,6 +87,7 @@ class Generator(Driver):
         self.par_to_col = {
             'RMSE': ('results','misc', 'RMSE'),
             'AIC': ('results','misc','AIC'),
+            'BIC': ('results','misc','BIC'),
             'av_divergence': ('results','misc', 'average_diverging'),
         }
 
@@ -146,7 +156,7 @@ class Generator(Driver):
     # Initialises the construction using the construction object, checking and creating all relevant files and folders
     def init_construction(self, construction):
         self.construction_results_path = self.results_path + '/' + self.results_name
-        self.full_results_path = self.construction_results_path + '/inference/auto_gen_results'
+        self.full_results_path = self.construction_results_path + '/auto_gen_instances'
 
         if not os.path.exists(self.construction_results_path):
             os.makedirs(self.construction_results_path)
@@ -194,75 +204,90 @@ class Generator(Driver):
                     inputs.loc[instance,self.par_to_col[param + '_param_accuracy']] = summary['overall'][param]['param_accuracy']
             return inputs
 
-        # Loops through each instance in the inputs data frame
-        for instance in inputs.index:
-            print('Generating instance ' +str(instance) + '...')
-            
-            # Generate the infered parameters for this instance
-            infered_model_params = assign_parameters(self.default_params['infered_params']['model_params'], inputs, instance)
-            infered_likelihood_params = assign_parameters(self.default_params['infered_params']['likelihood_params'], inputs, instance)
-            params = pd.concat([infered_model_params, infered_likelihood_params], axis = 0)
+        # Batch size for processing instances
+        batch_size = 2
 
-            # Generates the Model object for this instances
-            model = Model(inputs[self.par_to_col['model_type']].values[instance-1])
-            for model_param_name in self.default_params['model'].model_params.index:
-                model.add_model_param(model_param_name, 
-                                      np.float64(inputs[self.par_to_col['model_' + model_param_name]].values[instance-1]))
-                
-            # Generates the Likelihood object for this instances
-            likelihood = Likelihood(inputs[self.par_to_col['likelihood_type']].values[instance-1])
-            for likelihood_param_name in self.default_params['likelihood'].likelihood_params.index:
-                likelihood.add_likelihood_param(likelihood_param_name, 
-                                                np.float64(inputs[self.par_to_col['likelihood_' + likelihood_param_name]].values[instance-1]))
+        # Loops through each instance in the inputs data frame in batches
+        for batch_start in range(0, len(inputs), batch_size):
+            batch_end = min(batch_start + batch_size, len(inputs))
+            instances_batch = inputs.iloc[batch_start:batch_end]
 
-            # Additions to likelihood object under certain conditions
-            if self.data_params['data_type'] == 'dummy':
-                if self.data_params['sigma'] == 'NaN':
-                    if 'sigma' not in likelihood.likelihood_params:
-                        raise Exception('Either define your noise level with a fixed sigma in the likelihood, or set the noise level!')
-                    self.data_params['sigma'] = likelihood.likelihood_params['sigma']
+            # Print CPU info
+            cpu_usage = psutil.cpu_percent()
+            print(f"CPU Usage: {cpu_usage}%")
 
-            # Generates the sampler variables for this instance
-            num_samples = int(inputs[self.par_to_col['n_samples']].values[instance-1])
-            num_chains = int(inputs[self.par_to_col['n_chains']].values[instance-1])
-            thinning_rate = int(inputs[self.par_to_col['thinning_rate']].values[instance-1])
+            memory = psutil.virtual_memory()
+            print(f"Total Memory: {memory.total} bytes")
+            print(f"Available Memory: {memory.available} bytes")
+            print(f"Used Memory: {memory.used} bytes")
+            print(f"Memory Usage: {memory.percent}%")
 
-            # Generates the data for this instance
-            data = get_data(self.data_params['data_type'], self.data_params)
-            training_data, testing_data = train_test_split(data, test_size=0.2)
+            for instance in instances_batch.index:
+                print('Generating instance ' + str(instance) + '...')
 
-            # Actual parameter values are saved if they are available
-            actual_values = []
-            if self.data_params['data_type'] == 'dummy':
-                for inference_param in self.data_params['model']['inference_params'].keys():
-                    actual_values.append(self.data_params['model']['inference_params'][inference_param])
+                # Generate the infered parameters for this instance
+                infered_model_params = assign_parameters(self.default_params['infered_params']['model_params'], inputs, instance)
+                infered_likelihood_params = assign_parameters(self.default_params['infered_params']['likelihood_params'], inputs, instance)
+                params = pd.concat([infered_model_params, infered_likelihood_params], axis=0)
 
-            # Generate and visualise the samples based on the specific instance construction
-            sampler = Sampler(params, model, likelihood, training_data, testing_data, num_samples, n_chains=num_chains, thinning_rate=thinning_rate, data_path = instances_path)
-            sampler.sample_all()
-            visualiser = Visualiser(testing_data, 
-                                    sampler, 
-                                    model, 
-                                    previous_instance = sampler.instance, 
-                                    data_path = instances_path, 
-                                    suppress_prints = True, 
-                                    actual_values = actual_values)
-            # Saves the summary and traceplots for this instance
-            summary = visualiser.get_summary()
-            visualiser.get_traceplot()
+                # Generates the Model object for this instances
+                model = Model(inputs[self.par_to_col['model_type']].values[instance - 1])
+                for model_param_name in self.default_params['model'].model_params.index:
+                    model.add_model_param(model_param_name, np.float64(inputs[self.par_to_col['model_' + model_param_name]].values[instance - 1]))
 
-            # Adds results to this instance of the inputs dataframe
-            inputs = output_param_results(self.default_params['infered_params']['model_params'],inputs, instance)
-            inputs = output_param_results(self.default_params['infered_params']['likelihood_params'],inputs, instance)
-            inputs.loc[instance,self.par_to_col['RMSE']] = summary['RMSE']
-            inputs.loc[instance,self.par_to_col['AIC']] = summary['AIC']
-            divergences = []
-            for i in range(visualiser.num_chains):
-                divergences.append(summary['chain_' + str(i+1)]['fields']['diverging'])
-            inputs.loc[instance,self.par_to_col['av_divergence']] = np.mean(divergences)
+                # Generates the Likelihood object for this instances
+                likelihood = Likelihood(inputs[self.par_to_col['likelihood_type']].values[instance - 1])
+                for likelihood_param_name in self.default_params['likelihood'].likelihood_params.index:
+                    likelihood.add_likelihood_param(likelihood_param_name, np.float64(inputs[self.par_to_col['likelihood_' + likelihood_param_name]].values[instance - 1]))
 
-        # Saves the edited inputs file
+                # Additions to likelihood object under certain conditions
+                if self.data_params['data_type'] == 'dummy':
+                    if self.data_params['sigma'] == 'NaN':
+                        if 'sigma' not in likelihood.likelihood_params:
+                            raise Exception('Either define your noise level with a fixed sigma in the likelihood, or set the noise level!')
+                        self.data_params['sigma'] = likelihood.likelihood_params['sigma']
+
+                # Generates the sampler variables for this instance
+                num_samples = int(inputs[self.par_to_col['n_samples']].values[instance - 1])
+                num_chains = int(inputs[self.par_to_col['n_chains']].values[instance - 1])
+                thinning_rate = int(inputs[self.par_to_col['thinning_rate']].values[instance - 1])
+
+                # Generates the data for this instance
+                data = get_data(self.data_params['data_type'], self.data_params)
+                training_data, testing_data = train_test_split(data, test_size=0.2)
+
+                # Actual parameter values are saved if they are available
+                actual_values = []
+                if self.data_params['data_type'] == 'dummy':
+                    for inference_param in self.data_params['model']['inference_params'].keys():
+                        actual_values.append(self.data_params['model']['inference_params'][inference_param])
+
+                # Generate and visualize the samples based on the specific instance construction
+                sampler = Sampler(params, model, likelihood, training_data, testing_data, num_samples, n_chains=num_chains, thinning_rate=thinning_rate, data_path=instances_path)
+                sampler.sample_all()
+                visualiser = Visualiser(testing_data, sampler, model, previous_instance=sampler.instance, data_path=instances_path, suppress_prints=True, actual_values=actual_values)
+                # Saves the summary and traceplots for this instance
+                summary = visualiser.get_summary()
+                visualiser.get_traceplot()
+
+                # Adds results to this instance of the inputs dataframe
+                inputs = output_param_results(self.default_params['infered_params']['model_params'], inputs, instance)
+                inputs = output_param_results(self.default_params['infered_params']['likelihood_params'], inputs, instance)
+                inputs.loc[instance, self.par_to_col['RMSE']] = summary['RMSE']
+                inputs.loc[instance, self.par_to_col['AIC']] = summary['AIC']
+                inputs.loc[instance, self.par_to_col['BIC']] = summary['BIC']
+                divergences = []
+                for i in range(visualiser.num_chains):
+                    divergences.append(summary['chain_' + str(i + 1)]['fields']['diverging'])
+                inputs.loc[instance, self.par_to_col['av_divergence']] = np.mean(divergences)
+
+            # Delete sampler and visualiser objects to release memory
+            del sampler
+            del visualiser
+
+        # Saves the edited inputs file after processing all instances
         inputs.to_excel(results_path + '/results.xlsx')
+
         return inputs
     
     # Generates instances while varying one parameter beyond the Generator object's default values
@@ -369,6 +394,7 @@ class Generator(Driver):
         # Extracts success metrics from generated results
         RMSE_results = results[self.par_to_col['RMSE']].values.astype('float64')
         AIC_results = results[self.par_to_col['AIC']].values.astype('float64')
+        BIC_results = results[self.par_to_col['BIC']].values.astype('float64')
         diverging_results = np.around(results[self.par_to_col['av_divergence']].values.astype('float64'))
         tau_av = np.around(np.mean(param_taus.values, axis=0))
 
@@ -378,6 +404,7 @@ class Generator(Driver):
         varying_parameter_2 = np.reshape([varying_parameter_2], new_shape)
         RMSE_results = np.reshape([RMSE_results], new_shape)
         AIC_results = np.reshape([AIC_results], new_shape)
+        BIC_results = np.reshape([BIC_results], new_shape)
         diverging_results = np.reshape([diverging_results], new_shape)
         tau_av = np.reshape([tau_av], new_shape)
 
@@ -424,38 +451,49 @@ class Generator(Driver):
         fig2.savefig(results_path + '/AIC_plot.png')
         plt.close()
 
-        # Divergences figure
+        # BIC figure
         fig3 = plt.figure()
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
+        plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, BIC_results, cmap='jet')
+        plt.title('BIC of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
+        plt.colorbar()
+        plt.tight_layout()
+        fig3.savefig(results_path + '/BIC_plot.png')
+        plt.close()
+
+        # Divergences figure
+        fig4 = plt.figure()
         plt.xlabel(x_label)
         plt.ylabel(y_label)
         plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, diverging_results, cmap='jet')
         plt.title('Number of divergences of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
         plt.colorbar()
         plt.tight_layout()
-        fig3.savefig(results_path + '/divergence_plot.png')
+        fig4.savefig(results_path + '/divergence_plot.png')
         plt.close()
 
         # Convergence variation figure
-        fig4 = plt.figure()
+        fig5 = plt.figure()
         plt.xlabel(x_label)
         plt.ylabel(y_label)
         plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, tau_av, cmap='jet')
         plt.title('Tau convergence of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
         plt.colorbar()
         plt.tight_layout()
-        fig4.savefig(results_path + '/convergance_variation.png')
+        fig5.savefig(results_path + '/convergance_variation.png')
         plt.close()
 
         # Parameter accuracy figure
         if param_accuracy_conditional:
-            fig5 = plt.figure()
+            fig6 = plt.figure()
             plt.xlabel(x_label)
             plt.ylabel(y_label)
             plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, param_accuracy_av, cmap='jet')
             plt.title('Average parameter percentage error for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
             plt.colorbar()
             plt.tight_layout()
-            fig5.savefig(results_path + '/param_accuracy_plot.png')
+            fig6.savefig(results_path + '/param_accuracy_plot.png')
             plt.close()
 
     # Generates plots of the results from varying one parameter beyond the Generator object's default values
@@ -482,6 +520,7 @@ class Generator(Driver):
         # Extracts success metrics from generated results
         RMSE_results = results[self.par_to_col['RMSE']].values.astype('float64')
         AIC_results = results[self.par_to_col['AIC']].values.astype('float64')
+        BIC_results = results[self.par_to_col['BIC']].values.astype('float64')
         diverging_results = np.around(results[self.par_to_col['av_divergence']].values.astype('float64'))
         
         varying_parameter = results[self.par_to_col[parameter_name]]
@@ -508,19 +547,30 @@ class Generator(Driver):
         fig2.savefig(results_path + '/AIC_plot.png')
         plt.close()
 
-        # Divergences figure
+        # BIC figure
         fig3 = plt.figure()
+        plt.xlabel(parameter_name)
+        plt.ylabel('BIC')
+        plt.plot(varying_parameter, BIC_results)
+        plt.xscale(xscale)
+        plt.title('BIC of the algorithm for varying ' + parameter_name)
+        plt.tight_layout()
+        fig3.savefig(results_path + '/BIC_plot.png')
+        plt.close()
+
+        # Divergences figure
+        fig4 = plt.figure()
         plt.xlabel(parameter_name)
         plt.ylabel('Divergences')
         plt.plot(varying_parameter, diverging_results)
         plt.xscale(xscale)
         plt.title('Number of divergences of the algorithm for varying ' + parameter_name)
         plt.tight_layout()
-        fig3.savefig(results_path + '/divergence_plot.png')
+        fig4.savefig(results_path + '/divergence_plot.png')
         plt.close()
 
         # Convergence variation figure
-        fig4 = plt.figure()
+        fig5 = plt.figure()
         plt.xlabel(parameter_name)
         plt.ylabel('Tau')
         for param_name in param_taus.index:
@@ -529,12 +579,12 @@ class Generator(Driver):
         plt.title('Convergence of the algorithm for varying ' + parameter_name)
         plt.legend()
         plt.tight_layout()
-        fig4.savefig(results_path + '/convergance_variation.png')
+        fig5.savefig(results_path + '/convergance_variation.png')
         plt.close()
 
         # Parameter accuracy figure
         if param_accuracy_conditional:
-            fig5 = plt.figure()
+            fig6 = plt.figure()
             plt.xlabel(parameter_name)
             plt.ylabel('Parameter percentage error (%)')
             for param_name in param_accuracies.index:
@@ -543,7 +593,7 @@ class Generator(Driver):
             plt.title('Average parameter percentage error for varying ' + parameter_name)
             plt.legend()
             plt.tight_layout()
-            fig5.savefig(results_path + '/param_accuracy_plot.png')
+            fig6.savefig(results_path + '/param_accuracy_plot.png')
             plt.close()
 
 

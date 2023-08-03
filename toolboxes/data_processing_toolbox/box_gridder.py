@@ -7,7 +7,7 @@ import os
 class BoxGridder:
     
     # Takes the data as an input to initialise the box gridder
-    def __init__(self, data, grid_size, target = False, data_path = 'data/gridded_data'):
+    def __init__(self, data, grid_size, target = False, data_path = 'data/normalised_gridded_data'):
         self.data = data
         self.data_path = data_path
         self.grid_size = grid_size

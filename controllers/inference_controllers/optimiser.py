@@ -7,36 +7,19 @@ import json
 from numpyencoder import NumpyEncoder
 from matplotlib import pyplot as plt
 
-from drivers.driver import Driver
-from inference_toolbox.parameter import Parameter
-from inference_toolbox.model import Model
-from inference_toolbox.likelihood import Likelihood
-from inference_toolbox.sampler import Sampler
-from inference_toolbox.visualiser import Visualiser
-from inference_toolbox.domain import Domain
-from data_processing.get_data import get_data
+from controllers.controller import Controller
+from toolboxes.inference_toolbox.parameter import Parameter
+from toolboxes.inference_toolbox.model import Model
+from toolboxes.inference_toolbox.likelihood import Likelihood
+from toolboxes.inference_toolbox.sampler import Sampler
+from toolboxes.inference_toolbox.visualiser import Visualiser
+from toolboxes.plotting_toolbox.domain import Domain
+from toolboxes.data_processing_toolbox.get_data import get_data
 
 # Optimiser class - generates multiple instances of the sampler, varying their hyperparameters to optimise the results
-class Optimiser(Driver):
+class Optimiser(Controller):
     def __init__(self,
-                 results_name = 'name_placeholder',
-                 default_params = {
-                    'infered_params':pd.Series({
-                        'model_params':pd.Series({
-                            'I_y': Parameter('I_y', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
-                            'I_z': Parameter('I_z', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
-                            'Q': Parameter('Q', prior_select = 'gamma', default_value=3e13).add_prior_param('mu', 3e13).add_prior_param('sigma',1e13),
-                        }),
-                        'likelihood_params':pd.Series({},dtype='float64')
-                    }),
-                    'model':Model('log_gpm_alt_norm').add_model_param('H',10),
-                    'likelihood': Likelihood('gaussian_fixed_sigma').add_likelihood_param('sigma',1),
-                    'sampler': {
-                        'n_samples': 10000,
-                        'n_chains': 1,
-                        'thinning_rate': 1
-                    }
-                },
+                results_name = 'name_placeholder',
                 data_params = {
                     'data_type': 'dummy',
                     'data_path': 'data',
@@ -63,21 +46,44 @@ class Optimiser(Driver):
                     },
                     'output_header': 'Concentration'
                 },
-                results_path = 'results'):
+                default_params = {
+                    'infered_params':pd.Series({
+                        'model_params':pd.Series({
+                            'I_y': Parameter('I_y', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
+                            'I_z': Parameter('I_z', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
+                            'Q': Parameter('Q', prior_select = 'gamma', default_value=3e13).add_prior_param('mu', 3e13).add_prior_param('sigma',1e13),
+                        }),
+                        'likelihood_params':pd.Series({},dtype='float64')
+                    }),
+                    'model':Model('log_gpm_alt_norm').add_model_param('H',10),
+                    'likelihood': Likelihood('gaussian_fixed_sigma').add_likelihood_param('sigma',1),
+                    'sampler': {
+                        'n_samples': 10000,
+                        'n_chains': 1,
+                        'thinning_rate': 1
+                    }
+                },                
+                results_path = 'results/inference_results'):
         
-        # Inherits methods and attributes from parent Driver class
-        super().__init__(results_name, default_params, data_params, results_path)
+        # Inherits methods and attributes from parent Controller class
+        super().__init__(results_name, data_params, default_params, results_path)
         
+        # Generates results folder
+        if not os.path.exists(results_path):
+            os.makedirs(results_path)
+
         # Initialises the default parameters
         self.default_values = pd.Series({
             'RMSE': 'NaN',
             'AIC': 'NaN',
+            'BIC': 'NaN',
             'av_divergence': 'NaN'
         })
     
         # Initialises the parameter to data frame column dictionary
         self.par_to_col = {
             'AIC': ('results','misc', 'AIC'),
+            'BIC': ('results','misc', 'BIC'),
             'RMSE': ('results','misc', 'RMSE'),
             'av_divergence': ('results','misc', 'average_diverging'),
         }
@@ -448,10 +454,6 @@ class Optimiser(Driver):
         # Extracts information from the best trial of the optimiser
         results = study.best_params
         params, model, likelihood = self.prepare_inference(results=results)
-
-        # Sort out data
-        data = get_data(self.data_params['data_type'], self.data_params)
-        self.training_data, self.testing_data = train_test_split(data, test_size=0.2, random_state = 1)
         
         # Sampler parameters
         num_samples = self.default_params['sampler']['n_samples']
