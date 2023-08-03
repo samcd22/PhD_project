@@ -8,7 +8,9 @@ import json
 from numpyencoder import NumpyEncoder
 from fractions import Fraction
 
+# Visualiser class - generates the plots from the predictions of the trained gaussian processor
 class Visualiser:
+    # Initialises the Visualiser class saving all relevant variables and performing some initialising tasks
     def __init__(self, 
                  test_data, 
                  trainer, 
@@ -24,25 +26,24 @@ class Visualiser:
         self.include_test_points = include_test_points
         self.kernel = kernel_type
         self.results_path = self.data_path + '/' + self.kernel
+        self.model = trainer.model
 
         self.kernel_dict = {'matern_white': 'Matern and White Noise', 'rbf': 'Radial Basis Function', 'matern':'Matern'}
 
-        self.model = trainer.model
+        # Filters the relevant fitted gaussian processor parameters
         params = trainer.params
         params = self.remove_keys_containing_substring(params, 'bounds')
         self.params = {key: value for key, value in params.items() if not ('_' not in key and 'k' in key)}
 
-
+        # Creates folders if they don't exist
         if not os.path.exists(self.results_path):
             os.makedirs(self.results_path)
 
+    # Function for filtering gaussian processor parameters
     def remove_keys_containing_substring(self, dictionary, substring):
         return {key: value for key, value in dictionary.items() if substring not in key}
 
-
-    def get_summary(self):
-        print()
-
+    # Formats the gaussian processor fitted parameters to be displayed on the figure
     def get_GP_params_string(self):
         params_string_array = []
         for key in self.params.keys():
@@ -52,11 +53,14 @@ class Visualiser:
             params_string_array.append(one_param_string)
         return ('\n').join(params_string_array)
     
+    # Formats the RMSE to be displayed on the figure
     def get_RMSE_string(self):
         formatter = "{:.2e}" 
         if  np.floor(np.log10(self.RMSE)) < 2: formatter = "{:.2f}" 
         return 'RMSE = ' + formatter.format(self.RMSE)
 
+    # Outputs the plots for the predicted values from the gaussian processor, based on an inputted domain
+    # There are multiple ways of visualising these results
     def visualise_results(self, domain, name, plot_type = '3D', title = 'Concentration of Droplets'):
         # Generates domain plots
         points = domain.create_domain()
@@ -235,7 +239,6 @@ class Visualiser:
             cbar2 = plt.colorbar(plot_2, ax = ax2, location = 'bottom', shrink = 1)
             cbar3 = plt.colorbar(plot_3, ax = ax3, location = 'bottom', shrink = 1)
             cbar4 = plt.colorbar(plot_4, ax = np.array([ax4,ax5]), location = 'top', fraction = 0.8)
-
             cbar1.ax.set_title('Lower Bound Predicted Concentration', fontsize = 10)
             cbar2.ax.set_title('Mean Predicted Concentration', fontsize = 10)
             cbar3.ax.set_title('Upper Bound Predicted Concentration', fontsize = 10)
