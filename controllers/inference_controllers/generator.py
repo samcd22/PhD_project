@@ -14,8 +14,8 @@ from toolboxes.inference_toolbox.sampler import Sampler
 from toolboxes.inference_toolbox.visualiser import Visualiser
 from toolboxes.data_processing_toolbox.get_data import get_data
 
-from memory_profiler import profile
-import psutil
+# from memory_profiler import profile
+# import psutil
 
 
 # Generator class - generates multiple instances of the sampler based on varying their default parameters
@@ -212,15 +212,15 @@ class Generator(Controller):
             batch_end = min(batch_start + batch_size, len(inputs))
             instances_batch = inputs.iloc[batch_start:batch_end]
 
-            # Print CPU info
-            cpu_usage = psutil.cpu_percent()
-            print(f"CPU Usage: {cpu_usage}%")
+            # # Print CPU info
+            # cpu_usage = psutil.cpu_percent()
+            # print(f"CPU Usage: {cpu_usage}%")
 
-            memory = psutil.virtual_memory()
-            print(f"Total Memory: {memory.total} bytes")
-            print(f"Available Memory: {memory.available} bytes")
-            print(f"Used Memory: {memory.used} bytes")
-            print(f"Memory Usage: {memory.percent}%")
+            # memory = psutil.virtual_memory()
+            # print(f"Total Memory: {memory.total} bytes")
+            # print(f"Available Memory: {memory.available} bytes")
+            # print(f"Used Memory: {memory.used} bytes")
+            # print(f"Memory Usage: {memory.percent}%")
 
             for instance in instances_batch.index:
                 print('Generating instance ' + str(instance) + '...')

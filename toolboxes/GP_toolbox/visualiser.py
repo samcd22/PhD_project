@@ -214,9 +214,9 @@ class Visualiser:
                 pd_min = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
                 pd_max = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
 
-                plot_4 = ax1.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = lower_test_pred_C, c = lower_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
-                ax2.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = mean_test_pred_C, c = mean_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
-                ax3.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = upper_test_pred_C, c = upper_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
+                plot_4 = ax1.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = lower_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
+                ax2.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = mean_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
+                ax3.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = upper_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
                 
                 RMSE_string = self.get_RMSE_string()
 
