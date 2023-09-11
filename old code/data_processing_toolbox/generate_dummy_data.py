@@ -3,9 +3,9 @@ import pandas as pd
 import scipy.stats as stats
 import os
 
-from inference_toolbox.domain import Domain
-from inference_toolbox.model import Model
-from data_processing.utils import data_param_not_exist
+from toolboxes.plotting_toolbox.domain import Domain
+from toolboxes.inference_toolbox.model import Model
+from toolboxes.data_processing_toolbox.utils import data_param_not_exist
 
 current_directory = os.getcwd()
 if current_directory != '/project/':

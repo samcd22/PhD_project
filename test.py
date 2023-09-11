@@ -25,6 +25,7 @@ data_params = {
     'data_path':'data'
 }
 
+
 default_params = {
     'infered_params':pd.Series({
         'model_params':pd.Series({

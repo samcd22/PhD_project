@@ -7,7 +7,7 @@ import os
 class BoxGridder:
     
     # Takes the data as an input to initialise the box gridder
-    def __init__(self, data, grid_size, target = False, data_path = 'data/gridded_data'):
+    def __init__(self, data, grid_size, target = False, data_path = 'data/normalised_gridded_data'):
         self.data = data
         self.data_path = data_path
         self.grid_size = grid_size
@@ -173,7 +173,7 @@ class BoxGridder:
                 raise Exception('Type not found')
 
             ax = fig.add_subplot(111, projection = '3d')
-            p = ax.scatter(averaged_df.x, averaged_df.y, averaged_df.z, c=colour_output, s = size_output, cmap='jet', vmin = np.percentile(colour_output,5), vmax = np.percentile(colour_output,95))
+            p = ax.scatter(averaged_df.x, averaged_df.y, averaged_df.z, c=colour_output, s = 20, cmap='jet', vmin = np.percentile(colour_output,5), vmax = np.percentile(colour_output,95))
 
             ax.set_xlabel('Distance Downwind')
             ax.set_ylabel('Distance Crosswind')
@@ -186,7 +186,7 @@ class BoxGridder:
 
     def get_sample_histograms(self, averaged_df, n_hists = 5):
         samples = averaged_df.Samples.sample(n_hists, random_state=1)
-        samples_dir = self.data_dir + '/sample_grid_squared'
+        samples_dir = self.data_dir + '/sample_grid_squares'
         if not os.path.exists(samples_dir):
             os.makedirs(samples_dir)
 

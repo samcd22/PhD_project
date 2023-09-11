@@ -2,10 +2,10 @@ import numpy as np
 import pandas as pd
 import os
 import json
-from numpyro.infer import log_likelihood
 import numpyro
 import jax.numpy as jnp
 from jax import random
+from memory_profiler import profile
 
 # Sampler class - samples inference parameters
 class Sampler:

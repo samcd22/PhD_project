@@ -17,7 +17,7 @@ class Visualiser:
                  sampler, 
                  model, 
                  previous_instance = -1, 
-                 data_path = 'results/inference/general_instances', 
+                 data_path = 'results/inference_results/simulated_data/general_instances', 
                  include_test_points = True, 
                  suppress_prints = False,
                  actual_values = []):
@@ -315,11 +315,11 @@ class Visualiser:
                 pd_min = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
                 pd_max = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
 
-                plot_2 = ax1.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 10*np.log10(lower_test_pred_C), c = lower_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
-                ax2.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 10*np.log10(mean_test_pred_C), c = mean_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
-                ax3.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 10*np.log10(upper_test_pred_C), c = upper_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
+                plot_2 = ax1.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = lower_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
+                ax2.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = mean_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
+                ax3.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = upper_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
                 formatter = "{:.2e}" 
-                if  np.floor(np.log10(self.RMSE)) < 2: formatter = "{:.2f}" 
+                if  np.floor(np.log10(self.RMSE)) < 2: formatter = "{:.2f}"
                 RMSE_string = 'RMSE = ' + formatter.format(self.RMSE)
                 AIC_string = 'AIC = ' + formatter.format(self.AIC)
                 BIC_string = 'BIC = ' + formatter.format(self.BIC)
@@ -344,8 +344,12 @@ class Visualiser:
             ax5.set_yticks([])
 
             # Defines the two colorbars
-            plt.colorbar(plot_1, ax = ax4, location = 'top', shrink = 2)
-            plt.colorbar(plot_2, ax = ax5, location = 'top', shrink = 2)
+            cbar1 = plt.colorbar(plot_1, ax = ax4, location = 'top', shrink = 2)
+            cbar2 = plt.colorbar(plot_2, ax = ax5, location = 'top', shrink = 2)
+
+            cbar1.ax.set_title('Predicted Concentration', fontsize = 10)
+            cbar2.ax.set_title('Percemtage Difference in Test Data', fontsize = 10)
+
 
             # Defines the overall title, including the range of values for each plot
             if mean_bin_labs[bin_num].left < 0:
@@ -567,6 +571,7 @@ class Visualiser:
         else:
             summary['RMSE'] = self.RMSE
             summary['AIC'] = self.AIC
+            summary['BIC'] = self.BIC
             for chain_num in range(self.num_chains):
                 summary['chain_' + str(chain_num + 1)] = {}
                 samples = self.chain_samples[self.chain_samples['chain'] == chain_num + 1].drop(columns = ['chain', 'sample_index'])
