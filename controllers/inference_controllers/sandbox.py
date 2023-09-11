@@ -28,7 +28,7 @@ class Sandbox(Controller):
                         }),
                         'likelihood_params':pd.Series({},dtype='float64')
                     }),
-                    'model':Model('log_gpm_norm').add_model_param('H',10),
+                    'model':Model('log_gpm_alt_norm').add_model_param('H',10),
                     'likelihood': Likelihood('gaussian_fixed_sigma').add_likelihood_param('sigma',1),
                     'sampler': {
                         'n_samples': 10000,
