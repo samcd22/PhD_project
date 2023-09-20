@@ -32,6 +32,10 @@ class Parameter:
         elif self.prior_select == 'gamma':
             return numpyro.distributions.Gamma(self.alpha(self.prior_params.mu,self.prior_params.sigma), self.beta(self.prior_params.mu,self.prior_params.sigma))
     
+        # Uniform
+        elif self.prior_select == 'uniform':
+            return numpyro.distributions.Uniform(self.prior_params.low, self.prior_params.high)
+        
     # Generates a sample for this parameter
     def sample_param(self):
         prior_func = self.get_prior_function()
