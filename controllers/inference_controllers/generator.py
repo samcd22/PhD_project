@@ -23,32 +23,7 @@ class Generator(Controller):
     # Initialises the Generator class saving all relevant variables and performing some initialising tasks
     def __init__(self, 
                  results_name = 'name_placeholder',
-                 data_params = {
-                    'data_type': 'dummy',
-                    'data_path': 'data',
-                    'sigma': 'NaN',
-                    'model_select': 'log_gpm_norm',
-                    'noise_dist': 'gaussian',
-                    'model': {
-                        'model_params':{
-                            'H': 10
-                        },
-                        'inference_params':{
-                            'I_y': 0.1,
-                            'I_z': 0.1,
-                            'Q': 3e13
-                        },
-                    },
-                    'domain': {
-                        'domain_select': 'cone_from_source_z_limited', 
-                        'resolution': 20,
-                        'domain_params':{
-                            'r': 100,
-                            'theta': np.pi/8,
-                            'source': [0,0,10]}
-                    },
-                    'output_header': 'Concentration'
-                },
+                 data_params = None,
                 default_params = {
                     'infered_params':pd.Series({
                         'model_params':pd.Series({
@@ -241,11 +216,11 @@ class Generator(Controller):
                     likelihood.add_likelihood_param(likelihood_param_name, np.float64(inputs[self.par_to_col['likelihood_' + likelihood_param_name]].values[instance - 1]))
 
                 # Additions to likelihood object under certain conditions
-                if self.data_params['data_type'] == 'dummy':
-                    if self.data_params['sigma'] == 'NaN':
+                if self.data_params['data_type'] == 'simulated_data':
+                    if self.data_params['noise_level'] == 'NaN':
                         if 'sigma' not in likelihood.likelihood_params:
                             raise Exception('Either define your noise level with a fixed sigma in the likelihood, or set the noise level!')
-                        self.data_params['sigma'] = likelihood.likelihood_params['sigma']
+                        self.data_params['noise_level'] = likelihood.likelihood_params['sigma']
 
                 # Generates the sampler variables for this instance
                 num_samples = int(inputs[self.par_to_col['n_samples']].values[instance - 1])
@@ -258,7 +233,7 @@ class Generator(Controller):
 
                 # Actual parameter values are saved if they are available
                 actual_values = []
-                if self.data_params['data_type'] == 'dummy':
+                if self.data_params['data_type'] == 'simulated_data':
                     for inference_param in self.data_params['model']['inference_params'].keys():
                         actual_values.append(self.data_params['model']['inference_params'][inference_param])
 

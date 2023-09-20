@@ -7,10 +7,12 @@ import os
 class BoxGridder:
     
     # Takes the data as an input to initialise the box gridder
-    def __init__(self, data, grid_size, data_path = None):
+    def __init__(self, data, grid_size, data_path = None, data_logged = True, log_results = True):
         self.data = data
         self.data_path = data_path
         self.grid_size = grid_size
+        self.data_logged = data_logged
+        self.log_results = log_results
 
         self.data_path = data_path
         if not os.path.exists(self.data_path):
@@ -85,7 +87,10 @@ class BoxGridder:
             for i in range(self.data.shape[0]):
                 point = [self.data.loc[i,'x'],self.data.loc[i,'y'],self.data.loc[i,'z']]
 
-                conc = self.data.loc[i,input_column_name]
+                if self.data_logged:
+                    conc = 10**self.data.loc[i,input_column_name]
+                else:
+                    conc = self.data.loc[i,input_column_name]
 
                 box_bounds = self.get_box_bounds_of_point(grid, point)
                 centroid = np.mean(box_bounds,axis=1)
@@ -143,8 +148,13 @@ class BoxGridder:
             fig = plt.figure(figsize = (10,10))
 
             if type == 'Concentration':
-                colour_output = np.log10(averaged_df.Concentration)
-                title = 'Average log concentration across all experiments'
+                if self.log_results:
+                    colour_output = np.log10(averaged_df.Concentration)
+                    title = 'Average log concentration across all experiments'
+                else:
+                    colour_output = averaged_df.Concentration
+                    title = 'Average log concentration across all experiments'
+
 
             elif type == 'Counts':
                 colour_output = averaged_df.Counts
@@ -186,7 +196,14 @@ class BoxGridder:
             z = averaged_df.z[i]
 
             title = str([x,y,z])
-            plt.hist(np.log10(sample))
+
+            if self.log_results:
+                sample_results = np.log10(sample)
+            else:
+                sample_results = sample
+
+
+            plt.hist(sample_results)
             plt.xlabel('Concentration')
             plt.ylabel('Count')
             plt.title(title)

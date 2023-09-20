@@ -18,33 +18,8 @@ from toolboxes.GP_toolbox.visualiser import Visualiser
 class GaussianProcessor(Controller):
     # Initialises the GaussianProcessor class saving all relevant variables and performing some initialising tasks
     def __init__(self,results_name = 'name_placeholder',
-                 data_params = {
-                    'data_type': 'dummy',
-                    'data_path': 'data',
-                    'sigma': 'NaN',
-                    'model_select': 'log_gpm_alt_norm',
-                    'noise_dist': 'gaussian',
-                    'model': {
-                        'model_params':{
-                            'H': 10
-                        },
-                        'inference_params':{
-                            'I_y': 0.1,
-                            'I_z': 0.1,
-                            'Q': 3e13
-                        },
-                    },
-                    'domain': {
-                        'domain_select': 'cone_from_source_z_limited', 
-                        'resolution': 20,
-                        'domain_params':{
-                            'r': 100,
-                            'theta': np.pi/8,
-                            'source': [0,0,10]}
-                    },
-                    'output_header': 'Concentration'
-                },
-                results_path = 'results/GP_results'):
+                 data_params = None,
+                 results_path = 'results/GP_results'):
         
         # Inherits methods and attributes from parent Controller class
         super().__init__(results_name, data_params, None, results_path)
@@ -60,7 +35,7 @@ class GaussianProcessor(Controller):
         self.init_construction(construction)
 
         # Generates the data based on the data_params object and splits it into train and test data
-        data = get_data(data_params['data_type'], data_params)
+        data = get_data(data_params)
         self.training_data, self.testing_data = train_test_split(data, test_size=0.2, random_state = 1)
         
     # Initialises the construction using the construction object, checking and creating all relevant files and folders

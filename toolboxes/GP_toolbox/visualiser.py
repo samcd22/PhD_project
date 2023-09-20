@@ -17,10 +17,10 @@ class Visualiser:
                  kernel_type,
                  data_path= 'results/GP_results/simulated_data',
                  include_test_points = True,
-                 suppress_print = False):
+                 suppress_prints = False):
 
         # Save variables
-        self.suppress_print = suppress_print
+        self.suppress_prints = suppress_prints
         self.test_data = test_data
         self.data_path = data_path
         self.include_test_points = include_test_points

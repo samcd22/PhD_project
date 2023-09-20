@@ -86,7 +86,13 @@ class DataNormaliser:
         if self.gridding:
             gridding_string = ('_').join([str(x) for x in self.gridding])
             gridding_path = self.instance_path + '/gridding/grid_' + gridding_string
-            box_gridder = BoxGridder(data, self.gridding, data_path = gridding_path)
+            if self.data_params['log']:
+                data_logged = True
+                log_results = True
+            else:
+                data_logged = False
+                log_results = False
+            box_gridder = BoxGridder(data, self.gridding, data_path = gridding_path, data_logged = data_logged, log_results=log_results)
             data = box_gridder.get_averages(input_column_name = self.output_header)
             box_gridder.get_sample_histograms(data)
             box_gridder.visualise_average_data(data, self.data_params['output_header'])
@@ -120,7 +126,7 @@ class DataNormaliser:
             experiment_data[self.data_params['output_header']] = experiment_data[self.data_params['normaliser_params']['input_header']]*wind_speed*100**3
             
             if self.data_params['log']:
-                experiment_data[self.data_params['output_header']] = np.log(experiment_data[self.data_params['output_header']])
+                experiment_data[self.data_params['output_header']] = np.log10(experiment_data[self.data_params['output_header']])
             
             frames.append(experiment_data)
 

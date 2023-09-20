@@ -207,8 +207,11 @@ class Optimiser(Controller):
         # Initialises the inputs object using the default values as references for the column names
         self.all_inputs = pd.DataFrame(columns=[self.par_to_col[x] for x in self.default_values.index])
 
+        study_name = self.optimiser_name  # Unique identifier of the study.
+        storage_name = self.results_name + '_' + study_name
+
         # Initialises the optimiser instance
-        study = optuna.create_study(direction="minimize")
+        study = optuna.create_study(study_name=study_name, storage='sqlite:///' + storage_name, direction = "minimize", load_if_exists=True)
 
         # Defines the success metric for optimisation
         if self.index_name == 'rmse':
@@ -217,6 +220,7 @@ class Optimiser(Controller):
             optimizing_function = self.calculate_aic
         elif self.index_name == 'bic':
             optimizing_function = self.calculate_bic
+
 
         # Runs the optimiser using the optimisation function
         study.optimize(optimizing_function, n_trials=n_trials, timeout=6000)
@@ -393,11 +397,11 @@ class Optimiser(Controller):
             
             model.add_model_param(model_param_name, model_param)
 
-        if self.data_params['data_type'] == 'dummy':
-            if self.data_params['sigma'] == 'NaN':
+        if self.data_params['data_type'] == 'simulated_data':
+            if self.data_params['noise_level'] == 'NaN':
                 if 'sigma' not in likelihood.likelihood_params:
                     raise Exception('Either define your noise level with a fixed sigma in the likelihood, or set the noise level!')
-                self.data_params['sigma'] = likelihood.likelihood_params['sigma']
+                self.data_params['noise_level'] = likelihood.likelihood_params['sigma']
 
         return params, model, likelihood
     
@@ -424,7 +428,7 @@ class Optimiser(Controller):
         plt.savefig(self.optimiser_path + '/parameter_importances.png', bbox_inches="tight")
 
     # Generates an instance of the sampler based on the optimal hyperparameters concluded from the optimiser
-    def run_best_params(self, study):
+    def run_best_params(self, study, domain, name):
 
         # Extracts information from the best trial of the optimiser
         results = study.best_params
@@ -458,9 +462,5 @@ class Optimiser(Controller):
         visualiser.get_autocorrelations()
 
         # Generates the plots and animation of the modeled system using the sampled parameters
-        domain = Domain('cone_from_source_z_limited', resolution=80)
-        domain.add_domain_param('r', 1000)
-        domain.add_domain_param('theta', np.pi/8)
-        domain.add_domain_param('source', [0,0,10])
-        visualiser.visualise_results(domain = domain, name = 'small_scale_3D_plots', title='Log Concentration of Droplets', log_results=False)
+        visualiser.visualise_results(domain = domain, name = name, title='Log Concentration of Droplets', log_results=False)
         visualiser.animate(name = 'small_scale_3D_plots')      
