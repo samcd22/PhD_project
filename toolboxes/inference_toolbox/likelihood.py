@@ -37,7 +37,7 @@ class Likelihood:
         # Gamma likelihood with non-infered sigma
         elif self.likelihood_select == 'gamma_fixed_sigma':
             def gamma_likelihood_fixed_sigma(mu, params):
-                return numpyro.distributions.Gamma(self.alpha(mu,self.likelihood_params.sigma), self.beta(mu, self.likelihood_params.sigma))
+                return numpyro.distributions.Gamma(self.alpha(mu,self.likelihood_params.sigma), 1/self.beta(mu, self.likelihood_params.sigma))
             return gamma_likelihood_fixed_sigma
         
         # Gamma likelihood with infered sigma

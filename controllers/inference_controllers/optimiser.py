@@ -128,17 +128,17 @@ class Optimiser(Controller):
                 self.actual_values.append(self.data_params['model']['inference_params'][inference_param])
 
         # Generates the construction object
-        construction = self.get_constriction()
+        construction = self.get_data_construction()
 
         # Initialises the construction
-        self.init_construction(construction)
+        self.init_data_construction(construction)
 
         # Sort out data
         data = get_data(self.data_params)
         self.training_data, self.testing_data = train_test_split(data, test_size=0.2, random_state = 1)
 
     # Initialises the construction using the construction object, checking and creating all relevant files and folders
-    def init_construction(self, construction):         
+    def init_data_construction(self, construction):         
         self.construction_results_path = self.results_path + '/' + self.results_name
         self.full_results_path = self.construction_results_path + '/optimisers/'
 

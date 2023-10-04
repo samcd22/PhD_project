@@ -14,34 +14,14 @@ from toolboxes.inference_toolbox.sampler import Sampler
 from toolboxes.inference_toolbox.visualiser import Visualiser
 from toolboxes.data_processing_toolbox.get_data import get_data
 
-# from memory_profiler import profile
-# import psutil
-
-
 # Generator class - generates multiple instances of the sampler based on varying their default parameters
 class Generator(Controller):
     # Initialises the Generator class saving all relevant variables and performing some initialising tasks
     def __init__(self, 
                  results_name = 'name_placeholder',
                  data_params = None,
-                default_params = {
-                    'infered_params':pd.Series({
-                        'model_params':pd.Series({
-                            'I_y': Parameter('I_y', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
-                            'I_z': Parameter('I_z', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
-                            'Q': Parameter('Q', prior_select = 'gamma', default_value=3e13).add_prior_param('mu', 3e13).add_prior_param('sigma',1e13),
-                        }),
-                        'likelihood_params':pd.Series({},dtype='float64')
-                    }),
-                    'model':Model('log_gpm_norm').add_model_param('H',10),
-                    'likelihood': Likelihood('gaussian_fixed_sigma').add_likelihood_param('sigma',1),
-                    'sampler': {
-                        'n_samples': 10000,
-                        'n_chains': 3,
-                        'thinning_rate': 1
-                    }
-                },
-                results_path = 'results/inference_results'):
+                 default_params = None,
+                 results_path = 'results/inference_results'):
         
         # Inherits methods and attributes from parent Controller class
         super().__init__(results_name, data_params, default_params, results_path)
@@ -122,32 +102,85 @@ class Generator(Controller):
             self.default_values['likelihood_' + likelihood_param] = likelihood.likelihood_params[likelihood_param]
             self.par_to_col['likelihood_' + likelihood_param] = ('parameters', 'likelihood', likelihood_param)
 
-        # Generates the construction object
-        construction = self.get_constriction()
+        # Generates the data construction object
+        data_construction = self.get_data_construction()
+
+        # Generates the default_params construction object
+        default_params_construction = self.get_default_params_construction()
 
         # Initialises the construction
-        self.init_construction(construction)
-        
-    # Initialises the construction using the construction object, checking and creating all relevant files and folders
-    def init_construction(self, construction):
-        self.construction_results_path = self.results_path + '/' + self.results_name
-        self.full_results_path = self.construction_results_path + '/auto_gen_instances'
+        self.init_data_construction(data_construction)
+        self.init_default_params_construction(default_params_construction)
 
-        if not os.path.exists(self.construction_results_path):
-            os.makedirs(self.construction_results_path)
+    def init_default_params_construction(self, construction):
+        self.generator_path = self.data_construction_results_path + '/auto_gen_instances'
+
+        if not os.path.exists(self.generator_path):
+            os.makedirs(self.generator_path)
+        
+        generator_name = self.get_generator_name(self.generator_path, construction)
+
+        self.full_results_path = self.generator_path + '/' + generator_name
 
         if not os.path.exists(self.full_results_path):
             os.makedirs(self.full_results_path)
 
-        if os.path.exists(self.construction_results_path + '/construction.json'):
-            f = open(self.construction_results_path + '/construction.json')
+        if os.path.exists(self.full_results_path + '/default_params_construction.json'):
+            f = open(self.full_results_path + '/default_params_construction.json')
             saved_construction = json.load(f)
             f.close()
 
             if saved_construction != construction:
                 raise Exception('Default generator parameters do not match for this folder name!')
         else:
-            with open(self.full_results_path + '/construction.json', "w") as fp:
+            with open(self.full_results_path + '/default_params_construction.json', "w") as fp:
+                json.dump(construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
+
+
+    def get_generator_name(self, generators_path, default_params_construction):
+        data_exists = False
+        if not os.path.exists(generators_path):
+            os.makedirs(generators_path)
+        generator_folders = os.listdir(generators_path)
+        for generator_folder in generator_folders:
+            folder_path = self.generator_path + '/' + generator_folder
+            f = open(folder_path + '/default_params_construction.json')
+            generator_construction = json.load(f)
+            f.close()
+            if default_params_construction == generator_construction:
+                data_exists = True
+                output = generator_folder
+        
+        if not data_exists:
+            generator_nums = [int(x.split('_')[1]) for x in generator_folders]
+            missing_elements = []
+            if len(generator_nums) == 0:
+                output = 'generator_1'
+            else:
+                for el in range(1,np.max(generator_nums) + 2):
+                    if el not in generator_nums:
+                        missing_elements.append(el)
+                generator_num = np.min(missing_elements)
+                output = 'generator_' + str(generator_num)
+
+        return output
+    
+    # Initialises the construction using the construction object, checking and creating all relevant files and folders
+    def init_data_construction(self, construction):
+        self.data_construction_results_path = self.results_path + '/' + self.results_name
+
+        if not os.path.exists(self.data_construction_results_path):
+            os.makedirs(self.data_construction_results_path)
+
+        if os.path.exists(self.data_construction_results_path + '/data_construction.json'):
+            f = open(self.data_construction_results_path + '/data_construction.json')
+            saved_construction = json.load(f)
+            f.close()
+
+            if saved_construction != construction:
+                raise Exception('Default generator parameters do not match for this folder name!')
+        else:
+            with open(self.full_results_path + '/data_construction.json', "w") as fp:
                 json.dump(construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
 
     # Runs a list of instances with hyperparameters based on the inputted inputs data frame

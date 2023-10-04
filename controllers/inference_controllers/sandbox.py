@@ -32,13 +32,13 @@ class Sandbox(Controller):
                 self.actual_values.append(self.data_params['model']['inference_params'][inference_param])
 
         # Generates the construction object
-        construction = self.get_constriction()
+        construction = self.get_data_construction()
 
         # Initialises the construction
-        self.init_construction(construction)
+        self.init_data_construction(construction)
         
     # Initialises the construction using the construction object, checking and creating all relevant files and folders
-    def init_construction(self, construction):
+    def init_data_construction(self, construction):
         self.construction_results_path = self.results_path + '/' + self.results_name
         self.full_results_path = self.construction_results_path + '/general_instances'
 
@@ -48,15 +48,15 @@ class Sandbox(Controller):
         if not os.path.exists(self.full_results_path):
             os.makedirs(self.full_results_path)
 
-        if os.path.exists(self.construction_results_path + '/construction.json'):
-            f = open(self.construction_results_path + '/construction.json')
+        if os.path.exists(self.construction_results_path + '/data_construction.json'):
+            f = open(self.construction_results_path + '/data_construction.json')
             saved_construction = json.load(f)
             f.close()
 
             if saved_construction != construction:
                 raise Exception('Default generator parameters do not match for this folder name!')
         else:
-            with open(self.construction_results_path + '/construction.json', "w") as fp:
+            with open(self.construction_results_path + '/data_construction.json', "w") as fp:
                 json.dump(construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
 
     # Creates an instance of the sampler and visualiser, outputting the visualiser
