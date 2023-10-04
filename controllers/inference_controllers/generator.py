@@ -113,14 +113,14 @@ class Generator(Controller):
         self.init_default_params_construction(default_params_construction)
 
     def init_default_params_construction(self, construction):
-        self.generator_path = self.data_construction_results_path + '/auto_gen_instances'
+        self.generators_path = self.data_construction_results_path + '/auto_gen_instances'
 
-        if not os.path.exists(self.generator_path):
-            os.makedirs(self.generator_path)
+        if not os.path.exists(self.generators_path):
+            os.makedirs(self.generators_path)
         
-        generator_name = self.get_generator_name(self.generator_path, construction)
+        generator_name = self.get_generator_name(self.generators_path, construction)
 
-        self.full_results_path = self.generator_path + '/' + generator_name
+        self.full_results_path = self.generators_path + '/' + generator_name
 
         if not os.path.exists(self.full_results_path):
             os.makedirs(self.full_results_path)
@@ -143,7 +143,7 @@ class Generator(Controller):
             os.makedirs(generators_path)
         generator_folders = os.listdir(generators_path)
         for generator_folder in generator_folders:
-            folder_path = self.generator_path + '/' + generator_folder
+            folder_path = self.generators_path + '/' + generator_folder
             f = open(folder_path + '/default_params_construction.json')
             generator_construction = json.load(f)
             f.close()
@@ -162,7 +162,6 @@ class Generator(Controller):
                         missing_elements.append(el)
                 generator_num = np.min(missing_elements)
                 output = 'generator_' + str(generator_num)
-
         return output
     
     # Initialises the construction using the construction object, checking and creating all relevant files and folders

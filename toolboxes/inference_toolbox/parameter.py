@@ -36,11 +36,15 @@ class Parameter:
         elif self.prior_select == 'uniform':
             return numpyro.distributions.Uniform(self.prior_params.low, self.prior_params.high)
         
+        # Log Normal
+        if self.prior_select == 'log_norm':
+            return numpyro.distributions.LogNormal(self.prior_params.mu, self.prior_params.sigma)
+        
     # Generates a sample for this parameter
     def sample_param(self):
         prior_func = self.get_prior_function()
         a = numpyro.sample(self.name, prior_func)
-        return a            
+        return a
     
     # Copy function for the Parameter Class
     def copy(self):

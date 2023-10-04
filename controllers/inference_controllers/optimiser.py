@@ -6,6 +6,7 @@ import optuna
 import json
 from numpyencoder import NumpyEncoder
 from matplotlib import pyplot as plt
+import shutil
 
 from controllers.controller import Controller
 from toolboxes.inference_toolbox.parameter import Parameter
@@ -21,23 +22,7 @@ class Optimiser(Controller):
     def __init__(self,
                 results_name = 'name_placeholder',
                 data_params = None,
-                default_params = {
-                    'infered_params':pd.Series({
-                        'model_params':pd.Series({
-                            'I_y': Parameter('I_y', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
-                            'I_z': Parameter('I_z', prior_select = 'gamma', default_value=0.1).add_prior_param('mu', 0.1).add_prior_param('sigma',0.1),
-                            'Q': Parameter('Q', prior_select = 'gamma', default_value=3e13).add_prior_param('mu', 3e13).add_prior_param('sigma',1e13),
-                        }),
-                        'likelihood_params':pd.Series({},dtype='float64')
-                    }),
-                    'model':Model('log_gpm_norm').add_model_param('H',10),
-                    'likelihood': Likelihood('gaussian_fixed_sigma').add_likelihood_param('sigma',1),
-                    'sampler': {
-                        'n_samples': 10000,
-                        'n_chains': 1,
-                        'thinning_rate': 1
-                    }
-                },                
+                default_params = None,
                 results_path = 'results/inference_results'):
         
         # Inherits methods and attributes from parent Controller class
@@ -127,34 +112,91 @@ class Optimiser(Controller):
             for inference_param in self.data_params['model']['inference_params'].keys():
                 self.actual_values.append(self.data_params['model']['inference_params'][inference_param])
 
-        # Generates the construction object
-        construction = self.get_data_construction()
+        # Generates the data construction object
+        data_construction = self.get_data_construction()
+
+        # Generates the default_params construction object
+        default_params_construction = self.get_default_params_construction()
 
         # Initialises the construction
-        self.init_data_construction(construction)
+        self.init_data_construction(data_construction)
+        self.init_default_params_construction(default_params_construction)
 
         # Sort out data
         data = get_data(self.data_params)
         self.training_data, self.testing_data = train_test_split(data, test_size=0.2, random_state = 1)
 
     # Initialises the construction using the construction object, checking and creating all relevant files and folders
-    def init_data_construction(self, construction):         
-        self.construction_results_path = self.results_path + '/' + self.results_name
-        self.full_results_path = self.construction_results_path + '/optimisers/'
+    def init_data_construction(self, construction):
+        self.data_construction_results_path = self.results_path + '/' + self.results_name
 
-        if not os.path.exists(self.construction_results_path):
-            os.makedirs(self.construction_results_path)
-        
-        if os.path.exists(self.construction_results_path + '/construction.json'):
-            f = open(self.construction_results_path + '/construction.json')
+        if not os.path.exists(self.data_construction_results_path):
+            os.makedirs(self.data_construction_results_path)
+
+        if os.path.exists(self.data_construction_results_path + '/data_construction.json'):
+            f = open(self.data_construction_results_path + '/data_construction.json')
             saved_construction = json.load(f)
             f.close()
 
             if saved_construction != construction:
                 raise Exception('Default generator parameters do not match for this folder name!')
         else:
-            with open(self.construction_results_path + '/construction.json', "w") as fp:
+            with open(self.full_results_path + '/data_construction.json', "w") as fp:
                 json.dump(construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
+
+    def init_default_params_construction(self, construction):
+        self.generators_path = self.data_construction_results_path + '/auto_gen_instances'
+
+        if not os.path.exists(self.generators_path):
+            os.makedirs(self.generators_path)
+        
+        generator_name = self.get_generator_name(self.generators_path, construction)
+
+        self.unique_generator_path = self.generators_path + '/' + generator_name
+        self.full_results_path = self.unique_generator_path + '/' + 'optimisers'
+
+        if not os.path.exists(self.full_results_path):
+            os.makedirs(self.full_results_path)
+
+        if os.path.exists(self.unique_generator_path + '/default_params_construction.json'):
+            f = open(self.unique_generator_path + '/default_params_construction.json')
+            saved_construction = json.load(f)
+            f.close()
+
+            if saved_construction != construction:
+                raise Exception('Default generator parameters do not match for this folder name!')
+        else:
+            with open(self.full_results_path + '/default_params_construction.json', "w") as fp:
+                json.dump(construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
+
+
+    def get_generator_name(self, generators_path, default_params_construction):
+        data_exists = False
+        if not os.path.exists(generators_path):
+            os.makedirs(generators_path)
+        generator_folders = os.listdir(generators_path)
+        for generator_folder in generator_folders:
+            folder_path = self.generators_path + '/' + generator_folder
+            f = open(folder_path + '/default_params_construction.json')
+            generator_construction = json.load(f)
+            f.close()
+            if default_params_construction == generator_construction:
+                data_exists = True
+                output = generator_folder
+        
+        if not data_exists:
+            generator_nums = [int(x.split('_')[1]) for x in generator_folders]
+            missing_elements = []
+            if len(generator_nums) == 0:
+                output = 'generator_1'
+            else:
+                for el in range(1,np.max(generator_nums) + 2):
+                    if el not in generator_nums:
+                        missing_elements.append(el)
+                generator_num = np.min(missing_elements)
+                output = 'generator_' + str(generator_num)
+
+        return output
 
     # Generates a optimiser conctruction object which includes all info on how the optimiser was costructed
     def get_optimiser_construction(self):
@@ -197,6 +239,7 @@ class Optimiser(Controller):
         self.optimising_parameters = optimising_parameters
         self.optimiser_name = optimiser_name
         self.index_name = index_name
+        self.n_trials = n_trials
 
         # Generates the optimiser construction object
         construction = self.get_optimiser_construction()
@@ -208,10 +251,20 @@ class Optimiser(Controller):
         self.all_inputs = pd.DataFrame(columns=[self.par_to_col[x] for x in self.default_values.index])
 
         study_name = self.optimiser_name  # Unique identifier of the study.
-        storage_name = self.results_name + '_' + study_name
+        storage_name = self.full_results_path + '/' + study_name +'.db'
 
         # Initialises the optimiser instance
         study = optuna.create_study(study_name=study_name, storage='sqlite:///' + storage_name, direction = "minimize", load_if_exists=True)
+
+        num_previous_trials = len(study.trials)
+
+        if n_trials >= num_previous_trials:
+            if n_trials > num_previous_trials:
+                if os.path.exists(self.optimiser_path + '/best_instance'):
+                    shutil.rmtree(self.optimiser_path + '/best_instance')
+            n_trials -= num_previous_trials
+        else:
+            raise Exception('The previously run optimiser has run more trials!')
 
         # Defines the success metric for optimisation
         if self.index_name == 'rmse':
@@ -220,7 +273,6 @@ class Optimiser(Controller):
             optimizing_function = self.calculate_aic
         elif self.index_name == 'bic':
             optimizing_function = self.calculate_bic
-
 
         # Runs the optimiser using the optimisation function
         study.optimize(optimizing_function, n_trials=n_trials, timeout=6000)
@@ -429,7 +481,6 @@ class Optimiser(Controller):
 
     # Generates an instance of the sampler based on the optimal hyperparameters concluded from the optimiser
     def run_best_params(self, study, domain, name):
-
         # Extracts information from the best trial of the optimiser
         results = study.best_params
         params, model, likelihood = self.prepare_inference(results=results)
