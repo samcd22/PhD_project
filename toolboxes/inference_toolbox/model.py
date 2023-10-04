@@ -80,6 +80,39 @@ class Model:
             output = jnp.log10(Q/(2*u*jnp.pi*I_y*I_z*(x-x_0)**2)*jnp.exp(-(y-y_0)**2/(2*I_y**2*(x-x_0)**2))*(jnp.exp(-(z-z_0)**2/(2*I_z**2*(x-x_0)**2))+jnp.exp(-(z+z_0)**2/(2*I_z**2*(x-x_0)**2))))
             return output
         
+
+        #Logged Gaussian Plume Model, using pasquil gifford for sigma_y and sigma_z
+        def sarah_model_PG(params, x, y, z):
+            Q = params['Q']
+            x_0 = params['x_0']
+            y_0 = params['y_0']
+            z_0 = params['z_0']
+
+            x = jnp.array(x)
+            y = jnp.array(y)
+            z = jnp.array(z)
+
+            u = self.model_params.u
+
+            output = jnp.log10(Q/(2*u*jnp.pi*0.195*(x-x_0)**0.9*0.112*(x-x_0)**0.91)*jnp.exp(-(y-y_0)**2/(2*(0.195*(x-x_0)**0.9)**2))*(jnp.exp(-(z-z_0)**2/(2*(0.112*(x-x_0)**0.91)**2))+jnp.exp(-(z+z_0)**2/(2*(0.112*(x-x_0)**0.91)**2))))
+            return output
+        
+        #Logged Gaussian Plume Model, using Martin scheme for sigma_y and sigma_
+        def sarah_model_Martin(params, x, y, z):
+            Q = params['Q']
+            x_0 = params['x_0']
+            y_0 = params['y_0']
+            z_0 = params['z_0']
+
+            x = jnp.array(x)
+            y = jnp.array(y)
+            z = jnp.array(z)
+
+            u = self.model_params.u
+
+            output = jnp.log10(Q/(2*u*jnp.pi*104*(x-x_0)**0.894*61*(x-x_0)**0.911)*jnp.exp(-(y-y_0)**2/(2*(104*(x-x_0)**0.894)**2))*(jnp.exp(-(z-z_0)**2/(2*(61*(x-x_0)**0.911)**2))+jnp.exp(-(z+z_0)**2/(2*(61*(x-x_0)**0.911)**2))))
+            return output
+
         if self.model_select == "gpm_norm":
             return GPM_norm
         
@@ -91,5 +124,12 @@ class Model:
 
         elif self.model_select == "sarah_model":
             return sarah_model
+        
+        elif self.model_select == "sarah_model_PG":
+            return sarah_model_PG
+        
+        elif self.model_select == "sarah_model_Martin":
+            return sarah_model_Martin
+        
         else:
             raise Exception('Model does not exist!')

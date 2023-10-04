@@ -22,7 +22,10 @@ class DataSimulator:
         
         self.domain_select = data_params['domain']['domain_select']
         self.domain_params = data_params['domain']['domain_params']
-        self.domain_resolution = data_params['domain']['resolution']
+        if 'resolution' not in data_params['domain']:
+            self.domain_resolution = None
+        else:
+            self.domain_resolution = data_params['domain']['resolution']
 
         self.noise_dist = data_params['noise_dist']
         self.noise_level = data_params['noise_level']

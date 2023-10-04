@@ -4,7 +4,7 @@ import pandas as pd
 # Domain class - used for creating different domains, used for plotting resulta
 class Domain:
     # Initialises the Domain class saving all relevant variables
-    def __init__(self, domain_select = 'cuboid_from_source', resolution = 100):
+    def __init__(self, domain_select = 'cuboid_from_source', resolution = None):
         self.domain_params = pd.Series({},dtype='float64')
         self.domain_select = domain_select
         self.resolution  = resolution
@@ -23,6 +23,10 @@ class Domain:
         
         if self.domain_select == 'cone_from_source_z_limited':
             return self.create_z_limited_cone()
+
+        if self.domain_select == 'discrete_data_points':
+            return self.create_discrete_data_points()
+
 
     # Creates a cuboid of points
     def create_cuboid(self):
@@ -60,3 +64,13 @@ class Domain:
     def create_z_limited_cone(self):
         points = self.create_cone()
         return points[points[:,2]>=0]
+
+    #Create a grid of point
+    def create_discrete_data_points(self):
+        x = self.domain_params.x
+        y = self.domain_params.y
+        z = self.domain_params.z
+        points = np.column_stack([np.array(x), np.array(y), np.array(z)])
+        if not (len(x) == len(y) and len(y) == len(z)):
+            raise Exception('Coordinates with different length')
+        return points
