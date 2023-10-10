@@ -480,7 +480,7 @@ class Optimiser(Controller):
         plt.savefig(self.optimiser_path + '/parameter_importances.png', bbox_inches="tight")
 
     # Generates an instance of the sampler based on the optimal hyperparameters concluded from the optimiser
-    def run_best_params(self, study, domain, name):
+    def run_best_params(self, study, domain, name, prior_plots = None):
         # Extracts information from the best trial of the optimiser
         results = study.best_params
         params, model, likelihood = self.prepare_inference(results=results)
@@ -511,6 +511,10 @@ class Optimiser(Controller):
         visualiser.get_summary()
         visualiser.get_traceplot()
         visualiser.get_autocorrelations()
+
+        if prior_plots:
+            visualiser.get_prior_plots(prior_plots)
+
 
         # Generates the plots and animation of the modeled system using the sampled parameters
         visualiser.visualise_results(domain = domain, name = name, title='Log Concentration of Droplets', log_results=False)

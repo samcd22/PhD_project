@@ -7,7 +7,11 @@ from numpyencoder import NumpyEncoder
 import imageio.v2 as imageio
 from matplotlib.gridspec import GridSpec
 from fractions import Fraction
+from scipy import stats
+from labellines import labelLines
 np.seterr(divide='ignore', invalid='ignore')
+import warnings
+warnings.filterwarnings("ignore")
 
 # Visualiser class - Used for processing and visualising the results from the sampler
 class Visualiser:
@@ -69,9 +73,11 @@ class Visualiser:
                 self.actual_values[param] = actual_values[i]
 
         # Calculates the lower, median and upper bound parameters from the samples
+        self.params_min = self.samples.min()
         self.params_lower = self.get_ag_samples(self.samples, 0.05)
         self.params_mean = self.get_ag_samples(self.samples, 0.5)
         self.params_upper = self.get_ag_samples(self.samples, 0.95)
+        self.params_max = self.samples.max()
 
         # Calculates the Root Mean Squared Error
         self.RMSE = 'n/a'
@@ -188,6 +194,155 @@ class Visualiser:
             results_df = pd.DataFrame({'x': X.flatten(), 'y': Y.flatten(), 'z': Z.flatten(), 'C_lower': C_lower, 'C_mean': C_mean,'C_upper': C_upper})
 
             self.threeD_plots(results_df, name, log_results=log_results, title=title)
+
+    def gamma_setup(self, mu, sigma):
+        alpha =  mu**2/sigma**2
+        beta = mu/sigma**2
+        return stats.gamma(a = alpha, scale = 1/beta).pdf
+
+    def log_norm_setup(self, mu, sigma):
+        alpha = np.log(mu) - 0.5*np.log(1+sigma**2/mu)
+        beta = np.sqrt(np.log(1+sigma**2/mu))
+        def log_norm(x):
+            p = 1/(x*beta*np.sqrt(2*np.pi))*np.exp(-(np.log(x)-alpha)**2/(2*beta**2))
+            return p
+        return log_norm
+    
+    def get_prior_plots(self, prior_plots):
+        for i in range(len(prior_plots)):
+            prior_plot_info = prior_plots[i]
+            keys = prior_plot_info.keys()
+            params = [x for x in keys if x != 'references']
+            references = None
+            if 'references' in prior_plot_info:
+                references = prior_plot_info['references']
+            if len(params) == 2:
+                self.plot_two_priors(params[0], params[1], prior_plot_info[params[0]], prior_plot_info[params[1]], references)
+            elif len(params) == 1:
+                self.plot_one_prior(params[0], prior_plot_info[params[0]], references)
+
+
+    def plot_two_priors(self, param_1, param_2, param_1_range, param_2_range, references = None):
+        param_1_linspace = np.linspace(param_1_range[0], param_1_range[1], 100)
+        param_2_linspace = np.linspace(param_2_range[0], param_2_range[1], 100)
+        param_1_mesh, param_2_mesh = np.meshgrid(param_1_linspace, param_2_linspace)
+        shape = param_1_mesh.shape
+
+        param_1_mesh_flattened = param_1_mesh.flatten()
+        param_2_mesh_flattened = param_2_mesh.flatten()
+
+        P = []
+        
+        if self.hyperparams['params'][param_1]['prior_func'] == 'log_norm':
+            prior_dist_1 = self.log_norm_setup(self.hyperparams['params'][param_1]['prior_params']['mu'], self.hyperparams['params'][param_1]['prior_params']['sigma'])
+            prior_dist_2 = self.log_norm_setup(self.hyperparams['params'][param_2]['prior_params']['mu'], self.hyperparams['params'][param_2]['prior_params']['sigma'])
+
+        elif self.hyperparams['params'][param_1]['prior_func'] == 'gamma':
+            prior_dist_1 = self.gamma_setup(self.hyperparams['params'][param_1]['prior_params']['mu'], self.hyperparams['params'][param_1]['prior_params']['sigma'])
+            prior_dist_2 = self.gamma_setup(self.hyperparams['params'][param_2]['prior_params']['mu'], self.hyperparams['params'][param_2]['prior_params']['sigma'])
+        else:
+            raise Exception('Prior distribution not listed!')
+
+        for (param_1_point, param_2_point) in zip (param_1_mesh_flattened, param_2_mesh_flattened):
+            P.append(prior_dist_1(param_1_point)*prior_dist_2(param_2_point))
+
+        P = np.reshape(P,shape)
+
+        plt.figure(figsize=(8, 8))
+        plt.contourf(param_1_mesh, param_2_mesh, P, levels=30, cmap='viridis')
+        plt.xlabel(param_1)
+        plt.ylabel(param_2)
+        plt.title('Product of the distribution of ' + param_1 + ' and ' + param_2)
+
+        handles = []
+
+        if references:
+            reference_labels = references['labels']
+            reference_x = references[param_1]
+            reference_y = references[param_2]
+
+            refs = plt.plot(reference_x,reference_y,'.r', label = 'References')
+            handles.append(refs[0])
+
+            for i, (reference_x_point,reference_y_point) in enumerate(zip(reference_x,reference_y)):
+                label = reference_labels[i]
+                plt.annotate(label, (reference_x_point,reference_y_point), textcoords="offset points", 
+                xytext=(0,5), ha='center', color = 'r')
+
+        est_val = plt.scatter([self.params_mean[param_1]], [self.params_mean[param_2]], color = 'k', marker='s', label = 'Estimated Value')
+        handles.append(est_val)
+        if self.actual_values !='NaN':
+            act_val = plt.scatter([self.params_mean[param_1]], [self.params_mean[param_2]], color = 'orange', marker='*', label = "Actual Value")
+            handles.append(act_val)
+
+        plt.legend(handles = handles)
+
+        filename = 'prior_dist_' + param_1 + '_' + param_2 +'.png'
+        folder_name = self.data_path + '/instance_' + str(self.instance) + '/prior_dists'
+        full_path = folder_name + '/' + filename
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+
+        plt.savefig(full_path)
+        plt.close()
+
+    def plot_one_prior(self, param, param_range, references = None):
+        param_linspace = np.linspace(param_range[0], param_range[1], 100)
+        
+        if self.hyperparams['params'][param]['prior_func'] == 'log_norm':
+            prior_dist = self.log_norm_setup(self.hyperparams['params'][param]['prior_params']['mu'], self.hyperparams['params'][param]['prior_params']['sigma'])
+
+        elif self.hyperparams['params'][param]['prior_func'] == 'gamma':
+            prior_dist = self.gamma_setup(self.hyperparams['params'][param]['prior_params']['mu'], self.hyperparams['params'][param]['prior_params']['sigma'])
+        else:
+            raise Exception('Prior distribution not listed!')
+        
+        P = prior_dist(param_linspace)
+        
+        plt.figure(figsize=(8, 8))
+        dist_plot = plt.plot(param_linspace, P, color = 'k', label = 'Prior Distribution')
+        plt.xlabel(param)
+        plt.ylabel('P')
+        plt.title('Prior distribution of ' + param)
+        plt.yticks([])
+
+        handles = [dist_plot[0]]
+
+        if references:
+            reference_labels = references['labels']
+            reference_x = references[param]
+            refs = []
+
+            for  i, reference_x_point in enumerate(reference_x):
+                label = reference_labels[i]
+
+                ref = plt.axvline(reference_x_point, color ='r', linestyle='dotted', label=label)
+                refs.append(ref)
+
+            offset = np.linspace(-np.percentile(P,99)/2,np.percentile(P,99)/2,len(reference_labels))
+            labelLines(refs, zorder=2.5, align=True, yoffsets=offset)#, yoffsets=offset)
+            
+            ref.set_label('References')
+            handles.append(ref)
+        
+        est_val = plt.axvline(self.params_mean[param], color = 'b', linestyle = 'dashed', label = 'Estimated Value')
+        handles.append(est_val)
+
+        if self.actual_values != 'NaN':
+            act_val = plt.axvline(self.actual_values[param], color = 'g', linestyle = 'dashed', label = 'Actual Value')
+            handles.append(act_val)
+
+        plt.legend(handles = handles)
+
+
+        filename = 'prior_dist_' + param + '.png'
+        folder_name = self.data_path + '/instance_' + str(self.instance) + '/prior_dists'
+        full_path = folder_name + '/' + filename
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+
+        plt.savefig(full_path)
+        plt.close()
 
     # Plotting function for 3D plots
     def threeD_plots(self, results, name, q=10, log_results = True, title = 'Concentration of Droplets'):
@@ -370,7 +525,7 @@ class Visualiser:
         param_accuracy_string_array = []
         for param in self.samples.columns:
             if not self.actual_values[param] == 'NaN':
-                percentage_error = 200*np.abs(self.params_mean[param]-self.actual_values[param])/(self.params_mean[param] + self.actual_values[param])
+                percentage_error = 200*np.abs(self.params_mean[param]-self.actual_values[param])/(self.params_max[param] - self.params_min[param])
                 param_accuracy_string_array.append(param + ' error = ' + f'{percentage_error:.3}' + '%')
         return ('\n').join(param_accuracy_string_array)
 
@@ -593,7 +748,7 @@ class Visualiser:
                     if self.actual_values[param] !='NaN':
                         proposed = params_mean[param]
                         actual = self.actual_values[param]
-                        summary['chain_' + str(chain_num + 1)][param]['param_accuracy'] = 200*np.abs(proposed-actual)/(proposed + actual)
+                        summary['chain_' + str(chain_num + 1)][param]['param_accuracy'] = 200*np.abs(proposed-actual)/(self.params_max[param] - self.params_min[param])
 
                 
             overall_samples = self.samples

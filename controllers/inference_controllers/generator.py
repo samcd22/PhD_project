@@ -391,12 +391,14 @@ class Generator(Controller):
 
         # Checks whether parameter accuracies should be included in plotted results
         param_accuracy_conditional = 'model' in self.data_params and len(self.data_params['model']['inference_params']) == len(inference_param_names)
+        
+        new_shape = (np.unique(varying_parameter_1).size, np.unique(varying_parameter_2).size)
 
         for param_name in inference_param_names:
             param_taus[param_name] = results[self.par_to_col[param_name + '_tau']].values.astype('float64')
             if param_accuracy_conditional:
                 param_accuracies[param_name] = results[self.par_to_col[param_name + '_param_accuracy']].values.astype('float64')
-
+                param_accuracies[param_name] = np.reshape(param_accuracies[param_name], new_shape)
         
         # Extracts success metrics from generated results
         RMSE_results = results[self.par_to_col['RMSE']].values.astype('float64')
@@ -406,7 +408,6 @@ class Generator(Controller):
         tau_av = np.around(np.mean(param_taus.values, axis=0))
 
         # Reshapes metrics for plotting
-        new_shape = (np.unique(varying_parameter_1).size, np.unique(varying_parameter_2).size)
         varying_parameter_1 = np.reshape([varying_parameter_1], new_shape)
         varying_parameter_2 = np.reshape([varying_parameter_2], new_shape)
         RMSE_results = np.reshape([RMSE_results], new_shape)
@@ -416,9 +417,9 @@ class Generator(Controller):
         tau_av = np.reshape([tau_av], new_shape)
 
         # Extracts and reshapes parameter accuracy metric if neccessary
-        if param_accuracy_conditional:
-            param_accuracy_av = np.mean(param_accuracies.values, axis=0)
-            param_accuracy_av = np.reshape([param_accuracy_av], new_shape)
+        # if param_accuracy_conditional:
+        #     param_accuracy_av = np.mean(param_accuracies.values, axis=0)
+        #     param_accuracy_av = np.reshape([param_accuracy_av], new_shape)
 
         # Sets x scale for plotting
         if scale_1 == 'log':
@@ -493,15 +494,26 @@ class Generator(Controller):
 
         # Parameter accuracy figure
         if param_accuracy_conditional:
-            fig6 = plt.figure()
-            plt.xlabel(x_label)
-            plt.ylabel(y_label)
-            plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, param_accuracy_av, cmap='jet')
-            plt.title('Average parameter percentage error for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
-            plt.colorbar()
-            plt.tight_layout()
-            fig6.savefig(results_path + '/param_accuracy_plot.png')
-            plt.close()
+            # fig6 = plt.figure()
+            # plt.xlabel(x_label)
+            # plt.ylabel(y_label)
+            # plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, param_accuracy_av, cmap='jet')
+            # plt.title('Average parameter percentage error for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
+            # plt.colorbar()
+            # plt.tight_layout()
+            # fig6.savefig(results_path + '/param_accuracy_plot.png')
+            # plt.close()
+            for param_name in inference_param_names:
+                fig = plt.figure()
+                plt.xlabel(x_label)
+                plt.ylabel(y_label)
+                plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, param_accuracies[param_name], cmap='jet')
+                plt.title('Percentage error of ' + param_name + ' for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
+                plt.colorbar()
+                plt.tight_layout()
+                fig.savefig(results_path + '/' + param_name +'_accuracy_plot.png')
+                plt.close()
+
 
     # Generates plots of the results from varying one parameter beyond the Generator object's default values
     def plot_varying_one(self, results, parameter_name, results_path, xscale = 'log'):

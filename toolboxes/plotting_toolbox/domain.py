@@ -4,7 +4,7 @@ import pandas as pd
 # Domain class - used for creating different domains, used for plotting resulta
 class Domain:
     # Initialises the Domain class saving all relevant variables
-    def __init__(self, domain_select = 'cuboid_from_source', resolution = 100):
+    def __init__(self, domain_select = None, resolution = None):
         self.domain_params = pd.Series({},dtype='float64')
         self.domain_select = domain_select
         self.resolution  = resolution

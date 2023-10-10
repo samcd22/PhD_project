@@ -12,10 +12,16 @@ class Parameter:
         self.default_value = default_value
         
     # Utility function for converting mean and stdev to alpha in a Gamma distribution 
-    def alpha(self,mu,sigma): return mu**2/sigma**2
+    def alpha_gamma(self,mu,sigma): return mu**2/sigma**2
 
     # Utility function for converting mean and stdev to beta in a Gamma distribution 
-    def beta(self,mu,sigma): return mu/(sigma**2)
+    def beta_gamma(self,mu,sigma): return mu/(sigma**2)
+
+    # Utility function for converting mean and stdev to alpha in a Log Normal distribution 
+    def alpha_log_norm(self,mu,sigma): return np.log(mu) - 0.5*np.log(1+sigma**2/mu)
+
+    # Utility function for converting mean and stdev to beta in a Log Normal distribution 
+    def beta_log_norm(self,mu,sigma): return np.sqrt(np.log(1+sigma**2/mu))
 
     # Saves a named prior hyperparameters to the Parameter class before generating the parameter's prior distribution
     def add_prior_param(self, name, val):
@@ -30,7 +36,7 @@ class Parameter:
         
         # Gamma Prior
         elif self.prior_select == 'gamma':
-            return numpyro.distributions.Gamma(self.alpha(self.prior_params.mu,self.prior_params.sigma), self.beta(self.prior_params.mu,self.prior_params.sigma))
+            return numpyro.distributions.Gamma(self.alpha_gamma(self.prior_params.mu,self.prior_params.sigma), self.beta_gamma(self.prior_params.mu,self.prior_params.sigma))
     
         # Uniform
         elif self.prior_select == 'uniform':
@@ -38,7 +44,7 @@ class Parameter:
         
         # Log Normal
         if self.prior_select == 'log_norm':
-            return numpyro.distributions.LogNormal(self.prior_params.mu, self.prior_params.sigma)
+            return numpyro.distributions.LogNormal(self.alpha_log_norm(self.prior_params.mu,self.prior_params.sigma), self.beta_log_norm(self.prior_params.mu,self.prior_params.sigma))
         
     # Generates a sample for this parameter
     def sample_param(self):
