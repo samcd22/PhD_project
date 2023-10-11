@@ -221,7 +221,6 @@ class Visualiser:
             elif len(params) == 1:
                 self.plot_one_prior(params[0], prior_plot_info[params[0]], references)
 
-
     def plot_two_priors(self, param_1, param_2, param_1_range, param_2_range, references = None):
         param_1_linspace = np.linspace(param_1_range[0], param_1_range[1], 100)
         param_2_linspace = np.linspace(param_2_range[0], param_2_range[1], 100)
@@ -271,7 +270,7 @@ class Visualiser:
 
         est_val = plt.scatter([self.params_mean[param_1]], [self.params_mean[param_2]], color = 'k', marker='s', label = 'Estimated Value')
         handles.append(est_val)
-        if self.actual_values !='NaN':
+        if self.actual_values[param_1] !='NaN' and self.actual_values[param_2] !='NaN':
             act_val = plt.scatter([self.params_mean[param_1]], [self.params_mean[param_2]], color = 'orange', marker='*', label = "Actual Value")
             handles.append(act_val)
 
@@ -328,7 +327,7 @@ class Visualiser:
         est_val = plt.axvline(self.params_mean[param], color = 'b', linestyle = 'dashed', label = 'Estimated Value')
         handles.append(est_val)
 
-        if self.actual_values != 'NaN':
+        if self.actual_value[param] != 'NaN':
             act_val = plt.axvline(self.actual_values[param], color = 'g', linestyle = 'dashed', label = 'Actual Value')
             handles.append(act_val)
 
@@ -534,13 +533,13 @@ class Visualiser:
         param_string_array = []
         for param in self.params_mean.index:
             if np.floor(np.log10(self.params_mean[param])) < 2:
-                lower_string =  "{:.2f}".format(self.params_lower[param])
-                mean_string = "{:.2f}".format(self.params_mean[param])
-                upper_string = "{:.2f}".format(self.params_upper[param])
+                lower_string =  "{:.3f}".format(self.params_lower[param])
+                mean_string = "{:.3f}".format(self.params_mean[param])
+                upper_string = "{:.3f}".format(self.params_upper[param])
             else:
-                lower_string =  "{:.2e}".format(self.params_lower[param])
-                mean_string = "{:.2e}".format(self.params_mean[param])
-                upper_string = "{:.2e}".format(self.params_upper[param])
+                lower_string =  "{:.3e}".format(self.params_lower[param])
+                mean_string = "{:.3e}".format(self.params_mean[param])
+                upper_string = "{:.3e}".format(self.params_upper[param])
             param_string_array.append(param + ' = [' + lower_string + ', ' + mean_string + ', ' + upper_string + ']')
 
         return ('\n').join(param_string_array)
