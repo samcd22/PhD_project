@@ -110,7 +110,7 @@ class Model:
 
             u = self.model_params.u
 
-            output = jnp.log10(Q/(2*u*jnp.pi*104*(x-x_0)**0.894*61*(x-x_0)**0.911)*jnp.exp(-(y-y_0)**2/(2*(104*(x-x_0)**0.894)**2))*(jnp.exp(-(z-z_0)**2/(2*(61*(x-x_0)**0.911)**2))+jnp.exp(-(z+z_0)**2/(2*(61*(x-x_0)**0.911)**2))))
+            output = jnp.log10(Q/(2*u*jnp.pi*0.104*(x-x_0)**0.894*0.61*(x-x_0)**0.911)*jnp.exp(-(y-y_0)**2/(2*(0.104*(x-x_0)**0.894)**2))*(jnp.exp(-(z-z_0)**2/(2*(0.61*(x-x_0)**0.911)**2))+jnp.exp(-(z+z_0)**2/(2*(0.61*(x-x_0)**0.911)**2))))
             return output
 
         if self.model_select == "gpm_norm":
