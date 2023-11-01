@@ -184,7 +184,6 @@ class Sampler:
             f = open(folder_path + '/hyperparams.json')
             instance_hyperparams = json.load(f)
             f.close()
-            con = self.hyperparams == instance_hyperparams
             if self.hyperparams == instance_hyperparams:
                 data_exists = True
                 self.instance = int(instance_folder.split('_')[1])

@@ -59,15 +59,93 @@ class Optimiser(Controller):
         self.default_values['thinning_rate'] = sampler_info['thinning_rate']
         self.par_to_col['thinning_rate'] = ('parameters','sampler','thinning_rate')
 
+        def set_prior_param_default_values(param_name, params):
+            multi_mode = False
+            if 'multi_mode' in params[param_name].prior_select:
+                multi_mode = True
+            
+            for prior_param in params[param_name].prior_params.index:
+                n_dims = len(np.array(params[param_name].prior_params[prior_param]).shape)
+                if multi_mode:
+                    n_modes = np.array(params[param_name].prior_params[prior_param]).shape[0]
+                    dim1 = 1
+                    dim2 = 1
+                    if n_dims > 1:
+                        dim1 = np.array(params[param_name].prior_params[prior_param]).shape[1]
+                    if n_dims > 2:
+                        dim2 = np.array(params[param_name].prior_params[prior_param]).shape[2]
+                    for n in range(n_modes):
+                        if dim1 == 1:
+                            full_prior_param_name = param_name + '_' + prior_param + '_mode_' + str(n)
+                            self.default_values[full_prior_param_name] = np.array(params[param_name].prior_params[prior_param])[n]
+                            self.par_to_col[full_prior_param_name] = ('parameters', param_name, prior_param + '_mode_' + str(n))                    
+                        elif dim1 > 1:
+                            if dim2 == 1:
+                                for i in range(dim1):
+                                    full_prior_param_name = param_name + '_' + prior_param + '_' + str(i) + '_mode_' + str(n)
+                                    self.default_values[full_prior_param_name] = np.array(params[param_name].prior_params[prior_param])[n,i]
+                                    self.par_to_col[full_prior_param_name] = ('parameters', param_name, prior_param + '_' + str(i) + '_mode_' + str(n))
+
+                            elif dim2 > 1:
+                                for i in range(dim1):
+                                    for j in range(dim2):
+                                        full_prior_param_name = param_name + '_' + prior_param + '_' + str(i) + '_' + str(j) + '_mode_' + str(n)
+                                        self.default_values[full_prior_param_name] = np.array(params[param_name].prior_params[prior_param])[n,i,j]
+                                        self.par_to_col[full_prior_param_name] = ('parameters', param_name, prior_param + '_' + str(i) + '_' + str(j) + '_mode_' + str(n))
+                            else:
+                                raise Exception('Invalid shape of prior parameter')
+                        else:
+                            raise Exception('Invalid shape of prior parameter')
+
+
+                else:
+                    dim1 = 1
+                    dim2 = 1 
+                    if n_dims > 0:
+                        dim1 = np.array(params[param_name].prior_params[prior_param]).shape[0]
+                    if n_dims > 1:
+                        dim2 = np.array(params[param_name].prior_params[prior_param]).shape[1]
+
+                    if dim1 == 1:
+                        full_prior_param_name = param_name + '_' + prior_param
+                        self.default_values[full_prior_param_name] = params[param_name].prior_params[prior_param]
+                        self.par_to_col[full_prior_param_name] = ('parameters', param_name, prior_param)                    
+                    elif dim1 > 1:
+                        if dim2 == 1:
+                            for i in range(dim1):
+                                full_prior_param_name = param_name + '_' + prior_param + '_' + str(i)
+                                self.default_values[full_prior_param_name] = params[param_name].prior_params[prior_param][i]
+                                self.par_to_col[full_prior_param_name] = ('parameters', param_name, prior_param + '_' + str(i))
+
+                        elif dim2 > 1:
+                            for i in range(dim1):
+                                for j in range(dim2):
+                                    full_prior_param_name = param_name + '_' + prior_param + '_' + str(i) + '_' + str(j)
+                                    self.default_values[full_prior_param_name] = params[param_name].prior_params[prior_param][i][j]
+                                    self.par_to_col[full_prior_param_name] = ('parameters', param_name, prior_param + '_' + str(i) + '_' + str(j))
+                        else:
+                            raise Exception('Invalid shape of prior parameter')
+                        
+                    else:
+                        raise Exception('Invalid shape of prior parameter')
+
         # Adds all parameter information to the default parameters object and the parameter to data frame dictionary
         def set_param_default_values(params):
+            new_param_list = []
+            
             for param in params.index:
                 self.default_values[param+'_prior'] = params[param].prior_select
                 self.par_to_col[param+'_prior'] = ('parameters', param, 'prior')
                 
-                for prior_param in params[param].prior_params.index:
-                    self.default_values[param+'_'+prior_param] = params[param].prior_params[prior_param]
-                    self.par_to_col[param+'_'+prior_param] = ('parameters', param, prior_param)
+                set_prior_param_default_values(param, params)
+
+                if '_and_' in param:
+                    new_param_list.append(param.split('_and_')[0])
+                    new_param_list.append(param.split('_and_')[1])
+                else:
+                    new_param_list.append(param)
+
+            for param in new_param_list:
 
                 self.default_values[param+'_mean'] = 'NaN'
                 self.par_to_col[param+'_mean'] = ('results', param, 'mean')
@@ -305,8 +383,17 @@ class Optimiser(Controller):
         # Generates the summary object of the results of the instance
         summary = visualiser.get_summary()
 
+        param_list_1 = self.default_params['infered_params']['model_params'].index
+        new_param_list_1 = []
+        for param in param_list_1:
+            if '_and_' in param:
+                new_param_list_1.append(param.split('_and_')[0])
+                new_param_list_1.append(param.split('_and_')[1])
+            else:
+                new_param_list_1.append(param)
+
         # Adds the infered model parameter results to the results data frame
-        for param in self.default_params['infered_params']['model_params'].index:
+        for param in new_param_list_1:
             self.one_row[self.par_to_col[param + '_lower']] = summary['overall'][param]['lower']
             self.one_row[self.par_to_col[param + '_mean']] = summary['overall'][param]['mean']
             self.one_row[self.par_to_col[param + '_upper']] = summary['overall'][param]['upper']
@@ -314,8 +401,17 @@ class Optimiser(Controller):
             if 'param_accuracy' in summary['overall'][param]:
                 self.one_row[self.par_to_col[param + '_param_accuracy']] = summary['overall'][param]['param_accuracy']
 
+        param_list_2 = self.default_params['infered_params']['likelihood_params'].index
+        new_param_list_2 = []
+        for param in param_list_2:
+            if '_and_' in param:
+                new_param_list_2.append(param.split('_and_')[0])
+                new_param_list_2.append(param.split('_and_')[1])
+            else:
+                new_param_list_2.append(param)
+
         # Adds the infered likelihood parameter results to the results data frame
-        for param in self.default_params['infered_params']['likelihood_params'].index:
+        for param in new_param_list_2:
             self.one_row[self.par_to_col[param + '_lower']] = summary['overall'][param]['lower']
             self.one_row[self.par_to_col[param + '_mean']] = summary['overall'][param]['mean']
             self.one_row[self.par_to_col[param + '_upper']] = summary['overall'][param]['upper']
@@ -341,12 +437,148 @@ class Optimiser(Controller):
         self.all_inputs.to_csv(self.optimiser_path + '/results.csv')
 
         return sampler, visualiser
+    
+
 
     # Extracts information from the optimisation trial
     def prepare_inference(self, trial = '', results = {}):
+
         self.one_row = pd.Series(index = [self.par_to_col[x] for x in self.default_values.index], data = self.default_values.values)
         
         params = pd.Series({},dtype='float64')
+
+        def assign_prior_params(params, param_name, trial, prior_params):
+            multi_mode = False
+            if 'multi_mode' in params[param_name].prior_select:
+                multi_mode = True
+            
+            for prior_param_name in prior_params.index:
+                n_dims = len(np.array(prior_params[prior_param_name]).shape)
+                if multi_mode:
+                    n_modes = np.array(prior_params[prior_param_name]).shape[0]
+                    dim1 = 1
+                    dim2 = 1
+                    if n_dims > 1:
+                        dim1 = np.array(prior_params[prior_param_name]).shape[1]
+                    if n_dims > 2:
+                        dim2 = np.array(prior_params[prior_param_name]).shape[2]
+                    for n in range(n_modes):
+                        prior_param_val = []
+                        # Case 1
+                        if dim1 == 1:
+                            full_prior_param_name = param_name + '_' + prior_param_name + '_mode_' + str(n)
+                            if full_prior_param_name in self.optimising_parameters:
+                                if results:
+                                    prior_param_mode_val = results[full_prior_param_name]
+                                else:
+                                    prior_param_mode_val = trial.suggest_float(full_prior_param_name, *self.optimising_parameters[full_prior_param_name])
+                                    self.one_row[self.par_to_col[full_prior_param_name]] = prior_param_mode_val
+                            else:
+                                prior_param_mode_val = prior_params[prior_param_name][n]
+                    
+                        # Case 2
+                        elif dim1 > 1:
+                            if dim2 == 1:
+                                prior_param_mode_val = np.zeros(dim1)
+                                for i in range(dim1):
+                                    full_prior_param_name = param_name + '_' + prior_param_name + '_' + str(i) + '_mode_' + str(n)
+                                    if full_prior_param_name in self.optimising_parameters:
+                                        if results:
+                                            prior_param_mode_val[i] = results[full_prior_param_name]
+                                        else:
+                                            prior_param_mode_val[i] = trial.suggest_float(full_prior_param_name, *self.optimising_parameters[full_prior_param_name])
+                                            self.one_row[self.par_to_col[full_prior_param_name]] = prior_param_mode_val[i]
+                                    else:
+                                        prior_param_mode_val[i] = np.array(prior_params[prior_param_name])[n,i]
+                                
+                                prior_param_mode_val = np.array(prior_param_mode_val).tolist()
+
+                        # Case 3
+                            elif dim2 > 1:
+                                prior_param_mode_val = np.zeros((dim1,dim2))
+                                for i in range(dim1):
+                                    for j in range(dim2):
+                                        full_prior_param_name = param_name + '_' + prior_param_name + '_' + str(i) + '_' + str(j) + '_mode_' + str(n)
+                                        if full_prior_param_name in self.optimising_parameters:
+                                            if results:
+                                                prior_param_mode_val[i,j] = results[full_prior_param_name]
+                                            else:
+                                                prior_param_mode_val[i,j] = trial.suggest_float(full_prior_param_name, *self.optimising_parameters[full_prior_param_name])
+                                                self.one_row[self.par_to_col[full_prior_param_name]] = prior_param_mode_val[i,j]
+                                        else:
+                                            prior_param_mode_val[i,j] = np.array(prior_params[prior_param_name])[n,i,j]
+                                
+                                prior_param_mode_val = np.array(prior_param_mode_val).tolist()
+                            
+                            else:
+                                raise Exception('Invalid shape of prior parameter')
+                        else:
+                            raise Exception('Invalid shape of prior parameter')
+
+                        prior_param_val.append(prior_param_mode_val)
+
+                else:
+                    dim1 = 1
+                    dim2 = 1 
+                    if n_dims > 0:
+                        dim1 = np.array(prior_params[prior_param_name]).shape[0]
+                    if n_dims > 1:
+                        dim2 = np.array(prior_params[prior_param_name]).shape[1]
+
+                    # Case 4
+                    if dim1 == 1:
+                        full_prior_param_name = param_name + '_' + prior_param_name
+                        if full_prior_param_name in self.optimising_parameters:
+                            if results:
+                                prior_param_val = results[full_prior_param_name]
+                            else:
+                                prior_param_val = trial.suggest_float(full_prior_param_name, *self.optimising_parameters[full_prior_param_name])
+                                self.one_row[self.par_to_col[full_prior_param_name]] = prior_param_val
+                        else:
+                            prior_param_val = prior_params[prior_param_name]
+
+                    elif dim1 > 1:
+                    # Case 5
+                        if dim2 == 1:
+                            prior_param_val = np.zeros(dim1)
+                            for i in range(dim1):
+                                full_prior_param_name = param_name + '_' + prior_param_name + '_' + str(i)
+                                if full_prior_param_name in self.optimising_parameters:
+                                    if results:
+                                        prior_param_val[i] = results[full_prior_param_name]
+                                    else:
+                                        prior_param_val[i] = trial.suggest_float(full_prior_param_name, *self.optimising_parameters[full_prior_param_name])
+                                        self.one_row[self.par_to_col[full_prior_param_name]] = prior_param_val[i]
+                                else:
+                                    prior_param_val[i] = prior_params[prior_param_name][i]
+                                
+                                prior_param_val = np.array(prior_param_val).tolist()
+
+                    # Case 6
+                        elif dim2 > 1:
+                            prior_param_val = np.zeros((dim1,dim2))
+                            for i in range(dim1):
+                                for j in range(dim2):
+                                    full_prior_param_name = param_name + '_' + prior_param_name + '_' + str(i) + '_' + str(j)
+                                    if full_prior_param_name in self.optimising_parameters:
+                                        if results:
+                                            prior_param_val[i,j] = results[full_prior_param_name]
+                                        else:
+                                            prior_param_val[i,j] = trial.suggest_float(full_prior_param_name, *self.optimising_parameters[full_prior_param_name])
+                                            self.one_row[self.par_to_col[full_prior_param_name]] = prior_param_val[i,j]
+                                    else:
+                                        prior_param_val[i,j] = np.array(prior_params[prior_param_name])[i,j]
+                            
+                            prior_param_val = np.array(prior_param_val).tolist()
+                        else:
+                            raise Exception('Invalid shape of prior parameter')
+                        
+                    else:
+                        raise Exception('Invalid shape of prior parameter')
+                    
+                params[param_name].add_prior_param(prior_param_name, prior_param_val)
+
+            return params, trial
 
         # Model infered parameters
         for param_name in self.default_params['infered_params']['model_params'].keys():
@@ -360,20 +592,14 @@ class Optimiser(Controller):
             else:
                 prior_select = self.default_params['infered_params']['model_params'][param_name].prior_select
 
-            params[param_name] = Parameter(name = param_name, prior_select=prior_select)
-            
-            for prior_param_name in self.default_params['infered_params']['model_params'][param_name].prior_params.index:
-                
-                if param_name + '_' + prior_param_name in self.optimising_parameters:
-                    if results:
-                        prior_param = results[param_name + '_' + prior_param_name]
-                    else:
-                        prior_param = trial.suggest_float(param_name + '_' + prior_param_name, *self.optimising_parameters[param_name + '_' + prior_param_name])
-                        self.one_row[self.par_to_col[param_name + '_' + prior_param_name]] = prior_param
-                else:
-                    prior_param = self.default_params['infered_params']['model_params'][param_name].prior_params[prior_param_name]
+            if '_and_' in param_name:
+                params[param_name] = Parameter(name = param_name.split('_and_')[0], name_2 = param_name.split('_and_')[1], prior_select=prior_select)
+            else:
+                params[param_name] = Parameter(name = param_name, prior_select=prior_select)
 
-                params[param_name].add_prior_param(prior_param_name, prior_param)
+            params, trial = assign_prior_params(params, param_name, trial, self.default_params['infered_params']['model_params'][param_name].prior_params)
+    
+
 
         # Likelihood infered parameters
         for param_name in self.default_params['infered_params']['likelihood_params'].keys():
@@ -387,19 +613,13 @@ class Optimiser(Controller):
             else:
                 prior_select = self.default_params['infered_params']['likelihood_params'][param_name].prior_select
 
-            params[param_name] = Parameter(name = param_name, prior_select=prior_select)
-            for prior_param_name in self.default_params['infered_params']['likelihood_params'][param_name].prior_params.index:
+            if '_and_' in param_name:
+                params[param_name] = Parameter(name = param_name.split('_and_')[0], name_2 = param_name.split('_and_')[1], prior_select=prior_select)
+            else:
+                params[param_name] = Parameter(name = param_name, prior_select=prior_select)
                 
-                if param_name + '_' + prior_param_name in self.optimising_parameters:
-                    if results:
-                        prior_param = results[param_name + '_' + prior_param_name]
-                    else:
-                        prior_param = trial.suggest_float(param_name + '_' + prior_param_name, *self.optimising_parameters[param_name + '_' + prior_param_name])
-                        self.one_row[self.par_to_col[param_name + '_' + prior_param_name]] = prior_param
-                else:
-                    prior_param = self.default_params['infered_params']['likelihood_params'][param_name].prior_params[prior_param_name]
+            params, trial = assign_prior_params(params, param_name, trial, self.default_params['infered_params']['likelihood_params'][param_name].prior_params)
 
-                params[param_name].add_prior_param(prior_param_name, prior_param)
 
         # Likelihood
         if "likelihood_type" in self.optimising_parameters:

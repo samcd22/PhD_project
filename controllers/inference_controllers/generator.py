@@ -286,11 +286,9 @@ class Generator(Controller):
             for prior_param_name in input_params[param_name].prior_params.index:
                 param_and_prior_param_name = param_name + '_' + prior_param_name
                 uncoupled_prior_names = [x for x in self.par_to_col.keys() if param_and_prior_param_name in x]
-                multimodal = False
                 prior_param_elements = [x.replace(param_name + '_', '') for x in uncoupled_prior_names]
                 modes = []
                 if all('_mode_' in x for x in uncoupled_prior_names):
-                    multimodal = True
                     modes = np.unique([int(x.split('_mode_')[1]) for x in uncoupled_prior_names])
                     prior_param_elements = [x.split('_mode_')[0] for x in prior_param_elements]
                 
@@ -379,16 +377,6 @@ class Generator(Controller):
         for batch_start in range(0, len(inputs), batch_size):
             batch_end = min(batch_start + batch_size, len(inputs))
             instances_batch = inputs.iloc[batch_start:batch_end]
-
-            # # Print CPU info
-            # cpu_usage = psutil.cpu_percent()
-            # print(f"CPU Usage: {cpu_usage}%")
-
-            # memory = psutil.virtual_memory()
-            # print(f"Total Memory: {memory.total} bytes")
-            # print(f"Available Memory: {memory.available} bytes")
-            # print(f"Used Memory: {memory.used} bytes")
-            # print(f"Memory Usage: {memory.percent}%")
 
             for instance in instances_batch.index:
                 print('Generating instance ' + str(instance) + '...')
