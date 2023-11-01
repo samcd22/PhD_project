@@ -208,6 +208,71 @@ class Visualiser:
             return p
         return log_norm
     
+    def multi_var_log_norm_setup(self, mu, cov):
+        mu = np.array(mu)
+        cov = np.array(cov)
+        n_dim = len(mu)
+        alpha = np.zeros(n_dim)
+        beta = np.zeros((n_dim, n_dim))
+
+        for i in range(n_dim):
+            alpha[i] = np.log(mu[i]) - 1/2*np.log(cov[i,i]/mu[i]**2 +1)
+            for j in range(len(mu)):
+                beta[i,j] = np.log(cov[i,j]/(mu[i]*mu[j])+1)
+        def multi_var_log_norm(x):
+            n_points = x.shape[0]
+            p = np.ones(n_points)
+            for i in range(n_points):
+                vals = x[i]
+                for j in range(n_dim):
+                    p[i] *= (2*np.pi)**(-n_dim/2)*np.linalg.det(beta)**(-1/2)*1/vals[j]*np.exp(-1.2*(np.log(vals)-alpha).T@np.linalg.inv(beta)@(np.log(vals)-alpha))
+                    p[i] *= 1/vals[j]
+            return p
+        return multi_var_log_norm
+    
+    def multi_mode_log_norm_setup(self, mus, sigmas):
+        mus = np.array(mus)
+        sigmas = np.array(sigmas)
+        mixture_size = mus.size
+        alphas = np.log(mus) - 0.5*np.log(1+sigmas**2/mus)
+        betas = np.sqrt(np.log(1+sigmas**2/mus))
+        def multi_mode_log_norm(x):
+            p = []
+            for i in range(mixture_size):
+                p.append(1/(x*betas[i]*np.sqrt(2*np.pi))*np.exp(-(np.log(x)-alphas[i])**2/(2*betas[i]**2)))
+            return np.sum(p,axis = 0)/mixture_size
+        return multi_mode_log_norm
+    
+    def multi_mode_multi_var_log_norm_setup(self, mus, covs):
+        mus = np.array(mus)
+        covs = np.array(covs)
+        mixture_size = mus.shape[0]
+        n_dim = mus.shape[1]
+        alphas = np.zeros((mixture_size, n_dim))
+        betas = np.zeros((mixture_size, n_dim, n_dim))
+
+        for mode in range(mixture_size):
+            for i in range(n_dim):
+                alphas[mode, i] = np.log(mus[mode, i]) - 1/2*np.log(covs[mode, i,i]/mus[mode, i]**2 +1)
+                for j in range(n_dim):
+                    betas[mode, i,j] = np.log(covs[mode,i,j]/(mus[mode,i]*mus[mode,j])+1)
+
+
+        def multi_mode_multi_var_log_norm(x):
+            n_points = x.shape[0]
+            p = np.ones((mixture_size, n_points))
+            for mode in range(mixture_size):
+                for i in range(n_points):
+                    vals = x[i]
+                    for j in range(n_dim):
+
+                        p[mode,i] *= (2*np.pi)**(-n_dim/2)*np.linalg.det(betas[mode])**(-1/2)*1/vals[j]*np.exp(-1.2*(np.log(vals)-alphas[mode]).T@np.linalg.inv(betas[mode])@(np.log(vals)-alphas[mode]))
+                        p[mode,i] *= 1/vals[j]
+            return np.sum(p, axis = 0)/mixture_size
+                
+        return multi_mode_multi_var_log_norm    
+    
+
     def get_prior_plots(self, prior_plots):
         for i in range(len(prior_plots)):
             prior_plot_info = prior_plots[i]
@@ -227,28 +292,27 @@ class Visualiser:
         param_1_mesh, param_2_mesh = np.meshgrid(param_1_linspace, param_2_linspace)
         shape = param_1_mesh.shape
 
-        param_1_mesh_flattened = param_1_mesh.flatten()
-        param_2_mesh_flattened = param_2_mesh.flatten()
+        P = np.zeros(shape)
 
-        P = []
+        multi_var_param = param_1+'_and_'+param_2
         
-        if self.hyperparams['params'][param_1]['prior_func'] == 'log_norm':
-            prior_dist_1 = self.log_norm_setup(self.hyperparams['params'][param_1]['prior_params']['mu'], self.hyperparams['params'][param_1]['prior_params']['sigma'])
-            prior_dist_2 = self.log_norm_setup(self.hyperparams['params'][param_2]['prior_params']['mu'], self.hyperparams['params'][param_2]['prior_params']['sigma'])
+        if self.hyperparams['params'][multi_var_param]['prior_func'] == 'log_norm':
+            prior_dist = self.multi_var_log_norm_setup(self.hyperparams['params'][multi_var_param]['prior_params']['mu'], self.hyperparams['params'][multi_var_param]['prior_params']['cov'])
 
-        elif self.hyperparams['params'][param_1]['prior_func'] == 'gamma':
-            prior_dist_1 = self.gamma_setup(self.hyperparams['params'][param_1]['prior_params']['mu'], self.hyperparams['params'][param_1]['prior_params']['sigma'])
-            prior_dist_2 = self.gamma_setup(self.hyperparams['params'][param_2]['prior_params']['mu'], self.hyperparams['params'][param_2]['prior_params']['sigma'])
+        # elif self.hyperparams['params'][param_1]['prior_func'] == 'gamma':
+        #     prior_dist_1 = self.gamma_setup(self.hyperparams['params'][param_1]['prior_params']['mu'], self.hyperparams['params'][param_1]['prior_params']['sigma'])
+        #     prior_dist_2 = self.gamma_setup(self.hyperparams['params'][param_2]['prior_params']['mu'], self.hyperparams['params'][param_2]['prior_params']['sigma'])
+
+        elif self.hyperparams['params'][multi_var_param]['prior_func'] == 'multi_mode_log_norm':
+            prior_dist = self.multi_mode_multi_var_log_norm_setup(self.hyperparams['params'][multi_var_param]['prior_params']['mus'], self.hyperparams['params'][multi_var_param]['prior_params']['covs'])
         else:
             raise Exception('Prior distribution not listed!')
 
-        for (param_1_point, param_2_point) in zip (param_1_mesh_flattened, param_2_mesh_flattened):
-            P.append(prior_dist_1(param_1_point)*prior_dist_2(param_2_point))
-
-        P = np.reshape(P,shape)
+        P = prior_dist(np.array([param_1_mesh.flatten(), param_2_mesh.flatten()]).T)
+        P = np.reshape(P, shape)
 
         plt.figure(figsize=(8, 8))
-        plt.contourf(param_1_mesh, param_2_mesh, P, levels=30, cmap='viridis')
+        plt.contourf(param_1_mesh, param_2_mesh, P, levels=30, cmap='viridis', vmin = np.percentile(P,5))
         plt.xlabel(param_1)
         plt.ylabel(param_2)
         plt.title('Product of the distribution of ' + param_1 + ' and ' + param_2)
@@ -286,6 +350,13 @@ class Visualiser:
         plt.close()
 
     def plot_one_prior(self, param, param_range, references = None):
+        
+        # Correction to fit estimated value into distribution
+        if param_range[0] > self.params_mean[param]:
+            param_range[0] = self.params_mean[param]
+        elif param_range[1] < self.params_mean[param]:
+            param_range[1] = self.params_mean[param]
+        
         param_linspace = np.linspace(param_range[0], param_range[1], 100)
         
         if self.hyperparams['params'][param]['prior_func'] == 'log_norm':
@@ -293,6 +364,8 @@ class Visualiser:
 
         elif self.hyperparams['params'][param]['prior_func'] == 'gamma':
             prior_dist = self.gamma_setup(self.hyperparams['params'][param]['prior_params']['mu'], self.hyperparams['params'][param]['prior_params']['sigma'])
+        elif self.hyperparams['params'][param]['prior_func'] == 'multi_mode_log_norm':
+            prior_dist = self.multi_mode_log_norm_setup(self.hyperparams['params'][param]['prior_params']['mus'], self.hyperparams['params'][param]['prior_params']['sigmas'])
         else:
             raise Exception('Prior distribution not listed!')
         
@@ -327,7 +400,7 @@ class Visualiser:
         est_val = plt.axvline(self.params_mean[param], color = 'b', linestyle = 'dashed', label = 'Estimated Value')
         handles.append(est_val)
 
-        if self.actual_value[param] != 'NaN':
+        if self.actual_values[param] != 'NaN':
             act_val = plt.axvline(self.actual_values[param], color = 'g', linestyle = 'dashed', label = 'Actual Value')
             handles.append(act_val)
 

@@ -5,6 +5,7 @@ import os
 from matplotlib import pyplot as plt
 import json
 from numpyencoder import NumpyEncoder
+from numpy_da import DynamicArray
 
 from controllers.controller import Controller
 from toolboxes.inference_toolbox.parameter import Parameter
@@ -55,17 +56,95 @@ class Generator(Controller):
         self.default_values['thinning_rate'] = sampler_info['thinning_rate']
         self.par_to_col['thinning_rate'] = ('parameters','sampler','thinning_rate')
 
+        def set_prior_param_default_values(param_name, params):
+            multi_mode = False
+            if 'multi_mode' in params[param_name].prior_select:
+                multi_mode = True
+            
+            for prior_param in params[param_name].prior_params.index:
+                n_dims = len(np.array(params[param_name].prior_params[prior_param]).shape)
+                if multi_mode:
+                    n_modes = np.array(params[param_name].prior_params[prior_param]).shape[0]
+                    dim1 = 1
+                    dim2 = 1
+                    if n_dims > 1:
+                        dim1 = np.array(params[param_name].prior_params[prior_param]).shape[1]
+                    if n_dims > 2:
+                        dim2 = np.array(params[param_name].prior_params[prior_param]).shape[2]
+                    for n in range(n_modes):
+                        if dim1 == 1:
+                            full_prior_param_name = param_name + '_' + prior_param + '_mode_' + str(n)
+                            self.default_values[full_prior_param_name] = np.array(params[param_name].prior_params[prior_param])[n]
+                            self.par_to_col[full_prior_param_name] = ('parameters', param_name, prior_param + '_mode_' + str(n))                    
+                        elif dim1 > 1:
+                            if dim2 == 1:
+                                for i in range(dim1):
+                                    full_prior_param_name = param_name + '_' + prior_param + '_' + str(i) + '_mode_' + str(n)
+                                    self.default_values[full_prior_param_name] = np.array(params[param_name].prior_params[prior_param])[n,i]
+                                    self.par_to_col[full_prior_param_name] = ('parameters', param_name, prior_param + '_' + str(i) + '_mode_' + str(n))
+
+                            elif dim2 > 1:
+                                for i in range(dim1):
+                                    for j in range(dim2):
+                                        full_prior_param_name = param_name + '_' + prior_param + '_' + str(i) + '_' + str(j) + '_mode_' + str(n)
+                                        self.default_values[full_prior_param_name] = np.array(params[param_name].prior_params[prior_param])[n,i,j]
+                                        self.par_to_col[full_prior_param_name] = ('parameters', param_name, prior_param + '_' + str(i) + '_' + str(j) + '_mode_' + str(n))
+                            else:
+                                raise Exception('Invalid shape of prior parameter')
+                        else:
+                            raise Exception('Invalid shape of prior parameter')
+
+
+                else:
+                    dim1 = 1
+                    dim2 = 1 
+                    if n_dims > 0:
+                        dim1 = np.array(params[param_name].prior_params[prior_param]).shape[0]
+                    if n_dims > 1:
+                        dim2 = np.array(params[param_name].prior_params[prior_param]).shape[1]
+
+                    if dim1 == 1:
+                        full_prior_param_name = param_name + '_' + prior_param
+                        self.default_values[full_prior_param_name] = params[param_name].prior_params[prior_param]
+                        self.par_to_col[full_prior_param_name] = ('parameters', param_name, prior_param)                    
+                    elif dim1 > 1:
+                        if dim2 == 1:
+                            for i in range(dim1):
+                                full_prior_param_name = param_name + '_' + prior_param + '_' + str(i)
+                                self.default_values[full_prior_param_name] = params[param_name].prior_params[prior_param][i]
+                                self.par_to_col[full_prior_param_name] = ('parameters', param_name, prior_param + '_' + str(i))
+
+                        elif dim2 > 1:
+                            for i in range(dim1):
+                                for j in range(dim2):
+                                    full_prior_param_name = param_name + '_' + prior_param + '_' + str(i) + '_' + str(j)
+                                    self.default_values[full_prior_param_name] = params[param_name].prior_params[prior_param][i][j]
+                                    self.par_to_col[full_prior_param_name] = ('parameters', param_name, prior_param + '_' + str(i) + '_' + str(j))
+                        else:
+                            raise Exception('Invalid shape of prior parameter')
+                        
+                    else:
+                        raise Exception('Invalid shape of prior parameter')
+
         # Adds all parameter information to the default parameters object and the parameter to data frame dictionary
         def set_param_default_values(params):
+            new_param_list = []
+            
             for param in params.index:
                 self.default_values[param+'_prior'] = params[param].prior_select
                 self.par_to_col[param+'_prior'] = ('parameters', param, 'prior')
                 
-                for prior_param in params[param].prior_params.index:
-                    self.default_values[param+'_'+prior_param] = params[param].prior_params[prior_param]
-                    self.par_to_col[param+'_'+prior_param] = ('parameters', param, prior_param)
+                set_prior_param_default_values(param, params)
 
-                self.default_values[param+'_mean'] = params[param].default_value
+                if '_and_' in param:
+                    new_param_list.append(param.split('_and_')[0])
+                    new_param_list.append(param.split('_and_')[1])
+                else:
+                    new_param_list.append(param)
+
+            for param in new_param_list:
+
+                self.default_values[param+'_mean'] = 'NaN'
                 self.par_to_col[param+'_mean'] = ('results', param, 'mean')
                 
                 self.default_values[param+'_lower'] = 'NaN'
@@ -184,6 +263,7 @@ class Generator(Controller):
 
     # Runs a list of instances with hyperparameters based on the inputted inputs data frame
     def generate(self, inputs, results_path):
+        inputs.to_csv('temp.csv')
         # Creates the instances folder
         instances_path = results_path + '/instances'
         if not os.path.exists(instances_path):
@@ -193,16 +273,97 @@ class Generator(Controller):
         def assign_parameters(input_params, inputs, instance):
             params = pd.Series({},dtype='float64')
             for param_name in input_params.index:
-                params[param_name] = Parameter(name = param_name, 
+                if '_and_' in param_name:
+                    params[param_name] = Parameter(name = param_name.split('_and_')[0], name_2 = param_name.split('_and_')[1],
                                                prior_select=inputs[self.par_to_col[param_name + '_prior']].values[instance-1])
-                for prior_param_name in input_params[param_name].prior_params.index:
-                    params[param_name].add_prior_param(prior_param_name, 
-                                                        np.float64(inputs[self.par_to_col[param_name + '_' + prior_param_name]].values[instance-1]))
+                else:
+                    params[param_name] = Parameter(name = param_name, 
+                                               prior_select=inputs[self.par_to_col[param_name + '_prior']].values[instance-1])
+                params = assign_prior_parameters(input_params, params, param_name, inputs, instance)                
+            return params
+        
+        def assign_prior_parameters(input_params, params, param_name, inputs, instance):
+            for prior_param_name in input_params[param_name].prior_params.index:
+                param_and_prior_param_name = param_name + '_' + prior_param_name
+                uncoupled_prior_names = [x for x in self.par_to_col.keys() if param_and_prior_param_name in x]
+                multimodal = False
+                prior_param_elements = [x.replace(param_name + '_', '') for x in uncoupled_prior_names]
+                modes = []
+                if all('_mode_' in x for x in uncoupled_prior_names):
+                    multimodal = True
+                    modes = np.unique([int(x.split('_mode_')[1]) for x in uncoupled_prior_names])
+                    prior_param_elements = [x.split('_mode_')[0] for x in prior_param_elements]
+                
+                prior_param_elements = np.unique(prior_param_elements)
+
+                if len(modes) == 0 and len(prior_param_elements) == 1:
+                    prior_param_value = inputs[self.par_to_col[param_name + '_' + prior_param_name]].values[instance-1]
+                    params[param_name].add_prior_param(prior_param_name, prior_param_value)
+                
+                elif len(modes) != 0 and len(prior_param_elements) == 1:
+                    prior_param_value = []
+                    for mode in modes:
+                        prior_param_value.append(inputs[self.par_to_col[param_name + '_' + prior_param_name + '_mode_' + str(mode)]].values[instance-1])
+                    params[param_name].add_prior_param(prior_param_name, prior_param_value)
+                
+                elif len(modes) == 0 and len(prior_param_elements) != 1:
+                    element_coords_list = []
+                    for element in prior_param_elements:
+                        element_split = element.split('_')
+                        element_coords_list.append([int(x) for x in element_split[1:]])
+                    
+                    if len(element_coords_list[0]) == 1:
+                        prior_param_value = np.zeros(np.max(element_coords_list)+1)
+                        for element_coord in element_coords_list:
+                            prior_param_value[element_coord[0]] = inputs[self.par_to_col[param_name + '_' + prior_param_name + '_' + str(element_coord[0])]].values[instance-1]
+
+                    elif len(element_coords_list[0]) == 2:
+                        prior_param_value = np.zeros((np.max(np.array(element_coords_list)[:, 0])+1, np.max(np.array(element_coords_list)[:, 1])+1))
+                        for element_coord in element_coords_list:
+                            prior_param_value[element_coord[0], element_coord[1]] = inputs[self.par_to_col[param_name + '_' + prior_param_name + '_' + str(element_coord[0]) + '_' + str(element_coord[1])]].values[instance-1]
+                    else:
+                        raise Exception('Invalid Prior Shape!')
+
+                    params[param_name].add_prior_param(prior_param_name, prior_param_value.tolist())
+                            
+                else:
+                    prior_param_value = []
+                    for mode in modes:
+                        element_coords_list = []
+                        for element in prior_param_elements:
+                            element_split = element.split('_')
+                            element_coords_list.append([int(x) for x in element_split[1:]])
+                        
+                        if len(element_coords_list[0]) == 1:
+                            prior_param_mode_value = np.zeros(np.max(element_coords_list)+1)
+                            for element_coord in element_coords_list:
+                                prior_param_mode_value[element_coord[0]] = inputs[self.par_to_col[param_name + '_' + prior_param_name + '_' + str(element_coord[0]) + '_mode_' + str(mode)]].values[instance-1]
+
+                        elif len(element_coords_list[0]) == 2:
+                            prior_param_mode_value = np.zeros((np.max(np.array(element_coords_list)[:, 0])+1, np.max(np.array(element_coords_list)[:, 1])+1))
+                            for element_coord in element_coords_list:
+                                prior_param_mode_value[element_coord[0], element_coord[1]] = inputs[self.par_to_col[param_name + '_' + prior_param_name + '_' + str(element_coord[0]) + '_' + str(element_coord[1]) + '_mode_' + str(mode)]].values[instance-1]
+                        else:
+                            raise Exception('Invalid Prior Shape!')
+
+                        prior_param_value.append(prior_param_mode_value.tolist())
+
+                    params[param_name].add_prior_param(prior_param_name, prior_param_value)
+            
             return params
         
         # Adds the parameter results to a specified instance of the inputs dataframe
         def output_param_results(param_results, inputs, instance):
-            for param in param_results.index:
+            param_list = param_results.index
+            new_param_list = []
+            for param in param_list:
+                if '_and_' in param:
+                    new_param_list.append(param.split('_and_')[0])
+                    new_param_list.append(param.split('_and_')[1])
+                else:
+                    new_param_list.append(param)
+
+            for param in new_param_list:
                 inputs.loc[instance,self.par_to_col[param + '_lower']] = summary['overall'][param]['lower']
                 inputs.loc[instance,self.par_to_col[param + '_mean']] = summary['overall'][param]['mean']
                 inputs.loc[instance,self.par_to_col[param + '_upper']] = summary['overall'][param]['upper']
@@ -293,7 +454,7 @@ class Generator(Controller):
             del visualiser
 
         # Saves the edited inputs file after processing all instances
-        inputs.to_excel(results_path + '/results.xlsx')
+        inputs.to_csv(results_path + '/results.csv')
 
         return inputs
     
@@ -305,8 +466,8 @@ class Generator(Controller):
             os.makedirs(results_path)
 
         # Checks whether the generator has already been run
-        if os.path.exists(results_path +'/results.xlsx'):
-            results = pd.read_excel(results_path +'/results.xlsx', header=[0,1,2], index_col=0)
+        if os.path.exists(results_path +'/results.csv'):
+            results = pd.read_excel(results_path +'/results.cvs', header=[0,1,2], index_col=0)
         else:
             # Initialises the inputs object using the default values as references for the column names
             inputs = pd.DataFrame(columns=[self.par_to_col[x] for x in self.default_values.index])
@@ -342,8 +503,8 @@ class Generator(Controller):
             os.mkdir(results_path)
 
         # Checks whether the generator has already been run
-        if os.path.exists(results_path +'/results.xlsx'):
-            results = pd.read_excel(results_path +'/results.xlsx', header=[0,1,2], index_col=0)
+        if os.path.exists(results_path +'/results.csv'):
+            results = pd.read_csv(results_path +'/results.csv', header=[0,1,2], index_col=0)
         else:
             # Initialises the inputs object using the default values as references for the column names
             inputs = pd.DataFrame(columns=[self.par_to_col[x] for x in self.default_values.index])
@@ -389,11 +550,21 @@ class Generator(Controller):
         varying_parameter_1 = results[self.par_to_col[parameter_name_1]]
         varying_parameter_2 = results[self.par_to_col[parameter_name_2]]
 
+        new_inference_param_names = []
+        for param_name in inference_param_names:
+            if '_and_' in param_name:
+                new_inference_param_names.append(param_name.split('_and_')[0])
+                new_inference_param_names.append(param_name.split('_and_')[1])
+            else:
+                new_inference_param_names.append(param_name)
+
+        inference_param_names = new_inference_param_names
+
         # Checks whether parameter accuracies should be included in plotted results
         param_accuracy_conditional = 'model' in self.data_params and len(self.data_params['model']['inference_params']) == len(inference_param_names)
         
         new_shape = (np.unique(varying_parameter_1).size, np.unique(varying_parameter_2).size)
-
+        
         for param_name in inference_param_names:
             param_taus[param_name] = results[self.par_to_col[param_name + '_tau']].values.astype('float64')
             if param_accuracy_conditional:

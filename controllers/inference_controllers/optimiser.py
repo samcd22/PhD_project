@@ -69,7 +69,7 @@ class Optimiser(Controller):
                     self.default_values[param+'_'+prior_param] = params[param].prior_params[prior_param]
                     self.par_to_col[param+'_'+prior_param] = ('parameters', param, prior_param)
 
-                self.default_values[param+'_mean'] = params[param].default_value
+                self.default_values[param+'_mean'] = 'NaN'
                 self.par_to_col[param+'_mean'] = ('results', param, 'mean')
                 
                 self.default_values[param+'_lower'] = 'NaN'
@@ -166,7 +166,7 @@ class Optimiser(Controller):
             if saved_construction != construction:
                 raise Exception('Default generator parameters do not match for this folder name!')
         else:
-            with open(self.full_results_path + '/default_params_construction.json', "w") as fp:
+            with open(self.unique_generator_path + '/default_params_construction.json', "w") as fp:
                 json.dump(construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
 
 
@@ -224,22 +224,17 @@ class Optimiser(Controller):
                 json.dump(optimiser_construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
     
     # Runs multiple instances of the sampler optimising the inputted hyperparameters based on the inputted success metric
-    def run(self, n_trials = 100, optimising_parameters = {
-                    'I_y_mu': [1e-2, 10],
-                    'I_y_sigma': [1e-2, 10],
-                    'I_z_mu': [1e-2, 10],
-                    'I_z_sigma': [1e-2, 10],
-                    'Q_mu': [1e9, 1e18],
-                    'Q_sigma': [1e9, 1e18],
-                },
+    def run(self, n_trials = 100, optimising_parameters = None,
                 index_name = 'rmse',
-                optimiser_name = 'optimiser_1'):
+                optimiser_name = 'optimiser_1',
+                direction = 'minimize'):
         
         # Assigns variables
         self.optimising_parameters = optimising_parameters
         self.optimiser_name = optimiser_name
         self.index_name = index_name
         self.n_trials = n_trials
+        self.direction = direction
 
         # Generates the optimiser construction object
         construction = self.get_optimiser_construction()
@@ -250,11 +245,15 @@ class Optimiser(Controller):
         # Initialises the inputs object using the default values as references for the column names
         self.all_inputs = pd.DataFrame(columns=[self.par_to_col[x] for x in self.default_values.index])
 
+        if os.path.exists(self.optimiser_path + '/results.csv'):
+            previous_inputs = pd.read_csv(self.optimiser_path + '/results.csv', header=[0,1,2], index_col=0)
+            self.all_inputs = previous_inputs
+
         study_name = self.optimiser_name  # Unique identifier of the study.
         storage_name = self.full_results_path + '/' + study_name +'.db'
 
         # Initialises the optimiser instance
-        study = optuna.create_study(study_name=study_name, storage='sqlite:///' + storage_name, direction = "minimize", load_if_exists=True)
+        study = optuna.create_study(study_name=study_name, storage='sqlite:///' + storage_name, direction = direction, load_if_exists=True)
 
         num_previous_trials = len(study.trials)
 
@@ -338,7 +337,8 @@ class Optimiser(Controller):
         # Formats and saves the updated results data frame
         self.all_inputs = pd.concat([self.all_inputs, self.one_row.to_frame().T], ignore_index=True)
         self.all_inputs.columns = pd.MultiIndex.from_tuples(self.all_inputs.columns)
-        self.all_inputs.to_excel(self.optimiser_path + '/results.xlsx')
+
+        self.all_inputs.to_csv(self.optimiser_path + '/results.csv')
 
         return sampler, visualiser
 
@@ -476,14 +476,59 @@ class Optimiser(Controller):
     def get_plots(self, study):
         optuna.visualization.matplotlib.plot_optimization_history(study)
         plt.savefig(self.optimiser_path + '/optimisation_history.png', bbox_inches="tight")
+        plt.close()
+
         optuna.visualization.matplotlib.plot_param_importances(study)
         plt.savefig(self.optimiser_path + '/parameter_importances.png', bbox_inches="tight")
+        plt.close()
+
+        self.plot_parameter_history()
+
+    def plot_parameter_history(self):
+        if not os.path.exists(self.optimiser_path + '/parameter_histories'):
+            os.makedirs(self.optimiser_path + '/parameter_histories')
+
+        all_results = pd.read_csv(self.optimiser_path + '/results.csv', header=[0,1,2], index_col=0)
+        optimising_index_vals = all_results[self.par_to_col[self.index_name.upper()]]
+
+        plt.figure()
+        for optimising_param in self.optimising_parameters.keys():
+            best_current_index = optimising_index_vals[0]
+            best_current_params= np.zeros(optimising_index_vals.size)
+            param_data = all_results[self.par_to_col[optimising_param]]
+
+            for i, index_val in enumerate(optimising_index_vals):
+                if self.direction == 'minimize':
+                    if index_val <= best_current_index:
+                        best_current_params[i] = param_data[i]
+                        best_current_index = index_val
+                    else:
+                        best_current_params[i] = best_current_params[i-1]
+                elif self.direction == 'maximize':
+                    if index_val >= best_current_index:
+                        best_current_params[i] = param_data[i]
+                        best_current_index = index_val
+                    else:
+                        best_current_params[i] = best_current_params[i-1]                        
+                else:
+                    raise Exception('Invalid optimising direction!')
+
+            plt.plot(param_data, '.-b', label = 'Parameter Values')
+            plt.plot(best_current_params, '--r', label = 'Current Best Value')
+
+            plt.title(optimising_param)
+            plt.ylabel('Value')
+            plt.xlabel('Trial Number')
+            plt.legend()
+            plt.savefig(self.optimiser_path + '/parameter_histories/' + optimising_param + '_histories.png')
+            plt.close()
 
     # Generates an instance of the sampler based on the optimal hyperparameters concluded from the optimiser
     def run_best_params(self, study, domain, name, prior_plots = None):
         # Extracts information from the best trial of the optimiser
-        results = study.best_params
-        params, model, likelihood = self.prepare_inference(results=results)
+        self.results = study.best_params
+        self.save_results()
+        params, model, likelihood = self.prepare_inference(results=self.results)
         
         # Sampler parameters
         num_samples = self.default_params['sampler']['n_samples']
@@ -519,3 +564,7 @@ class Optimiser(Controller):
         # Generates the plots and animation of the modeled system using the sampled parameters
         visualiser.visualise_results(domain = domain, name = name, title='Log Concentration of Droplets', log_results=False)
         visualiser.animate(name = 'small_scale_3D_plots')      
+
+    def save_results(self):
+        with open(self.optimiser_path + '/results.json', "w") as fp:
+            json.dump(self.results,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)

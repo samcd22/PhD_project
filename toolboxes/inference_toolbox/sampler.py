@@ -5,7 +5,6 @@ import json
 import numpyro
 import jax.numpy as jnp
 from jax import random
-from memory_profiler import profile
 
 # Sampler class - samples inference parameters
 class Sampler:
@@ -22,6 +21,15 @@ class Sampler:
         self.n_chains = n_chains
         self.n_warmup = n_warmup
         self.thinning_rate = thinning_rate
+
+        self.actual_parameter_names = []
+        for param in self.params.index:
+            if '_and_' in param:
+                names = param.split('_and_')
+                for i in range(len(names)):
+                    self.actual_parameter_names.append(names[i])
+            else:
+                self.actual_parameter_names.append(param)
 
         self.data_path = data_path
         
@@ -57,28 +65,67 @@ class Sampler:
     def format_samples(self, samples):
         chain_new_samples = pd.DataFrame({}, dtype='float64')
         for param in self.params.index:
-            sample_chains = np.array(samples[param])
-            chains = range(sample_chains.shape[0])
-            chain_array = np.array([])
-            chain_new_samples_array = np.array([])
-            sample_index_array = np.array([])
-            
-            for chain in chains:
-                chain_new_samples_array = np.concatenate((chain_new_samples_array, sample_chains[chain]))
-                chain_array = np.concatenate((chain_array, (chain+1)*np.ones(sample_chains[chain].shape)))
-                sample_index_array = np.concatenate((sample_index_array, np.array(range(sample_chains.shape[1]))+1))
-            chain_new_samples[param] = chain_new_samples_array
+
+
+            if '_and_' in param:
+
+                sub_params = param.split('_and_')
+                for i in range(len(sub_params)):
+                    chain_array = np.array([])
+                    chain_new_samples_array = np.array([])
+                    sample_index_array = np.array([])
+
+                    sub_param = sub_params[i]
+                    sample_chains = samples[param][:,:,i]
+                    chains = range(sample_chains.shape[0])
+                
+                    for chain in chains:
+                        chain_new_samples_array = np.concatenate((chain_new_samples_array, sample_chains[chain]))
+                        chain_array = np.concatenate((chain_array, (chain+1)*np.ones(sample_chains[chain].shape)))
+                        sample_index_array = np.concatenate((sample_index_array, np.array(range(sample_chains.shape[1]))+1))
+                    
+                    chain_new_samples[sub_param] = chain_new_samples_array
+
+            else:
+                chain_array = np.array([])
+                chain_new_samples_array = np.array([])
+                sample_index_array = np.array([])
+                sample_chains = np.array(samples[param])
+                chains = range(sample_chains.shape[0])
+                
+                for chain in chains:
+                    chain_new_samples_array = np.concatenate((chain_new_samples_array, sample_chains[chain]))
+                    chain_array = np.concatenate((chain_array, (chain+1)*np.ones(sample_chains[chain].shape)))
+                    sample_index_array = np.concatenate((sample_index_array, np.array(range(sample_chains.shape[1]))+1))
+                
+                chain_new_samples[param] = chain_new_samples_array
+        
         chain_new_samples['chain'] = chain_array
         chain_new_samples['sample_index'] = sample_index_array
 
         return chain_new_samples.sort_values(['sample_index']).reset_index().drop(columns=['chain', 'sample_index','index']), chain_new_samples
     
+    def format_params(self, current_params_sample):
+        formatted_current_params_sample = {}
+
+        for param_ind in self.params.index:
+            if 'and' in param_ind:
+                names = param_ind.split('_and_')
+                for i in range(len(names)):
+                    temp = current_params_sample[param_ind]
+                    formatted_current_params_sample[names[i]] = temp[i]
+            else:
+                formatted_current_params_sample[param_ind] = current_params_sample[param_ind]
+        return formatted_current_params_sample
+
     # Generates one sample of the infered parameters
     def sample_one(self):
         current_params_sample ={}
         for param_ind in self.params.index:
             s = self.params[param_ind].sample_param()
             current_params_sample[param_ind] = s
+        
+        current_params_sample = self.format_params(current_params_sample)
 
         mu = self.model_func(current_params_sample, self.data.x, self.data.y, self.data.z)
         numpyro.deterministic('mu', mu)
@@ -132,12 +179,12 @@ class Sampler:
         data_exists = False
         if not os.path.exists(self.data_path):
             os.makedirs(self.data_path)
-        x=os.listdir(self.data_path)
         for instance_folder in os.listdir(self.data_path):
             folder_path = self.data_path + '/' + instance_folder
             f = open(folder_path + '/hyperparams.json')
             instance_hyperparams = json.load(f)
             f.close()
+            con = self.hyperparams == instance_hyperparams
             if self.hyperparams == instance_hyperparams:
                 data_exists = True
                 self.instance = int(instance_folder.split('_')[1])
