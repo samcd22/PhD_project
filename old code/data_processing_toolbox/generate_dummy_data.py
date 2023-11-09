@@ -37,7 +37,7 @@ def generate_dummy_data(sigma, model_select, noise_dist = "gaussian", model_para
         for param in domain_params['domain_params'].keys():
             domain.add_domain_param(param, domain_params['domain_params'][param])
 
-    points = domain.create_domain()
+    points = domain.create_3D_domain()
 
 
     mu = model_func(inference_params, points[:,0], points[:,1], points[:,2])

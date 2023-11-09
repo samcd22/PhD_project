@@ -28,7 +28,7 @@ class DataSimulator:
             self.domain_resolution = data_params['domain']['resolution']
 
         self.noise_dist = data_params['noise_dist']
-        self.noise_level = data_params['noise_level']
+        self.noise_percentage = data_params['noise_percentage']
 
         self.output_header = data_params['output_header']
 
@@ -102,15 +102,16 @@ class DataSimulator:
             for param in self.domain_params.keys():
                 domain.add_domain_param(param, self.domain_params[param])
 
-            points = domain.create_domain()
+            points = domain.create_3D_domain()
 
             mu = model_func(inference_params, points[:,0], points[:,1], points[:,2])
-        
+            noise_level = mu*self.noise_percentage
+
             if self.noise_dist == 'gaussian':
-                C = np.array([val + self.noise_level*np.random.normal() for val in mu])
+                C = np.array([mu[i] + noise_level[i]*np.random.normal() for i in range(mu.size)])
             elif self.noise_dist == 'gamma':
-                a = mu**2/self.noise_level**2
-                b = mu/self.noise_level**2
+                a = mu**2/noise_level**2
+                b = mu/noise_level**2
                 C = np.array([stats.gamma.rvs(a[i], scale = 1/b[i]) for i in range(mu.size)])
             elif self.noise_dist == 'no_noise':
                 C = mu

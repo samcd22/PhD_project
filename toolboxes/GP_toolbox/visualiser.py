@@ -63,7 +63,7 @@ class Visualiser:
     # There are multiple ways of visualising these results
     def visualise_results(self, domain, name, plot_type = '3D', title = 'Concentration of Droplets'):
         # Generates domain plots
-        points = domain.create_domain()
+        points = domain.create_3D_domain()
 
         # Checks whether plots exist
         if os.path.exists(self.results_path + '/' + name):

@@ -5,7 +5,8 @@ import os
 from matplotlib import pyplot as plt
 import json
 from numpyencoder import NumpyEncoder
-from numpy_da import DynamicArray
+import matplotlib.colors as colors
+
 
 from controllers.controller import Controller
 from toolboxes.inference_toolbox.parameter import Parameter
@@ -263,7 +264,6 @@ class Generator(Controller):
 
     # Runs a list of instances with hyperparameters based on the inputted inputs data frame
     def generate(self, inputs, results_path):
-        inputs.to_csv('temp.csv')
         # Creates the instances folder
         instances_path = results_path + '/instances'
         if not os.path.exists(instances_path):
@@ -397,11 +397,8 @@ class Generator(Controller):
                     likelihood.add_likelihood_param(likelihood_param_name, np.float64(inputs[self.par_to_col['likelihood_' + likelihood_param_name]].values[instance - 1]))
 
                 # Additions to likelihood object under certain conditions
-                if self.data_params['data_type'] == 'simulated_data':
-                    if self.data_params['noise_level'] == 'NaN':
-                        if 'sigma' not in likelihood.likelihood_params:
-                            raise Exception('Either define your noise level with a fixed sigma in the likelihood, or set the noise level!')
-                        self.data_params['noise_level'] = likelihood.likelihood_params['sigma']
+                if self.data_params['data_type'] == 'simulated_data' and self.data_params['noise_percentage'] == 'NaN':
+                    raise Exception('Set the noise percentage!')
 
                 # Generates the sampler variables for this instance
                 num_samples = int(inputs[self.par_to_col['n_samples']].values[instance - 1])
@@ -601,7 +598,7 @@ class Generator(Controller):
         plt.xlabel(x_label)
         plt.ylabel(y_label)
         plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, RMSE_results, cmap='jet')
-        plt.title('RMSE of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
+        plt.title('RMSE of the algorithm for varying \n' + parameter_name_1 + ' and ' + parameter_name_2)
         plt.colorbar()
         plt.tight_layout()
         fig1.savefig(results_path + '/RMSE_plot.png')
@@ -611,8 +608,8 @@ class Generator(Controller):
         fig2 = plt.figure()
         plt.xlabel(x_label)
         plt.ylabel(y_label)
-        plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, AIC_results, cmap='jet')
-        plt.title('AIC of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
+        plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, AIC_results, cmap='jet', norm=colors.LogNorm(vmin=AIC_results.min(), vmax=AIC_results.max()))
+        plt.title('AIC of the algorithm for varying \n' + parameter_name_1 + ' and ' + parameter_name_2)
         plt.colorbar()
         plt.tight_layout()
         fig2.savefig(results_path + '/AIC_plot.png')
@@ -622,8 +619,8 @@ class Generator(Controller):
         fig3 = plt.figure()
         plt.xlabel(x_label)
         plt.ylabel(y_label)
-        plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, BIC_results, cmap='jet')
-        plt.title('BIC of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
+        plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, BIC_results, cmap='jet', norm=colors.LogNorm(vmin=AIC_results.min(), vmax=AIC_results.max()))
+        plt.title('BIC of the algorithm for varying \n' + parameter_name_1 + ' and ' + parameter_name_2)
         plt.colorbar()
         plt.tight_layout()
         fig3.savefig(results_path + '/BIC_plot.png')
@@ -634,7 +631,7 @@ class Generator(Controller):
         plt.xlabel(x_label)
         plt.ylabel(y_label)
         plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, diverging_results, cmap='jet')
-        plt.title('Number of divergences of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
+        plt.title('Number of divergences of the algorithm for varying \n' + parameter_name_1 + ' and ' + parameter_name_2)
         plt.colorbar()
         plt.tight_layout()
         fig4.savefig(results_path + '/divergence_plot.png')
@@ -645,7 +642,7 @@ class Generator(Controller):
         plt.xlabel(x_label)
         plt.ylabel(y_label)
         plt.pcolor(scaled_varying_parameter_1, scaled_varying_parameter_2, tau_av, cmap='jet')
-        plt.title('Tau convergence of the algorithm for varying ' + parameter_name_1 + ' and ' + parameter_name_2)
+        plt.title('Tau convergence of the algorithm for varying \n' + parameter_name_1 + ' and ' + parameter_name_2)
         plt.colorbar()
         plt.tight_layout()
         fig5.savefig(results_path + '/convergance_variation.png')
@@ -709,7 +706,7 @@ class Generator(Controller):
         plt.ylabel('RMSE')
         plt.plot(varying_parameter, RMSE_results)
         plt.xscale(xscale)
-        plt.title('RMSE of the algorithm for varying ' + parameter_name)
+        plt.title('RMSE of the algorithm for varying \n' + parameter_name)
         plt.tight_layout()
         fig1.savefig(results_path + '/RMSE_plot.png')
         plt.close()
@@ -720,7 +717,7 @@ class Generator(Controller):
         plt.ylabel('AIC')
         plt.plot(varying_parameter, AIC_results)
         plt.xscale(xscale)
-        plt.title('AIC of the algorithm for varying ' + parameter_name)
+        plt.title('AIC of the algorithm for varying \n' + parameter_name)
         plt.tight_layout()
         fig2.savefig(results_path + '/AIC_plot.png')
         plt.close()
@@ -731,7 +728,7 @@ class Generator(Controller):
         plt.ylabel('BIC')
         plt.plot(varying_parameter, BIC_results)
         plt.xscale(xscale)
-        plt.title('BIC of the algorithm for varying ' + parameter_name)
+        plt.title('BIC of the algorithm for varying \n' + parameter_name)
         plt.tight_layout()
         fig3.savefig(results_path + '/BIC_plot.png')
         plt.close()
@@ -742,7 +739,7 @@ class Generator(Controller):
         plt.ylabel('Divergences')
         plt.plot(varying_parameter, diverging_results)
         plt.xscale(xscale)
-        plt.title('Number of divergences of the algorithm for varying ' + parameter_name)
+        plt.title('Number of divergences of the algorithm for varying \n' + parameter_name)
         plt.tight_layout()
         fig4.savefig(results_path + '/divergence_plot.png')
         plt.close()
@@ -754,7 +751,7 @@ class Generator(Controller):
         for param_name in param_taus.index:
             plt.plot(varying_parameter, param_taus[param_name], label = param_name)
         plt.xscale(xscale)
-        plt.title('Convergence of the algorithm for varying ' + parameter_name)
+        plt.title('Convergence of the algorithm for varying \n' + parameter_name)
         plt.legend()
         plt.tight_layout()
         fig5.savefig(results_path + '/convergance_variation.png')
@@ -768,7 +765,7 @@ class Generator(Controller):
             for param_name in param_accuracies.index:
                 plt.plot(varying_parameter, param_accuracies[param_name], label = param_name)
             plt.xscale(xscale)
-            plt.title('Average parameter percentage error for varying ' + parameter_name)
+            plt.title('Average parameter percentage error for varying \n' + parameter_name)
             plt.legend()
             plt.tight_layout()
             fig6.savefig(results_path + '/param_accuracy_plot.png')

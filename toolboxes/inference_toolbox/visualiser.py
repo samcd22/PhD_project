@@ -176,16 +176,16 @@ class Visualiser:
     # Outputs the plots for visualising the modelled system based on the concluded lower, median and upper bound parameters and an inputted domain
     # There are multiple ways of visualising these results
     def visualise_results(self, domain, name, plot_type = '3D', log_results = True, title = 'Concentration of Droplets'):
-        # Generates domain plots
-        points = domain.create_domain()
-
-        # Checks whether plots exist
-        if os.path.exists(self.data_path + '/instance_' + str(self.instance) + '/' + name):
-            if not self.suppress_prints:
-                print('Plots already exist!')
 
         # Output plots are 3D
-        elif plot_type == '3D':
+        if plot_type == '3D':
+
+            if domain.n_dims != 3:
+                raise Exception('Domain does not have the correct number of spatial dimensions!')
+            
+            # Generates domain plots
+            points = domain.create_3D_domain()
+
             X, Y, Z = points[:,0], points[:,1], points[:,2]
             C_lower = self.model_func(self.params_lower, X,Y,Z)
             C_mean = self.model_func(self.params_mean, X,Y,Z)
@@ -194,6 +194,26 @@ class Visualiser:
             results_df = pd.DataFrame({'x': X.flatten(), 'y': Y.flatten(), 'z': Z.flatten(), 'C_lower': C_lower, 'C_mean': C_mean,'C_upper': C_upper})
 
             self.threeD_plots(results_df, name, log_results=log_results, title=title)
+
+        elif plot_type == '2D_slice':
+            count = 0
+            for slice_name in ['x_slice', 'y_slice', 'z_slice']:
+                if slice_name in domain.domain_params:
+                    count+=1
+                    points = domain.create_2D_slice_domain(slice_name)
+
+                    X, Y, Z = points[:,0], points[:,1], points[:,2]
+
+                    C_lower = self.model_func(self.params_lower, X,Y,Z)
+                    C_mean = self.model_func(self.params_mean, X,Y,Z)
+                    C_upper = self.model_func(self.params_upper, X,Y,Z)
+
+                    results_df = pd.DataFrame({'x': X.flatten(), 'y': Y.flatten(), 'z': Z.flatten(), 'C_lower': C_lower, 'C_mean': C_mean,'C_upper': C_upper})
+
+                    self.twoD_slice_plots(results_df, name,  slice_name = slice_name, log_results=log_results, title=title)
+
+            if count == 0:
+                raise Exception('No slice parameter inputted')
 
     def gamma_setup(self, mu, sigma):
         alpha =  mu**2/sigma**2
@@ -272,7 +292,6 @@ class Visualiser:
                 
         return multi_mode_multi_var_log_norm    
     
-
     def get_prior_plots(self, prior_plots):
         for i in range(len(prior_plots)):
             prior_plot_info = prior_plots[i]
@@ -287,6 +306,16 @@ class Visualiser:
                 self.plot_one_prior(params[0], prior_plot_info[params[0]], references)
 
     def plot_two_priors(self, param_1, param_2, param_1_range, param_2_range, references = None):
+        if param_1_range[0] > self.params_mean[param_1]:
+            param_1_range[0] = self.params_mean[param_1]
+        elif param_1_range[1] < self.params_mean[param_1]:
+            param_1_range[1] = self.params_mean[param_1]
+
+        if param_2_range[0] > self.params_mean[param_2]:
+            param_2_range[0] = self.params_mean[param_2]
+        elif param_2_range[1] < self.params_mean[param_2]:
+            param_2_range[1] = self.params_mean[param_2]
+
         param_1_linspace = np.linspace(param_1_range[0], param_1_range[1], 100)
         param_2_linspace = np.linspace(param_2_range[0], param_2_range[1], 100)
         param_1_mesh, param_2_mesh = np.meshgrid(param_1_linspace, param_2_linspace)
@@ -312,7 +341,7 @@ class Visualiser:
         P = np.reshape(P, shape)
 
         plt.figure(figsize=(8, 8))
-        plt.contourf(param_1_mesh, param_2_mesh, P, levels=30, cmap='viridis', vmin = np.percentile(P,5))
+        plt.contourf(param_1_mesh, param_2_mesh, P, levels=30, cmap='plasma', vmin = np.percentile(P,5))
         plt.xlabel(param_1)
         plt.ylabel(param_2)
         plt.title('Product of the distribution of ' + param_1 + ' and ' + param_2)
@@ -332,10 +361,10 @@ class Visualiser:
                 plt.annotate(label, (reference_x_point,reference_y_point), textcoords="offset points", 
                 xytext=(0,5), ha='center', color = 'r')
 
-        est_val = plt.scatter([self.params_mean[param_1]], [self.params_mean[param_2]], color = 'k', marker='s', label = 'Estimated Value')
+        est_val = plt.scatter([self.params_mean[param_1]], [self.params_mean[param_2]], color = 'k', marker='s', edgecolors='w', label = 'Estimated Value')
         handles.append(est_val)
         if self.actual_values[param_1] !='NaN' and self.actual_values[param_2] !='NaN':
-            act_val = plt.scatter([self.params_mean[param_1]], [self.params_mean[param_2]], color = 'orange', marker='*', label = "Actual Value")
+            act_val = plt.scatter([self.actual_values[param_1]], [self.actual_values[param_2]], color = 'orange', marker='*', edgecolors='black', label = "Actual Value")
             handles.append(act_val)
 
         plt.legend(handles = handles)
@@ -361,7 +390,6 @@ class Visualiser:
         
         if self.hyperparams['params'][param]['prior_func'] == 'log_norm':
             prior_dist = self.log_norm_setup(self.hyperparams['params'][param]['prior_params']['mu'], self.hyperparams['params'][param]['prior_params']['sigma'])
-
         elif self.hyperparams['params'][param]['prior_func'] == 'gamma':
             prior_dist = self.gamma_setup(self.hyperparams['params'][param]['prior_params']['mu'], self.hyperparams['params'][param]['prior_params']['sigma'])
         elif self.hyperparams['params'][param]['prior_func'] == 'multi_mode_log_norm':
@@ -416,6 +444,137 @@ class Visualiser:
         plt.savefig(full_path)
         plt.close()
 
+    def twoD_slice_plots(self, results, name, slice_name = None, log_results=False, title=None):
+        full_path = self.data_path + '/instance_' + str(self.instance) + '/' + name + '_2D_' + slice_name + '.png'
+        if os.path.exists(full_path):
+            print('2D slice plot already exists!')
+        else:        
+            if slice_name == 'x_slice':
+                X = results.y
+                Y = results.z
+                final_title = title + '\nslice at x = ' + str(results.x[0])
+                xlab = 'y'
+                ylab = 'z'
+            elif slice_name == 'y_slice':
+                X = results.x
+                Y = results.z
+                final_title = title + '\nslice at y = ' + str(results.y[0])
+                xlab = 'x'
+                ylab = 'z'
+            elif slice_name == 'z_slice':
+                X = results.x
+                Y = results.y
+                final_title = title + '\nslice at z = ' + str(results.z[0])
+                xlab = 'x'
+                ylab = 'y'
+            else:
+                raise Exception('No slice inputted!')
+
+            C_lower = results.C_lower
+            C_mean = results.C_mean
+            C_upper = results.C_upper
+
+
+            # Modifying C depending on if the results need logging
+            if log_results:
+                C_lower[C_lower<1] = 1
+                C_lower = np.log10(C_lower)
+                
+                C_mean[C_mean<1] = 1
+                C_mean = np.log10(C_mean)
+                
+                C_upper[C_upper<1] = 1
+                C_upper = np.log10(C_upper)
+
+            # Define min and max values for colorbar
+            min_val = np.percentile([C_lower, C_mean, C_upper],10)
+            max_val = np.percentile([C_lower, C_mean, C_upper],90)
+
+            fin_alpha = len(self.params_mean)*0.75
+
+            y = 12
+            r = 0.8
+            alpha = (1-r)*y
+
+            delta_alpha = fin_alpha - alpha
+
+            y_prime = y + delta_alpha
+            r_prime = r*y/y_prime
+
+            r_prime_frac = Fraction(r_prime)
+
+            fig = plt.figure(constrained_layout = True, figsize = (24,y_prime))
+            spec = GridSpec(2, 6, figure = fig, height_ratios= [r_prime_frac.numerator, r_prime_frac.denominator - r_prime_frac.numerator])
+
+            ax1 = fig.add_subplot(spec[0,:2])
+            ax2 = fig.add_subplot(spec[0,2:4])
+            ax3 = fig.add_subplot(spec[0,4:])
+            ax4 = fig.add_subplot(spec[1,:3])
+            ax5 = fig.add_subplot(spec[1,3:])
+            
+            # Defines the lower bound subplot
+            plot_1 = ax1.tricontourf(X, Y, results.C_lower, vmin=min_val, vmax=max_val, levels = 100)
+            ax1.set_title('Generated by the lower bound parameters', fontsize = 20)
+            ax1.set_xlabel(xlab)
+            ax1.set_ylabel(ylab)
+            ax1.set_xlim(np.min(X), np.max(X))
+            ax1.set_ylim(np.min(Y), np.max(Y))
+
+            # Defines the mean subplot
+            ax2.tricontourf(X, Y, results.C_mean, vmin=min_val, vmax=max_val, levels = 100)
+            ax2.set_title('Generated by the mean parameters', fontsize = 20)
+            ax2.set_xlabel(xlab)
+            ax2.set_ylabel(ylab)
+            ax2.set_xlim(np.min(X), np.max(X))
+            ax2.set_ylim(np.min(Y), np.max(Y))
+
+            # Defines the upper bound subplot
+            ax3.tricontourf(X, Y, results.C_upper, vmin=min_val, vmax=max_val, levels = 100)
+            ax3.set_title('Generated by the upper bound parameters', fontsize = 20)
+            ax3.set_xlabel(xlab)
+            ax3.set_ylabel(ylab)
+            ax3.set_xlim(np.min(X), np.max(X))
+            ax3.set_ylim(np.min(Y), np.max(Y))
+
+            # Generates the test point data on each graph
+            if self.include_test_points:
+                formatter = "{:.2e}" 
+                if  np.floor(np.log10(self.RMSE)) < 2: formatter = "{:.2f}"
+                RMSE_string = 'RMSE = ' + formatter.format(self.RMSE)
+                AIC_string = 'AIC = ' + formatter.format(self.AIC)
+                BIC_string = 'BIC = ' + formatter.format(self.BIC)
+
+            else:
+                RMSE_string = 'RMSE = n/a'
+                AIC_string = 'AIC = n/a'
+                BIC_string = 'BIC = n/a'
+
+            # Creates an axis to display the parameter values
+            param_string = self.get_param_string()
+            ax4.text(0.5,0.5,param_string, fontsize = 30, va = "center", ha = 'center')
+            ax4.set_xticks([])
+            ax4.set_yticks([])
+
+            param_accuracy_string = self.get_param_accuracy_string()
+
+            # Creates an axis to display the sampling information
+            ax5.text(0.5,0.5, RMSE_string + ',   ' + AIC_string + ',   ' + BIC_string + '\n' + param_accuracy_string, fontsize = 30, va = "center", ha = 'center')
+            ax5.set_xticks([])
+            ax5.set_yticks([])
+
+            # Defines the two colorbars
+            cbar1 = plt.colorbar(plot_1, ax = ax4, location = 'top', shrink = 2)
+
+            cbar1.ax.set_title('Predicted Concentration', fontsize = 10)
+
+            # Defines the overall title, including the range of values for each plot
+            fig.suptitle(final_title, fontsize = 32)
+
+            # Saves the figures if required
+
+            fig.savefig(full_path)
+            plt.close()
+
     # Plotting function for 3D plots
     def threeD_plots(self, results, name, q=10, log_results = True, title = 'Concentration of Droplets'):
         X = results.x
@@ -435,7 +594,7 @@ class Visualiser:
             
             C_upper[C_upper<1] = 1
             C_upper = np.log10(C_upper)
-        
+
         # Define the bin numbers and their labels
         lower_bin_nums = pd.qcut(C_lower,q, labels = False, duplicates='drop')
         lower_bin_labs = np.array(pd.qcut(C_mean,q, duplicates='drop').unique())
@@ -473,131 +632,136 @@ class Visualiser:
             upper_test_pred_C = self.model_func(self.params_upper, self.test_data['x'], self.test_data['y'], self.test_data['z'])
             upper_test_actual_C = self.test_data['Concentration']
             upper_percentage_difference = 2*np.abs(lower_test_actual_C-upper_test_pred_C)/(upper_test_actual_C + upper_test_pred_C) * 100
- 
+
         # Creates a directory for the instance if the save parameter is selected
-        os.mkdir(self.data_path + '/instance_' + str(self.instance) + '/' + str(name))
-        os.mkdir(self.data_path + '/instance_' + str(self.instance) + '/' + str(name) + '/figures')
+        if not os.path.exists(self.data_path + '/instance_' + str(self.instance) + '/' + str(name) + '_3D_scatter/figures'):
+            os.makedirs(self.data_path + '/instance_' + str(self.instance) + '/' + str(name) + '_3D_scatter/figures')
         
         # Loops through each bin number and generates a figure with the bin data 
         for bin_num in np.sort(np.unique(mean_bin_nums)):
-
-            lower_bin_data = lower_conc_and_bins[lower_conc_and_bins['bin'] >= bin_num]
-            mean_bin_data = mean_conc_and_bins[mean_conc_and_bins['bin'] >= bin_num]
-            upper_bin_data = upper_conc_and_bins[upper_conc_and_bins['bin'] >= bin_num]
-
-            fin_alpha = len(self.params_mean)*0.75
-
-            y = 12
-            r = 0.8
-            alpha = (1-r)*y
-
-            delta_alpha = fin_alpha - alpha
-
-            y_prime = y + delta_alpha
-            r_prime = r*y/y_prime
-
-            r_prime_frac = Fraction(r_prime)
-
-            fig = plt.figure(constrained_layout = True, figsize = (24,y_prime))
-            spec = GridSpec(2, 6, figure = fig, height_ratios= [r_prime_frac.numerator, r_prime_frac.denominator - r_prime_frac.numerator])
-
-            ax1 = fig.add_subplot(spec[0,:2], projection='3d')
-            ax2 = fig.add_subplot(spec[0,2:4], projection='3d')
-            ax3 = fig.add_subplot(spec[0,4:], projection='3d')
-            ax4 = fig.add_subplot(spec[1,:3])
-            ax5 = fig.add_subplot(spec[1,3:])
-            
-            # Defines the lower bound subplot
-            plot_1 = ax1.scatter(lower_bin_data.x, lower_bin_data.y, lower_bin_data.z, c = lower_bin_data.conc, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
-            ax1.set_title('Generated by the lower bound parameters', fontsize = 20)
-            ax1.set_xlabel('x')
-            ax1.set_ylabel('y')
-            ax1.set_zlabel('z')
-            ax1.set_xlim(np.min(X), np.max(X))
-            ax1.set_ylim(np.min(Y), np.max(Y))
-            ax1.set_zlim(np.min(Z), np.max(Z))
-
-            # Defines the mean subplot
-            ax2.scatter(mean_bin_data.x, mean_bin_data.y, mean_bin_data.z, c = mean_bin_data.conc, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
-            ax2.set_title('Generated by the mean parameters', fontsize = 20)
-            ax2.set_xlabel('x')
-            ax2.set_ylabel('y')
-            ax2.set_zlabel('z')
-            ax2.set_xlim(np.min(X), np.max(X))
-            ax2.set_ylim(np.min(Y), np.max(Y))
-            ax2.set_zlim(np.min(Z), np.max(Z))
-
-            # Defines the upper bound subplot
-            ax3.scatter(upper_bin_data.x, upper_bin_data.y, upper_bin_data.z, c = upper_bin_data.conc, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
-            ax3.set_title('Generated by the upper bound parameters', fontsize = 20)
-            ax3.set_xlabel('x')
-            ax3.set_ylabel('y')
-            ax3.set_zlabel('z')
-            ax3.set_xlim(np.min(X), np.max(X))
-            ax3.set_ylim(np.min(Y), np.max(Y))
-            ax3.set_zlim(np.min(Z), np.max(Z))
-
-            # Generates the test point data on each graph
-            if self.include_test_points:
-                pd_min = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
-                pd_max = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
-
-                plot_2 = ax1.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = lower_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
-                ax2.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = mean_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
-                ax3.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = upper_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
-                formatter = "{:.2e}" 
-                if  np.floor(np.log10(self.RMSE)) < 2: formatter = "{:.2f}"
-                RMSE_string = 'RMSE = ' + formatter.format(self.RMSE)
-                AIC_string = 'AIC = ' + formatter.format(self.AIC)
-                BIC_string = 'BIC = ' + formatter.format(self.BIC)
-
-                
-            else:
-                RMSE_string = 'RMSE = n/a'
-                AIC_string = 'AIC = n/a'
-                BIC_string = 'BIC = n/a'
-
-            # Creates an axis to display the parameter values
-            param_string = self.get_param_string()
-            ax4.text(0.5,0.5,param_string, fontsize = 30, va = "center", ha = 'center')
-            ax4.set_xticks([])
-            ax4.set_yticks([])
-
-            param_accuracy_string = self.get_param_accuracy_string()
-
-            # Creates an axis to display the sampling information
-            ax5.text(0.5,0.5, RMSE_string + ',   ' + AIC_string + ',   ' + BIC_string + '\n' + param_accuracy_string, fontsize = 30, va = "center", ha = 'center')
-            ax5.set_xticks([])
-            ax5.set_yticks([])
-
-            # Defines the two colorbars
-            cbar1 = plt.colorbar(plot_1, ax = ax4, location = 'top', shrink = 2)
-            cbar2 = plt.colorbar(plot_2, ax = ax5, location = 'top', shrink = 2)
-
-            cbar1.ax.set_title('Predicted Concentration', fontsize = 10)
-            cbar2.ax.set_title('Percemtage Difference in Test Data', fontsize = 10)
-
-
-            # Defines the overall title, including the range of values for each plot
-            if mean_bin_labs[bin_num].left < 0:
-                left_bound = 0
-            else:
-                left_bound = mean_bin_labs[bin_num].left
-            fig.suptitle(title + '\nValues for mean plot greater than ' + "{:.2f}".format(left_bound) + '\n', fontsize = 32)
-
-            # Saves the figures if required
             fig_name = 'fig_' + str(bin_num + 1) + '_of_' + str(np.max(mean_bin_nums + 1)) + '.png'
-            full_path = self.data_path + '/instance_' + str(self.instance) + '/' + name + '/figures/' + fig_name
+            full_path = self.data_path + '/instance_' + str(self.instance) + '/' + name + '_3D_scatter' + '/figures/' + fig_name
             if not os.path.exists(full_path):
-                fig.savefig(full_path)
-            plt.close()
+                lower_bin_data = lower_conc_and_bins[lower_conc_and_bins['bin'] >= bin_num]
+                mean_bin_data = mean_conc_and_bins[mean_conc_and_bins['bin'] >= bin_num]
+                upper_bin_data = upper_conc_and_bins[upper_conc_and_bins['bin'] >= bin_num]
+
+                fin_alpha = len(self.params_mean)*0.75
+
+                y = 12
+                r = 0.8
+                alpha = (1-r)*y
+
+                delta_alpha = fin_alpha - alpha
+
+                y_prime = y + delta_alpha
+                r_prime = r*y/y_prime
+
+                r_prime_frac = Fraction(r_prime)
+
+                fig = plt.figure(constrained_layout = True, figsize = (24,y_prime))
+                spec = GridSpec(2, 6, figure = fig, height_ratios= [r_prime_frac.numerator, r_prime_frac.denominator - r_prime_frac.numerator])
+
+                ax1 = fig.add_subplot(spec[0,:2], projection='3d')
+                ax2 = fig.add_subplot(spec[0,2:4], projection='3d')
+                ax3 = fig.add_subplot(spec[0,4:], projection='3d')
+                ax4 = fig.add_subplot(spec[1,:3])
+                ax5 = fig.add_subplot(spec[1,3:])
+                
+                # Defines the lower bound subplot
+                plot_1 = ax1.scatter(lower_bin_data.x, lower_bin_data.y, lower_bin_data.z, c = lower_bin_data.conc, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
+                ax1.set_title('Generated by the lower bound parameters', fontsize = 20)
+                ax1.set_xlabel('x')
+                ax1.set_ylabel('y')
+                ax1.set_zlabel('z')
+                ax1.set_xlim(np.min(X), np.max(X))
+                ax1.set_ylim(np.min(Y), np.max(Y))
+                ax1.set_zlim(np.min(Z), np.max(Z))
+
+                # Defines the mean subplot
+                ax2.scatter(mean_bin_data.x, mean_bin_data.y, mean_bin_data.z, c = mean_bin_data.conc, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
+                ax2.set_title('Generated by the mean parameters', fontsize = 20)
+                ax2.set_xlabel('x')
+                ax2.set_ylabel('y')
+                ax2.set_zlabel('z')
+                ax2.set_xlim(np.min(X), np.max(X))
+                ax2.set_ylim(np.min(Y), np.max(Y))
+                ax2.set_zlim(np.min(Z), np.max(Z))
+
+                # Defines the upper bound subplot
+                ax3.scatter(upper_bin_data.x, upper_bin_data.y, upper_bin_data.z, c = upper_bin_data.conc, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
+                ax3.set_title('Generated by the upper bound parameters', fontsize = 20)
+                ax3.set_xlabel('x')
+                ax3.set_ylabel('y')
+                ax3.set_zlabel('z')
+                ax3.set_xlim(np.min(X), np.max(X))
+                ax3.set_ylim(np.min(Y), np.max(Y))
+                ax3.set_zlim(np.min(Z), np.max(Z))
+
+                # Generates the test point data on each graph
+                if self.include_test_points:
+                    pd_min = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
+                    pd_max = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
+
+                    plot_2 = ax1.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = lower_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
+                    ax2.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = mean_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
+                    ax3.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = upper_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
+                    formatter = "{:.2e}" 
+                    if  np.floor(np.log10(self.RMSE)) < 2: formatter = "{:.2f}"
+                    RMSE_string = 'RMSE = ' + formatter.format(self.RMSE)
+                    AIC_string = 'AIC = ' + formatter.format(self.AIC)
+                    BIC_string = 'BIC = ' + formatter.format(self.BIC)
+
+                    
+                else:
+                    RMSE_string = 'RMSE = n/a'
+                    AIC_string = 'AIC = n/a'
+                    BIC_string = 'BIC = n/a'
+
+                # Creates an axis to display the parameter values
+                param_string = self.get_param_string()
+                ax4.text(0.5,0.5,param_string, fontsize = 30, va = "center", ha = 'center')
+                ax4.set_xticks([])
+                ax4.set_yticks([])
+
+                param_accuracy_string = self.get_param_accuracy_string()
+
+                # Creates an axis to display the sampling information
+                ax5.text(0.5,0.5, RMSE_string + ',   ' + AIC_string + ',   ' + BIC_string + '\n' + param_accuracy_string, fontsize = 30, va = "center", ha = 'center')
+                ax5.set_xticks([])
+                ax5.set_yticks([])
+
+                # Defines the two colorbars
+                cbar1 = plt.colorbar(plot_1, ax = ax4, location = 'top', shrink = 2)
+                cbar2 = plt.colorbar(plot_2, ax = ax5, location = 'top', shrink = 2)
+
+                cbar1.ax.set_title('Predicted Concentration', fontsize = 10)
+                cbar2.ax.set_title('Percemtage Difference in Test Data', fontsize = 10)
+
+
+                # Defines the overall title, including the range of values for each plot
+                if mean_bin_labs[bin_num].left < 0:
+                    left_bound = 0
+                else:
+                    left_bound = mean_bin_labs[bin_num].left
+                fig.suptitle(title + '\nValues for mean plot greater than ' + "{:.2f}".format(left_bound) + '\n', fontsize = 32)
+
+                # Saves the figures if required
+                fig_name = 'fig_' + str(bin_num + 1) + '_of_' + str(np.max(mean_bin_nums + 1)) + '.png'
+                full_path = self.data_path + '/instance_' + str(self.instance) + '/' + name + '_3D_scatter' + '/figures/' + fig_name
+                if not os.path.exists(full_path):
+                    fig.savefig(full_path)
+                plt.close()
+        
+        self.animate(name = name + '_3D_scatter')
+
 
     # Generates a string of all parameter accuracy results
     def get_param_accuracy_string(self):
         param_accuracy_string_array = []
         for param in self.samples.columns:
             if not self.actual_values[param] == 'NaN':
-                percentage_error = 200*np.abs(self.params_mean[param]-self.actual_values[param])/(self.params_max[param] - self.params_min[param])
+                percentage_error = 100*np.abs(self.params_mean[param]-self.actual_values[param])/(self.params_max[param] - self.params_min[param])
                 param_accuracy_string_array.append(param + ' error = ' + f'{percentage_error:.3}' + '%')
         return ('\n').join(param_accuracy_string_array)
 
@@ -820,7 +984,7 @@ class Visualiser:
                     if self.actual_values[param] !='NaN':
                         proposed = params_mean[param]
                         actual = self.actual_values[param]
-                        summary['chain_' + str(chain_num + 1)][param]['param_accuracy'] = 200*np.abs(proposed-actual)/(self.params_max[param] - self.params_min[param])
+                        summary['chain_' + str(chain_num + 1)][param]['param_accuracy'] = np.abs(100*np.abs(proposed-actual)/(self.params_max[param] - self.params_min[param]))
 
                 
             overall_samples = self.samples
@@ -841,7 +1005,7 @@ class Visualiser:
                 summary['overall'][param]['tau'] = self.autocorrs['overall'][param]['tau']
 
                 if self.actual_values[param] !='NaN':
-                    summary['overall'][param]['param_accuracy'] = np.abs(overall_params_mean[param]-self.actual_values[param])/np.mean([overall_params_mean[param],self.actual_values[param]])*100
+                    summary['overall'][param]['param_accuracy'] = np.abs(np.abs(overall_params_mean[param]-self.actual_values[param])/(self.params_max[param] - self.params_min[param])*100)
 
 
             with open(self.data_path + '/instance_' + str(self.instance) + '/summary.json', "w") as fp:

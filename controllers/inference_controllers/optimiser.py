@@ -669,11 +669,8 @@ class Optimiser(Controller):
             
             model.add_model_param(model_param_name, model_param)
 
-        if self.data_params['data_type'] == 'simulated_data':
-            if self.data_params['noise_level'] == 'NaN':
-                if 'sigma' not in likelihood.likelihood_params:
-                    raise Exception('Either define your noise level with a fixed sigma in the likelihood, or set the noise level!')
-                self.data_params['noise_level'] = likelihood.likelihood_params['sigma']
+        if self.data_params['data_type'] == 'simulated_data' and self.data_params['noise_percentage'] == 'NaN':
+                raise Exception('Set the noise percentage!')
 
         return params, model, likelihood
     
@@ -770,7 +767,8 @@ class Optimiser(Controller):
                         model, 
                         previous_instance = sampler.instance, 
                         data_path = best_instance_path, 
-                        suppress_prints = True)
+                        suppress_prints = True,
+                        actual_values=self.actual_values)
         
         # Generates the summary object, traceplots and autocorrelation plots
         visualiser.get_summary()
