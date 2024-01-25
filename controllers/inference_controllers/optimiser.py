@@ -247,7 +247,6 @@ class Optimiser(Controller):
             with open(self.unique_generator_path + '/default_params_construction.json', "w") as fp:
                 json.dump(construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
 
-
     def get_generator_name(self, generators_path, default_params_construction):
         data_exists = False
         if not os.path.exists(generators_path):
@@ -437,8 +436,6 @@ class Optimiser(Controller):
         self.all_inputs.to_csv(self.optimiser_path + '/results.csv')
 
         return sampler, visualiser
-    
-
 
     # Extracts information from the optimisation trial
     def prepare_inference(self, trial = '', results = {}):
@@ -730,7 +727,7 @@ class Optimiser(Controller):
                 else:
                     raise Exception('Invalid optimising direction!')
 
-            plt.plot(param_data, '.-b', label = 'Parameter Values')
+            plt.plot(param_data, '.-b', label = 'Parameter Values', alpha = 0.7)
             plt.plot(best_current_params, '--r', label = 'Current Best Value')
 
             plt.title(optimising_param)
@@ -778,10 +775,10 @@ class Optimiser(Controller):
         if prior_plots:
             visualiser.get_prior_plots(prior_plots)
 
-
         # Generates the plots and animation of the modeled system using the sampled parameters
-        visualiser.visualise_results(domain = domain, name = name, title='Log Concentration of Droplets', log_results=False)
-        visualiser.animate(name = 'small_scale_3D_plots')      
+        visualiser.visualise_results(domain = domain, plot_type = '2D_slice', name = name, title='Log Concentration of Droplets', log_results=False)
+        visualiser.visualise_results(domain = domain, plot_type = '3D', name = name, title='Log Concentration of Droplets', log_results=False)
+
 
     def save_results(self):
         with open(self.optimiser_path + '/results.json', "w") as fp:

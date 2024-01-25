@@ -12,6 +12,7 @@ from labellines import labelLines
 np.seterr(divide='ignore', invalid='ignore')
 import warnings
 warnings.filterwarnings("ignore")
+import statsmodels.api as sm
 
 # Visualiser class - Used for processing and visualising the results from the sampler
 class Visualiser:
@@ -755,7 +756,6 @@ class Visualiser:
         
         self.animate(name = name + '_3D_scatter')
 
-
     # Generates a string of all parameter accuracy results
     def get_param_accuracy_string(self):
         param_accuracy_string_array = []
@@ -867,29 +867,34 @@ class Visualiser:
             os.mkdir(autocorr_folder)
 
         for chain in range(self.num_chains):
-            full_path = autocorr_folder + '/autocorrelations_' + str(chain + 1) + '.png'
-            
-            if self.num_chains == 1:
-                title = 'MCMC autocorrelations'
-            else:
-                title = 'MCMC autocorrelations for chain ' + str(chain + 1)
+            for param in self.samples.columns:
+                full_path = autocorr_folder + '/autocorrelations_' + param + '_chain_' + str(chain + 1) + '.png'
+                
+                if self.num_chains == 1:
+                    title = 'MCMC autocorrelations for ' + param
+                else:
+                    title = 'MCMC autocorrelations for ' + param + ', chain ' + str(chain + 1)
 
-            if os.path.exists(full_path):
-                if not self.suppress_prints:
-                    print('Autocorrelations plot ' + str(chain + 1) + ' already exists')
-            else:
-                ac = self.autocorr_fig(chain, title = title)
-                ac.savefig(full_path)
+                if os.path.exists(full_path):
+                    if not self.suppress_prints:
+                        print('Autocorrelations plot ' + param + ', chain ' + str(chain + 1) + ' already exists')
+                else:
+                    ac = self.autocorr_fig(param, chain, title = title)
+                    ac.savefig(full_path)
     
     # Generates a autocorrelation plots based on the samples
-    def autocorr_fig(self, chain_num = 1, title = ''):
+    def autocorr_fig(self, param, chain_num = 1, title = ''):
         fig = plt.figure(figsize=(6,4))
-        for param in self.samples.columns:
-            autocorrelations = self.autocorrs['chain_' + str(chain_num + 1)][param]['Ct']
-            tau = self.autocorrs['chain_' + str(chain_num + 1)][param]['tau']
-            plt.plot(autocorrelations, label = param + ', tau = ' + str(tau))
+        autocorrelations = self.autocorrs['chain_' + str(chain_num + 1)][param]['Ct']
+        tau = self.autocorrs['chain_' + str(chain_num + 1)][param]['tau']
+        ci = self.autocorrs['chain_' + str(chain_num + 1)][param]['ci']
+        formatted_tau = "{:.2f}".format(tau)
+        plt.bar(range(autocorrelations.size), autocorrelations, label = param + ', tau = ' + formatted_tau)
+        plt.axhline(y = ci, color = 'r', linestyle = '--')
+        plt.axhline(y = -ci, color = 'r', linestyle = '--')
+        
         plt.legend()
-        plt.xlabel('Sample number')
+        plt.xlabel('Lag')
         plt.ylabel('Autocorrelation')
         plt.title(title + '\nDiscrete Autocorrelation')
         plt.tight_layout()
@@ -909,20 +914,16 @@ class Visualiser:
             if D == -1:
                 D = int(samples.shape[0])
             
-            xp = np.atleast_2d(samples)
-            z = (xp-np.mean(xp, axis=0))/np.std(xp, axis=0)
-
-            Ct = np.ones((D, z.shape[1]))
-            Ct[1:,:] = np.array([np.mean(z[i:]*z[:-i], axis=0) for i in range(1,D)])
-            tau_hat = 1 + 2*np.cumsum(Ct, axis=0)
-            Mrange = np.arange(len(tau_hat))
-            tau = np.argmin(Mrange[:,None] - 5*tau_hat, axis=0)
-
             self.autocorrs['chain_' + str(chain_num+1)] = {}
-            for i, param in enumerate(self.samples.columns):
-                self.autocorrs['chain_' + str(chain_num+1)][param] = {}
-                self.autocorrs['chain_' + str(chain_num+1)][param]['tau'] = tau[i]
-                self.autocorrs['chain_' + str(chain_num+1)][param]['Ct'] = Ct[:,i]
+            for col in samples.columns:
+                x = samples[col]
+                acf = sm.tsa.acf(x)
+                ci = np.sqrt(1/x.size*(1+2*np.sum(acf)))
+                tau = 1 + 2*sum(acf)
+                self.autocorrs['chain_' + str(chain_num+1)][col] = {}
+                self.autocorrs['chain_' + str(chain_num+1)][col]['tau'] = tau
+                self.autocorrs['chain_' + str(chain_num+1)][col]['Ct'] = acf
+                self.autocorrs['chain_' + str(chain_num+1)][col]['ci'] = ci
         
         self.autocorrs['overall'] = {}
         for param in self.samples.columns:

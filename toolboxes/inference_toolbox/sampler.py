@@ -34,7 +34,7 @@ class Sampler:
         self.data_path = data_path
         
         if self.n_warmup == -1:
-            self.n_warmup = int(0.25*n_samples)
+            self.n_warmup = int(0.5*n_samples)
 
         self.instance = -1
 
