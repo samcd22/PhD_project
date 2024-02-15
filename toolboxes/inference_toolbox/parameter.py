@@ -29,7 +29,7 @@ class Parameter:
 
     # Utility function for converting mean and stdev to alpha in a Log Normal distribution 
     def alpha_log_norm(self,mu,cov): 
-        if np.isscalar(mu): return np.log(mu) - 0.5*np.log(1+cov/mu)
+        if np.isscalar(mu): return np.log(mu) - 0.5*np.log(1+cov/mu**2)
         else:
             mu = np.array(mu)
             cov = np.array(cov)
@@ -40,7 +40,7 @@ class Parameter:
 
     # Utility function for converting mean and stdev to beta in a Log Normal distribution 
     def beta_log_norm(self,mu,cov):         
-        if np.isscalar(mu): return np.sqrt(np.log(1+cov/mu))
+        if np.isscalar(mu): return np.sqrt(np.log(1+cov/mu**2))
         else:
             mu = np.array(mu)
             cov = np.array(cov)

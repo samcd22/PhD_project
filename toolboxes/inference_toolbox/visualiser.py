@@ -362,7 +362,7 @@ class Visualiser:
                 plt.annotate(label, (reference_x_point,reference_y_point), textcoords="offset points", 
                 xytext=(0,5), ha='center', color = 'r')
 
-        est_val = plt.scatter([self.params_mean[param_1]], [self.params_mean[param_2]], color = 'k', marker='s', edgecolors='w', label = 'Estimated Value')
+        est_val = plt.scatter([self.params_mean[param_1]], [self.params_mean[param_2]], color = 'w', marker='s', edgecolors='k', label = 'Estimated Value')
         handles.append(est_val)
         if self.actual_values[param_1] !='NaN' and self.actual_values[param_2] !='NaN':
             act_val = plt.scatter([self.actual_values[param_1]], [self.actual_values[param_2]], color = 'orange', marker='*', edgecolors='black', label = "Actual Value")
@@ -704,9 +704,21 @@ class Visualiser:
                     pd_min = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
                     pd_max = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
 
-                    plot_2 = ax1.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = lower_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
-                    ax2.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = mean_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
-                    ax3.scatter(self.test_data['x'],self.test_data['y'],self.test_data['z'], s = 20, c = upper_percentage_difference, cmap='jet', vmin = pd_min, vmax = pd_max)
+                    self.all_test_data = self.test_data
+                    self.all_test_data['lower_p_diff'] = lower_percentage_difference
+                    self.all_test_data['mean_p_diff'] = mean_percentage_difference
+                    self.all_test_data['upper_p_diff'] = upper_percentage_difference
+
+                    self.all_test_data = self.all_test_data[self.all_test_data['y']>np.min(Y)]
+                    self.all_test_data = self.all_test_data[self.all_test_data['x']<np.max(X)]
+                    self.all_test_data = self.all_test_data[self.all_test_data['x']>np.min(X)]
+                    self.all_test_data = self.all_test_data[self.all_test_data['y']<np.max(Y)]
+                    self.all_test_data = self.all_test_data[self.all_test_data['z']>np.min(Z)]
+                    self.all_test_data = self.all_test_data[self.all_test_data['z']<np.max(Z)]
+
+                    plot_2 = ax1.scatter(self.all_test_data['x'],self.all_test_data['y'],self.all_test_data['z'], s = 20, c = self.all_test_data['lower_p_diff'], cmap='jet', vmin = pd_min, vmax = pd_max)
+                    ax2.scatter(self.all_test_data['x'],self.all_test_data['y'],self.all_test_data['z'], s = 20, c = self.all_test_data['mean_p_diff'], cmap='jet', vmin = pd_min, vmax = pd_max)
+                    ax3.scatter(self.all_test_data['x'],self.all_test_data['y'],self.all_test_data['z'], s = 20, c = self.all_test_data['upper_p_diff'], cmap='jet', vmin = pd_min, vmax = pd_max)
                     formatter = "{:.2e}" 
                     if  np.floor(np.log10(self.RMSE)) < 2: formatter = "{:.2f}"
                     RMSE_string = 'RMSE = ' + formatter.format(self.RMSE)
