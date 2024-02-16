@@ -390,11 +390,11 @@ class Visualiser:
         param_linspace = np.linspace(param_range[0], param_range[1], 100)
         
         if self.hyperparams['params'][param]['prior_func'] == 'log_norm':
-            prior_dist = self.log_norm_setup(self.hyperparams['params'][param]['prior_params']['mu'], self.hyperparams['params'][param]['prior_params']['sigma'])
+            prior_dist = self.log_norm_setup(self.hyperparams['params'][param]['prior_params']['mu'], self.hyperparams['params'][param]['prior_params']['cov'])
         elif self.hyperparams['params'][param]['prior_func'] == 'gamma':
-            prior_dist = self.gamma_setup(self.hyperparams['params'][param]['prior_params']['mu'], self.hyperparams['params'][param]['prior_params']['sigma'])
+            prior_dist = self.gamma_setup(self.hyperparams['params'][param]['prior_params']['mu'], self.hyperparams['params'][param]['prior_params']['cov'])
         elif self.hyperparams['params'][param]['prior_func'] == 'multi_mode_log_norm':
-            prior_dist = self.multi_mode_log_norm_setup(self.hyperparams['params'][param]['prior_params']['mus'], self.hyperparams['params'][param]['prior_params']['sigmas'])
+            prior_dist = self.multi_mode_log_norm_setup(self.hyperparams['params'][param]['prior_params']['mus'], self.hyperparams['params'][param]['prior_params']['covs'])
         else:
             raise Exception('Prior distribution not listed!')
         

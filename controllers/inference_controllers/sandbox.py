@@ -74,7 +74,7 @@ class Sandbox(Controller):
         thinning_rate = self.default_params['sampler']['thinning_rate']
         
         # Initialises the a sampler object
-        sampler = Sampler(params, 
+        self.sampler = Sampler(params, 
                           model, 
                           likelihood, 
                           training_data, 
@@ -85,13 +85,13 @@ class Sandbox(Controller):
                           data_path = self.full_results_path)
         
         # Runs the sampler for the allotted number of samples
-        sampler.sample_all()
+        self.sampler.sample_all()
 
         # Initialises the sampler object
         visualiser = Visualiser(testing_data,
-                                sampler,
+                                self.sampler,
                                 model,
-                                previous_instance=sampler.instance,
+                                previous_instance=self.sampler.instance,
                                 data_path = self.full_results_path,
                                 actual_values = self.actual_values)
         return visualiser

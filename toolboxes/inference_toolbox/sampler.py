@@ -6,6 +6,24 @@ import numpyro
 import jax.numpy as jnp
 from jax import random
 
+# General
+import os
+# cpu cores available for sampling (we want this to equal num_chains)
+os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=4'
+
+import pandas as pd
+import numpy as np
+
+
+# NumPyro for proabilistic programming
+import arviz as az
+from jax import random
+import jax.numpy as jnp
+import numpyro
+from numpyro.diagnostics import hpdi
+from numpyro.infer import MCMC, NUTS, Predictive
+from matplotlib import pyplot as plt
+
 # Sampler class - samples inference parameters
 class Sampler:
     # Initialises the Sampler class saving all relavant variables and generating a hyperparameters object
@@ -61,11 +79,47 @@ class Sampler:
             self.fields = {}
             return [], [], {}
         
+    def test_priors(self):
+        # JAX requires a key for random number generation
+        rng_key_ = random.PRNGKey(2101)
+        # here take 100 samples from our priors and make predictions on x_log
+        prior_samples = Predictive(self.sample_one, num_samples=500)(
+            rng_key_
+        )
+
+        ci = 0.89
+
+        # and put this into arviz for easy plotting
+        arviz_priors = az.from_numpyro(
+            prior=prior_samples
+        )
+
+        # get the mean model prediciton and CI
+        mean_mu_prior = jnp.mean(arviz_priors.prior['mu'].values.squeeze(), axis=0)
+        hpdi_mu_prior = hpdi(arviz_priors.prior['mu'].values.squeeze(), ci)
+        hpdi_sim_prior = hpdi(arviz_priors.prior['obs'].values.squeeze(), ci)
+
+        arviz_priors
+
+                # and now plot the distributions and the simulated data
+        print('#'*80)
+        print('Priors')
+        priors_ax = az.plot_trace(
+            arviz_priors.prior, 
+            var_names=['I_y_and_I_z','Q', 'sigma'],
+            figsize=(6,4),
+            rug=True,
+            combined=True,
+            show=False
+        )
+        # make it readable
+        plt.subplots_adjust(hspace=0.5)
+        plt.show()
+
     # Puts the samples into the correct format - splitting samples into "all samples" and "chain samples"
     def format_samples(self, samples):
         chain_new_samples = pd.DataFrame({}, dtype='float64')
         for param in self.params.index:
-
 
             if '_and_' in param:
 
@@ -85,6 +139,7 @@ class Sampler:
                         sample_index_array = np.concatenate((sample_index_array, np.array(range(sample_chains.shape[1]))+1))
                     
                     chain_new_samples[sub_param] = chain_new_samples_array
+                    chain_new_samples[sub_param]*=self.params[param].order
 
             else:
                 chain_array = np.array([])
@@ -99,6 +154,8 @@ class Sampler:
                     sample_index_array = np.concatenate((sample_index_array, np.array(range(sample_chains.shape[1]))+1))
                 
                 chain_new_samples[param] = chain_new_samples_array
+                chain_new_samples[param]*=self.params[param].order
+
         
         chain_new_samples['chain'] = chain_array
         chain_new_samples['sample_index'] = sample_index_array
@@ -122,14 +179,14 @@ class Sampler:
     def sample_one(self):
         current_params_sample ={}
         for param_ind in self.params.index:
-            s = self.params[param_ind].sample_param()
-            current_params_sample[param_ind] = s
+            s, order = self.params[param_ind].sample_param()
+            current_params_sample[param_ind] = s*order
         
         current_params_sample = self.format_params(current_params_sample)
 
         mu = self.model_func(current_params_sample, self.data.x, self.data.y, self.data.z)
-        numpyro.deterministic('mu', mu)
-        observations_modelled = numpyro.sample('obs', self.likelihood_func(mu, current_params_sample), obs=jnp.array(self.data.Concentration))
+        mu = numpyro.deterministic('mu', mu)
+        return numpyro.sample('obs', self.likelihood_func(mu, current_params_sample), obs=jnp.array(self.data.Concentration))
 
     # Generates the hyperparamaters object and saves it to the Sampler class
     def get_hyperparams(self):
@@ -141,7 +198,7 @@ class Sampler:
             self.hyperparams['params'][param_ind]['prior_func'] = self.params[param_ind].prior_select
             self.hyperparams['params'][param_ind]['prior_params'] = {}
             for prior_param_ind in self.params[param_ind].prior_params.index:
-                self.hyperparams['params'][param_ind]['prior_params'][prior_param_ind] = self.params[param_ind].prior_params[prior_param_ind]
+                self.hyperparams['params'][param_ind]['prior_params'][prior_param_ind] = self.params[param_ind].prior_params[prior_param_ind]*self.params[param_ind].order
 
         # Adding Model related hyperparameters
         self.hyperparams['model'] = {}

@@ -666,7 +666,7 @@ class Optimiser(Controller):
             
             model.add_model_param(model_param_name, model_param)
 
-        if self.data_params['data_type'] == 'simulated_data' and self.data_params['noise_percentage'] == 'NaN':
+        if self.data_params['data_type'] == 'simulated_data' and self.data_params['noise_level'] == 'NaN':
                 raise Exception('Set the noise percentage!')
 
         return params, model, likelihood

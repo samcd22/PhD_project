@@ -8,7 +8,7 @@ from numpyro import distributions
 # Parameter class - used for generating the infered parameters in our sampler
 class Parameter:
     # Initialises the Likelihood class saving all relevant variables
-    def __init__(self, name, name_2 = None, prior_select = "gaussian"):
+    def __init__(self, name, name_2 = None, prior_select = "gaussian", order = 1):
         self.prior_params = pd.Series({},dtype='float64')
         self.name_1 = name
         self.name_2 = name_2
@@ -19,6 +19,7 @@ class Parameter:
             self.name = self.name_1 + '_and_' + self.name_2
         else:
             self.name = self.name_1
+        self.order = order
 
         
     # Utility function for converting mean and stdev to alpha in a Gamma distribution 
@@ -62,14 +63,14 @@ class Parameter:
             if self.multivar:
                 raise Exception('Distribution not supported!')
             else:
-                return distributions.Normal(self.prior_params.mu, self.prior_params.sigma)
+                return distributions.Normal(self.prior_params.mu, self.prior_params['cov'])
         
         # Gamma Prior
         elif self.prior_select == 'gamma':
             if self.multivar:
                 raise Exception('Distribution not supported!')
             else:
-                return distributions.Gamma(self.alpha_gamma(self.prior_params.mu,self.prior_params.sigma**2), self.beta_gamma(self.prior_params.mu,self.prior_params.sigma**2))
+                return distributions.Gamma(self.alpha_gamma(self.prior_params.mu,self.prior_params['cov']), self.beta_gamma(self.prior_params.mu,self.prior_params['cov]']))
     
         # Uniform
         elif self.prior_select == 'uniform':
@@ -84,7 +85,7 @@ class Parameter:
                 multinorm = distributions.MultivariateNormal(self.alpha_log_norm(self.prior_params.mu, self.prior_params['cov']), self.beta_log_norm(self.prior_params.mu, self.prior_params['cov']))
                 return distributions.TransformedDistribution(multinorm, distributions.transforms.ExpTransform())
             else:
-                return distributions.LogNormal(self.alpha_log_norm(self.prior_params.mu,self.prior_params.sigma**2), self.beta_log_norm(self.prior_params.mu,self.prior_params.sigma**2))
+                return distributions.LogNormal(self.alpha_log_norm(self.prior_params.mu,self.prior_params['cov']), self.beta_log_norm(self.prior_params.mu,self.prior_params['cov']))
         
         elif self.prior_select == 'multi_mode_log_norm':
             if self.multivar:
@@ -98,18 +99,18 @@ class Parameter:
                     dists.append(distributions.TransformedDistribution(multinorm, distributions.transforms.ExpTransform()))
                 return distributions.MixtureGeneral(mixing_dist, dists)
             else:
-                if len(self.prior_params.mus) != len(self.prior_params.sigmas):
+                if len(self.prior_params.mus) != len(self.prior_params.covs):
                     raise Exception('Invalid prior parameters!')
                 
                 dists = []
                 mixture_size = len(self.prior_params.mus)
                 mixing_dist = distributions.Categorical(probs=jnp.ones(mixture_size) / mixture_size)
                 for i in range(len(self.prior_params.mus)):
-                    dists.append(distributions.LogNormal(self.alpha_log_norm(self.prior_params.mus[i],self.prior_params.sigmas[i]**2), self.beta_log_norm(self.prior_params.mus[i],self.prior_params.sigmas[i]**2)))
+                    dists.append(distributions.LogNormal(self.alpha_log_norm(self.prior_params.mus[i],self.prior_params.covs[i]), self.beta_log_norm(self.prior_params.mus[i],self.prior_params.covs[i])))
                 return distributions.MixtureGeneral(mixing_dist, dists)
         
     # Generates a sample for this parameter
     def sample_param(self):
         prior_func = self.get_prior_function()
         a = numpyro.sample(self.name, prior_func)
-        return a
+        return a, self.order
