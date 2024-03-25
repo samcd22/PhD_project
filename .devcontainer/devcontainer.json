@@ -1,5 +1,5 @@
 {
-    "image": "jsimdare/darenumpyro",
+    "image": "docker_test",
     "mounts": [
         "source=${localWorkspaceFolder},target=/project,type=bind,consistency=cached"
     ],
