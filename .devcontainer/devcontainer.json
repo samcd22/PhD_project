@@ -1,9 +1,9 @@
 {
-    "image": "docker_test",
+    "image": "test_1",
     "mounts": [
-        "source=${localWorkspaceFolder},target=/project,type=bind,consistency=cached"
+        "source=${localWorkspaceFolder},target=/PhD_project,type=bind,consistency=cached"
     ],
-    "workspaceFolder": "/project",
+    "workspaceFolder": "PhD_project",
     "customizations": {
         "vscode": {
             "extensions": [
