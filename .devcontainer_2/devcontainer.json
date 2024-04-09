@@ -1,0 +1,18 @@
+{
+    "image": "test_1",
+    "mounts": [
+        "source=${localWorkspaceFolder}/data,target=/PhD_project/data,type=bind,consistency=cached",
+        "source=${localWorkspaceFolder}/results,target=/PhD_project/results,type=bind,consistency=cached",
+        "source=${localWorkspaceFolder}/.devcontainer,target=/PhD_project/.devcontainer_2,type=bind,consistency=cached",
+        "source=${localWorkspaceFolder}/Dockerfile,target=/PhD_project/second.Dockerfile,type=bind,consistency=cached"
+    ],
+    "workspaceFolder": "/PhD_project",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-toolsai.jupyter",
+                "ms-python.python"
+            ]
+        }
+    }
+}
