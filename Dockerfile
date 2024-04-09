@@ -29,6 +29,7 @@ RUN mkdir /PhD_project/data
 RUN mkdir /PhD_project/results
 
 RUN apt-get install ffmpeg libsm6 libxext6  -y
+RUN apt-get install libgl1-mesa-glx
 
 RUN cd /PhD_project
 # # Activate the Conda environment
