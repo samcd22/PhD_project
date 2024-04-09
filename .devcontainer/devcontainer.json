@@ -1,5 +1,5 @@
 {
-    "image": "test_1",
+    "image": "bayesian_inference_tool",
     "mounts": [
         "source=${localWorkspaceFolder}/data,target=/PhD_project/data,type=bind,consistency=cached",
         "source=${localWorkspaceFolder}/results,target=/PhD_project/results,type=bind,consistency=cached",
