@@ -28,6 +28,8 @@ WORKDIR /PhD_project
 RUN mkdir /PhD_project/data
 RUN mkdir /PhD_project/results
 
+RUN apt-get install ffmpeg libsm6 libxext6  -y
+
 RUN cd /PhD_project
 # # Activate the Conda environment
 SHELL ["conda", "run", "-n", "myenv", "/bin/bash", "-c"]
