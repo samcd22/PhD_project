@@ -7,7 +7,7 @@ from numpyro import distributions
 
 # Parameter class - used for generating the infered parameters in our sampler
 class Parameter:
-    # Initialises the Likelihood class saving all relevant variables
+    # Initialises the Parameter class saving all relevant variables
     def __init__(self, name, name_2 = None, prior_select = "gaussian", order = 1):
         self.prior_params = pd.Series({},dtype='float64')
         self.name_1 = name
