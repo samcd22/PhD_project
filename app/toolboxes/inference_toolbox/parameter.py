@@ -56,7 +56,7 @@ class Parameter:
             raise TypeError("name must be a string or a list")
         if not isinstance(prior_select, str):
             raise TypeError("prior_select must be a string")
-        if not isinstance(order, int):
+        if not isinstance(order, (int, float)):
             raise TypeError("order must be an integer")
         if prior_select not in ["gaussian", "gamma", "uniform", "log_norm", "multi_mode_gaussian", "multi_mode_log_norm"]:
             raise ValueError("Invalid prior distribution selected!")

@@ -9,8 +9,9 @@ class Model:
     A class representing the Model used for predicting a system's behaviour. The parameters of this model are optimised using Bayesian Inference
 
     Attributes:
-    - model_params (pd.Series): A pandas Series object to store model parameters.
+    - fixed_model_params (pd.Series): A pandas Series object to store model parameters.
     - model_select (str): The selected model.
+    - model_type (str): The type of model.
 
     Methods:
     - __init__(self, model_select: str): Initializes the Model class.
@@ -24,29 +25,72 @@ class Model:
 
         Args:
         - model_select (str): The selected model. Options are:
-            - "gpm_norm": Wind speed weighted Gaussian Plume Model.
-            - "gpm_norm_log_Q": Wind speed weighted Gaussian Plume Model, with logarithmised Q.
-            - "log_gpm_norm": Wind speed weighted, logarithmised Gaussian Plume Model.
-            - "log_gpm_norm_log_Q": Wind speed weighted, logarithmised Gaussian Plume Model, with logarithmised Q.
-            - "log_gpm_norm_source": Wind speed weighted, logarithmised Gaussian Plume Model, with source.
+            - Spatial 3D models:
+                - "gpm_norm": Wind speed weighted Gaussian Plume Model.
+                - "log_gpm_norm": Wind speed weighted, logarithmised Gaussian Plume Model.
+                - "log_gpm_source": Logarithmised Gaussian Plume Model, with source location.
         """
-        self.model_params = pd.Series({}, dtype='float64')
+        self.fixed_model_params = pd.Series({}, dtype='float64')
         self.model_select = model_select
-    
-    def add_model_param(self, name: str, val: ModelInput) -> 'Model':
+        
+        if self.model_select == "gpm_norm":
+            self.model_type = 'scalar_spatial_3D'
+            self.dependent_variables = ['Concentration']
+            self.independent_variables = ['x', 'y', 'z']
+            self.all_param_names = ['I_y', 'I_z', 'Q', 'H']
+
+        elif self.model_select == "log_gpm_norm":
+            self.model_type = 'scalar_spatial_3D'
+            self.dependent_variables = ['Concentration']
+            self.independent_variables = ['x', 'y', 'z']
+            self.all_param_names = ['I_y', 'I_z', 'Q', 'H']
+        
+        elif self.model_select == "log_gpm_source":
+            self.model_type = 'scalar_spatial_3D'
+            self.dependent_variables = ['Concentration']
+            self.independent_variables = ['x', 'y', 'z']
+            self.all_param_names = ['I_y', 'I_z', 'Q', 'H', 'x_0', 'y_0', 'z_0', 'u']
+
+        # IMPLEMENT MORE MODELS HERE
+        else:
+            raise Exception('Invalid model selected!')    
+        
+
+    def add_fixed_model_param(self, name: str, val) -> 'Model':
         """
         Adds a named parameter to the Model class.
 
         Args:
         - name (str): The name of the parameter.
-        - val (ModelInput): The value of the parameter.
+        - val: The value of the parameter.
 
         Returns:
         - self: The Model object.
         """
-        self.model_params[name] = val
+        self.fixed_model_params[name] = val
         return self
-    
+        
+    def _set_params(self, inference_model_params):
+        """
+        Set the parameters of the model.
+
+        Args:
+            inference_model_params (dict): A dictionary containing the inference model parameters.
+
+        Raises:
+            Exception: If any required parameter is missing for the model.
+
+        """
+        self.inference_params = inference_model_params
+        for param_name in self.all_param_names:
+            if param_name in inference_model_params:
+                setattr(self, param_name, inference_model_params[param_name])
+            elif param_name in self.fixed_model_params:
+                setattr(self, param_name, self.fixed_model_params[param_name]) 
+            else:
+                raise Exception('Model - missing parameters for the model!')
+            
+
     def get_model(self):
         
         """
@@ -55,121 +99,127 @@ class Model:
         Returns:
         - function: The selected model function.
         """
-        def _GPM_norm(params, x, y, z):
+
+        def _GPM_norm(inferance_model_params: pd.Series, x, y, z):
             """
             Wind speed weighted Gaussian Plume Model.
 
             Args:
-            - params (dict): A dictionary containing the model parameters.
-            - x, y, z: The coordinates.
+            - inferance_model_params (pd.Series): A pandas Series object containing the inferred model parameters.
+            - x (float or array-like): The x-coordinate.
+            - y (float or array-like): The y-coordinate.
+            - z (float or array-like): The z-coordinate.
 
-            Returns:
-            - jnp.ndarray: The model output.
-            """
-            I_y = params['I_y']
-            I_z = params['I_z']
-            Q = params['Q']
-            x = jnp.array(x)
-            y = jnp.array(y)
-            z = jnp.array(z)
+            Parameters:
+            - I_y (float): The y-component of the plume dispersion.
+            - I_z (float): The z-component of the plume dispersion.
+            - Q (float): The input flux rate.
+            - H (float): The height of the source.
 
-            H = self.model_params.H
+            Independent Variables:
+            - x (float or array-like): The x-coordinate.
+            - y (float or array-like): The y-coordinate.
+            - z (float or array-like): The z-coordinate.
+
+            Dependent Variables:
+            - Concentration (float or array-like): The concentration of the plume.
             
-            return Q/(2*jnp.pi*I_y*I_z*x**2)*jnp.exp(-y**2/(2*I_y**2*x**2))*(jnp.exp(-(z-H)**2/(2*I_z**2*x**2))+jnp.exp(-(z+H)**2/(2*I_z**2*x**2)))
-        
-        def _GPM_norm_log_Q(params, x, y, z):
+            Returns:
+            - jnp.ndarray: The model output.
             """
-            Wind speed weighted Gaussian Plume Model, with logarithmised Q.
+            self._set_params(inferance_model_params)
+                
+            x = jnp.array(x)
+            y = jnp.array(y)
+            z = jnp.array(z)
+
+            func = self.Q/(2*jnp.pi*self.I_y*self.I_z*x**2)*jnp.exp(-y**2/(2*self.I_y**2*x**2))*(jnp.exp(-(z-self.H)**2/(2*self.I_z**2*x**2))+jnp.exp(-(z+self.H)**2/(2*self.I_z**2*x**2)))
+            
+            return func
+                        
+        def _log_GPM_norm(inference_model_params, x, y, z):
+            """
+            Wind speed weighted, logarithmised Gaussian Plume Model.
 
             Args:
-            - params (dict): A dictionary containing the model parameters.
-            - x, y, z: The coordinates.
+            - inference_model_params (dict): A dictionary containing the model parameters.
+            - x (float or array-like): The x-coordinate.
+            - y (float or array-like): The y-coordinate.
+            - z (float or array-like): The z-coordinate.
+
+            Parameters:
+            - I_y (float): The y-component of the plume dispersion.
+            - I_z (float): The z-component of the plume dispersion.
+            - Q (float): The input flux rate.
+            - H (float): The height of the source.
+
+            Independent Variables:
+            - x (float or array-like): The x-coordinate.
+            - y (float or array-like): The y-coordinate.
+            - z (float or array-like): The z-coordinate.
+
+            Dependent Variables:
+            - Concentration (float or array-like): The concentration of the plume.
 
             Returns:
             - jnp.ndarray: The model output.
             """
-            I_y = params['I_y']
-            I_z = params['I_z']
-            log_10_Q = params['log_10_Q']
+
+            self._set_params(self.all_param_names, inference_model_params, self.fixed_model_params)
+
             x = jnp.array(x)
             y = jnp.array(y)
             z = jnp.array(z)
-            H = self.model_params.H
-            return 10**log_10_Q/(2*jnp.pi*I_y*I_z*x**2)*jnp.exp(-y**2/(2*I_y**2*x**2))*(jnp.exp(-(z-H)**2/(2*I_z**2*x**2))+jnp.exp(-(z+H)**2/(2*I_z**2*x**2)))
-        
-        def _log_GPM_norm(params, x, y, z):
+
+            return jnp.log10(self.Q/(2*jnp.pi*self.I_y*self.I_z*x**2)*jnp.exp(-y**2/(2*self.I_y**2*x**2))*(jnp.exp(-(z-self.H)**2/(2*self.I_z**2*x**2))+jnp.exp(-(z+self.H)**2/(2*self.I_z**2*x**2))))
+                
+        def _log_gpm_source(params, x, y, z):
             """
             Wind speed weighted, logarithmised Gaussian Plume Model.
 
             Args:
             - params (dict): A dictionary containing the model parameters.
-            - x, y, z: The coordinates.
+            - x (float or array-like): The x-coordinate.
+            - y (float or array-like): The y-coordinate.
+            - z (float or array-like): The z-coordinate.
+
+            Parameters:
+            - I_y (float): The y-component of the plume dispersion.
+            - I_z (float): The z-component of the plume dispersion.
+            - Q (float): The input flux rate.
+            - x_0 (float): The x-coordinate of the source.
+            - y_0 (float): The y-coordinate of the source.
+            - z_0 (float): The z-coordinate of the source.
+            - u (float): The wind speed.
+            - H (float): The height of the source.
+
+            Independent Variables:
+            - x (float or array-like): The x-coordinate.
+            - y (float or array-like): The y-coordinate.
+            - z (float or array-like): The z-coordinate.
+
+            Dependent Variables:
+            - Concentration (float or array-like): The concentration of the plume.
 
             Returns:
             - jnp.ndarray: The model output.
+
             """
-            I_y = params['I_y']
-            I_z = params['I_z']
-            Q = params['Q']
+            self._set_params(self.all_param_names, params, self.fixed_model_params)
+
             x = jnp.array(x)
             y = jnp.array(y)
             z = jnp.array(z)
-            H = self.model_params.H
-            return jnp.log10(Q/(2*jnp.pi*I_y*I_z*x**2)*jnp.exp(-y**2/(2*I_y**2*x**2))*(jnp.exp(-(z-H)**2/(2*I_z**2*x**2))+jnp.exp(-(z+H)**2/(2*I_z**2*x**2))))
+            func = jnp.log10(self.Q/(2*self.u*jnp.pi*self.I_y*self.I_z*(x-self.x_0)**2)*jnp.exp(-(y-self.y_0)**2/(2*self.I_y**2*(x-self.x_0)**2))*(jnp.exp(-(z-self.z_0)**2/(2*self.I_z**2*(x-self.x_0)**2))+jnp.exp(-(z+self.z_0)**2/(2*self.I_z**2*(x-self.x_0)**2))))
+            return func
         
-        def _log_GPM_norm_log_Q(params, x, y, z):
-            """
-            Wind speed weighted, logarithmised Gaussian Plume Model, with logarithmised Q.
+        # IMPLEMENT MORE MODELS HERE
 
-            Args:
-            - params (dict): A dictionary containing the model parameters.
-            - x, y, z: The coordinates.
-
-            Returns:
-            - jnp.ndarray: The model output.
-            """
-            I_y = params['I_y']
-            I_z = params['I_z']
-            Q = params['Q']
-            x = jnp.array(x)
-            y = jnp.array(y)
-            z = jnp.array(z)
-            H = self.model_params.H
-            return jnp.log10(jnp.log(Q)/(2*jnp.pi*I_y*I_z*x**2)*jnp.exp(-y**2/(2*I_y**2*x**2))*(jnp.exp(-(z-H)**2/(2*I_z**2*x**2))+jnp.exp(-(z+H)**2/(2*I_z**2*x**2))))
-        
-        def _log_gpm_norm_source(params, x, y, z):
-            """
-            Wind speed weighted, logarithmised Gaussian Plume Model.
-
-            Args:
-            - params (dict): A dictionary containing the model parameters.
-            - x, y, z: The coordinates.
-
-            Returns:
-            - jnp.ndarray: The model output.
-            """
-            I_y = params['I_y']
-            I_z = params['I_z']
-            Q = params['Q']
-            x_0 = params['x_0']
-            y_0 = params['y_0']
-            z_0 = params['z_0']
-            x = jnp.array(x)
-            y = jnp.array(y)
-            z = jnp.array(z)
-            u = self.model_params.u
-            output = jnp.log10(Q/(2*u*jnp.pi*I_y*I_z*(x-x_0)**2)*jnp.exp(-(y-y_0)**2/(2*I_y**2*(x-x_0)**2))*(jnp.exp(-(z-z_0)**2/(2*I_z**2*(x-x_0)**2))+jnp.exp(-(z+z_0)**2/(2*I_z**2*(x-x_0)**2))))
-            return output
-        
         if self.model_select == "gpm_norm":
             return _GPM_norm
-        elif self.model_select == "gpm_norm_log_Q":
-            return _GPM_norm_log_Q
         elif self.model_select == "log_gpm_norm":
             return _log_GPM_norm
-        elif self.model_select == "log_gpm_norm_log_Q":
-            return _log_GPM_norm_log_Q
-        elif self.model_select == "log_gpm_norm_source":
-            return _log_gpm_norm_source
+        elif self.model_select == "log_gpm_source":
+            return _log_gpm_source
         else:
-            raise Exception('Invalid model selected!')
+            raise Exception('Model - invalid model selected!')
