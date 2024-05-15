@@ -78,11 +78,11 @@ class Parameter:
         Utility function for converting mean and stdev to alpha in a Gamma distribution.
 
         Args:
-            mu (float or array-like): The mean value(s).
-            cov (float or array-like): The covariance value(s).
+        - mu (float or array-like): The mean value(s).
+        - cov (float or array-like): The covariance value(s).
 
         Returns:
-            float or array-like: The alpha value(s).
+        - float or array-like: The alpha value(s).
         """
         if cov == 0:
             raise ValueError("'Parameter - 'cov' cannot be zero.")
@@ -94,11 +94,11 @@ class Parameter:
         Utility function for converting mean and stdev to beta in a Gamma distribution.
 
         Args:
-            mu (float or array-like): The mean value(s).
-            cov (float or array-like): The covariance value(s).
+        - mu (float or array-like): The mean value(s).
+        - cov (float or array-like): The covariance value(s).
 
         Returns:
-            float or array-like: The beta value(s).
+        - float or array-like: The beta value(s).
         """
         if cov == 0:
             raise ValueError("'Parameter - 'cov' cannot be zero.")
@@ -110,11 +110,11 @@ class Parameter:
         Utility function for converting mean and stdev to location in a Log Normal distribution.
 
         Args:
-            mu (float or array-like): The mean value(s).
-            cov (float or array-like): The covariance value(s).
+        - mu (float or array-like): The mean value(s).
+        - cov (float or array-like): The covariance value(s).
 
         Returns:
-            float or array-like: The loc value(s).
+        - float or array-like: The loc value(s).
         """
 
 
@@ -142,11 +142,11 @@ class Parameter:
         Utility function for converting mean and stdev to scale in a Log Normal distribution.
 
         Args:
-            mu (float or array-like): The mean value(s).
-            cov (float or array-like): The covariance value(s).
+        - mu (float or array-like): The mean value(s).
+        - cov (float or array-like): The covariance value(s).
 
         Returns:
-            float or array-like: The scale value(s).
+        - float or array-like: The scale value(s).
         """
         if np.isscalar(mu):
             return np.sqrt(np.log(1 + cov / mu**2))
@@ -168,7 +168,7 @@ class Parameter:
         - val (float, int or np.ndarray): The value of the prior hyperparameter.
 
         Returns:
-            Parameter: The Parameter instance.
+        - Parameter: The Parameter instance.
         """
 
         if isinstance(val, list):
@@ -379,7 +379,7 @@ class Parameter:
         Generates the selected prior distribution using the prior hyperparameters.
 
         Returns:
-            numpyro.distributions.Distribution: The prior distribution.
+        - numpyro.distributions.Distribution: The prior distribution.
         """
 
         def gaussian_prior(prior_params):
@@ -469,7 +469,7 @@ class Parameter:
         Generates a sample for this parameter.
 
         Returns:
-            tuple: A tuple containing the sampled parameter value and its order.
+        - tuple: A tuple containing the sampled parameter value and its order.
         """
         prior_func = self.get_prior_function()
         a = numpyro.sample(self.joined_name, prior_func)

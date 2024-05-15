@@ -18,20 +18,16 @@ class Sampler:
     The Sampler class is used to sample inference parameters using MCMC (Markov Chain Monte Carlo) methods.
 
     Attributes:
-    - params (pandas.Index): Index of parameters.
-    - model (Model): The model object.
-    - likelihood (Likelihood): The likelihood object.
-    - training_data (numpy.ndarray): The training data.
-    - testing_data (numpy.ndarray): The testing data.
+    - inference_params (pandas.Index): List of inference parameters.
+    - model_obj (Model): The model object.
+    - likelihood_obj (Likelihood): The likelihood object.
+    - data_obj (Data): The data object.
     - n_samples (int): Number of samples to generate.
-    - p_warmup (int, optional): Percentage of warmup samples. Defaults to 0.5.
-    - n_chains (int, optional): Number of chains. Defaults to 1.
-    - thinning_rate (int, optional): Thinning rate for samples. Defaults to 1.
-    - data_path (str, optional): Path to save the results. Defaults to 'results/inference/general_instances'.
-    - actual_parameter_names (list): A list of the actual parameter names.
-    - instance (int): The instance number.
-    - hyperparams (dict): A dictionary containing the hyperparameters for the inference.
-
+    - p_warmup (int): Percentage of warmup samples.
+    - n_chains (int): Number of chains.
+    - thinning_rate (int): Thinning rate for samples.
+    - results_path (str): Root path to save the results.
+    
     Methods:
     - sample_all(rng_key): Generates the allotted number of samples.
     - sample_one(): Generates one sample of the inferred parameters.
@@ -42,32 +38,36 @@ class Sampler:
 
     class Sampler:
         def __init__(self, 
-                     params: pd.Series, 
-                     model: Model, 
-                     likelihood: Likelihood, 
+                     inference_params: pd.Series, 
+                     model_obj: Model, 
+                     likelihood_obj: Likelihood, 
+                     data_obj: Data,
                      training_data: pd.Series, 
-                     testing_data: pd.Series, 
-                     n_samples: int, 
+                     testing_data: pd.Series,
+                     data_name: str,
+                     n_samples: int = 10000, 
                      p_warmup:float=0.5,
-                     n_chains:int=1, 
-                     thinning_rate:float=1, 
-                     data_path:str='results/inference/general_instances'):
+                     n_chains:int=1,
+                     thinning_rate:float=1,
+                     results_path = '/PhD_project/results'):
             """
             Initialize the Sampler object.
 
             Args:
-            - params (pandas.Index): Index of parameters.
+            - inference_params (pandas.Index): List of inference parameters.
             - model (Model): The model object.
             - likelihood (Likelihood): The likelihood object.
             - training_data (numpy.ndarray): The training data.
             - testing_data (numpy.ndarray): The testing data.
-            - n_samples (int): Number of samples to generate.
+            - data_name (str): The name of the data (same as the name of the data and results folders).
+            - n_samples (int, optional): Number of samples to generate. Defaults to 10,000.
             - p_warmup (int, optional): Percentage of warmup samples. Defaults to 0.5.
             - n_chains (int, optional): Number of chains. Defaults to 1.
             - thinning_rate (int, optional): Thinning rate for samples. Defaults to 1.
-            - data_path (str, optional): Path to save the results. Defaults to 'results/inference/general_instances'.
+            - results_path (str, optional): Root path to save the results. Defaults to 'results'.
+
             """
-            self.params = params
+            self.inference_params = inference_params
             self.model = model
             self.model_func = model.get_model()
             self.likelihood = likelihood
@@ -79,9 +79,10 @@ class Sampler:
             self.pwarmup = p_warmup
             self.n_warmup = p_warmup*n_samples
             self.thinning_rate = thinning_rate
+            self.data_name = data_name
 
             self.actual_parameter_names = []
-            for param in self.params.index:
+            for param in self.inference_params.index:
                 if '_and_' in param:
                     names = param.split('_and_')
                     for i in range(len(names)):
@@ -155,7 +156,7 @@ class Sampler:
         - pd.DataFrame: A DataFrame containing the samples for each chain as well as the total samples.
         """
         chain_new_samples = pd.DataFrame({}, dtype='float64')
-        for param in self.params.index:
+        for param in self.inference_params.index:
             if '_and_' in param:
                 sub_params = param.split('_and_')
                 for i in range(len(sub_params)):
@@ -173,7 +174,7 @@ class Sampler:
                         sample_index_array = np.concatenate((sample_index_array, np.array(range(sample_chains.shape[1])) + 1))
 
                     chain_new_samples[sub_param] = chain_new_samples_array
-                    chain_new_samples[sub_param] *= self.params[param].order
+                    chain_new_samples[sub_param] *= self.inference_params[param].order
 
             else:
                 chain_array = np.array([])
@@ -188,7 +189,7 @@ class Sampler:
                     sample_index_array = np.concatenate((sample_index_array, np.array(range(sample_chains.shape[1])) + 1))
 
                 chain_new_samples[param] = chain_new_samples_array
-                chain_new_samples[param] *= self.params[param].order
+                chain_new_samples[param] *= self.inference_params[param].order
 
         chain_new_samples['chain'] = chain_array
         chain_new_samples['sample_index'] = sample_index_array
@@ -207,7 +208,7 @@ class Sampler:
         """
         formatted_current_params_sample = {}
 
-        for param_ind in self.params.index:
+        for param_ind in self.inference_params.index:
             if 'and' in param_ind:
                 names = param_ind.split('_and_')
                 for i in range(len(names)):
@@ -225,8 +226,8 @@ class Sampler:
         - numpyro.distributions.Distribution: One sample of the parameters.
         """
         current_params_sample = {}
-        for param_ind in self.params.index:
-            s, order = self.params[param_ind].sample_param()
+        for param_ind in self.inference_params.index:
+            s, order = self.inference_params[param_ind].sample_param()
             current_params_sample[param_ind] = s * order
 
         current_params_sample = self._format_params(current_params_sample)
@@ -245,12 +246,12 @@ class Sampler:
         """
         self.hyperparams = {}
         self.hyperparams['params'] = {}
-        for param_ind in self.params.index:
+        for param_ind in self.inference_params.index:
             self.hyperparams['params'][param_ind] = {}
-            self.hyperparams['params'][param_ind]['prior_func'] = self.params[param_ind].prior_select
+            self.hyperparams['params'][param_ind]['prior_func'] = self.inference_params[param_ind].prior_select
             self.hyperparams['params'][param_ind]['prior_params'] = {}
-            for prior_param_ind in self.params[param_ind].prior_params.index:
-                self.hyperparams['params'][param_ind]['prior_params'][prior_param_ind] = self.params[param_ind].prior_params[prior_param_ind] * self.params[param_ind].order
+            for prior_param_ind in self.inference_params[param_ind].prior_params.index:
+                self.hyperparams['params'][param_ind]['prior_params'][prior_param_ind] = self.inference_params[param_ind].prior_params[prior_param_ind] * self.params[param_ind].order
 
         self.hyperparams['model'] = {}
         self.hyperparams['model']['model_func'] = self.model.model_select
