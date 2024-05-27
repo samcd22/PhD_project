@@ -10,25 +10,6 @@ import json
 import os
 ModelInput = Union[str, int, float]
 
-import cProfile
-import pstats
-import io
-from functools import wraps
-
-def profile(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        profiler = cProfile.Profile()
-        profiler.enable()
-        result = func(*args, **kwargs)
-        profiler.disable()
-        s = io.StringIO()
-        ps = pstats.Stats(profiler, stream=s).sort_stats('cumulative')
-        ps.print_stats()
-        print(s.getvalue())
-        return result
-    return wrapper
-
 class Model:
     """
     A class representing the Model used for predicting a system's behaviour. The parameters of this model are optimised using Bayesian Inference
@@ -132,7 +113,7 @@ class Model:
         
         inference_param_vars = [self.variables[param] for param in self.all_param_names if param not in self.fixed_model_params]
 
-        self.sum_expr = sp.simplify(self.sum_expr.subs([(self.variables[param], self.fixed_model_params[param]) for param in self.fixed_model_params.index]))
+        self.sum_expr = self.sum_expr.subs([(self.variables[param], self.fixed_model_params[param]) for param in self.fixed_model_params.index])
         self.expr_func = sp.lambdify([*[self.variables[indep_var] for indep_var in self.independent_variables], *inference_param_vars], self.sum_expr, modules='jax')        
 
         def _model_func(inference_model_params, independent_variables):

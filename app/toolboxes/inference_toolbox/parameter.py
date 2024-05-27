@@ -67,6 +67,7 @@ class Parameter:
         self.prior_select = prior_select
         self.multivar = False
         self.multi_mode = multi_mode
+        self.prior_func = None
         if isinstance(self.name, list) and len(self.name) >= 2:
             self.multivar = True
             self.joined_name = '_and_'.join(self.name)
@@ -488,6 +489,7 @@ class Parameter:
         Returns:
         - tuple: A tuple containing the sampled parameter value and its order.
         """
-        prior_func = self.get_prior_function()
-        sample_val = numpyro.sample(self.joined_name, prior_func)
+        if self.prior_func == None:
+            self.prior_func = self.get_prior_function()
+        sample_val = numpyro.sample(self.joined_name, self.prior_func)
         return sample_val

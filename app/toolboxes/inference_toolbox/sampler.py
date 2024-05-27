@@ -6,9 +6,26 @@ from jax import random, jit
 from numpyencoder import NumpyEncoder
 import pandas as pd
 import numpy as np
+import cProfile
+
 
 # CPU cores available for sampling (we want this to equal num_chains)
 os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=4'
+
+def profile(func):
+    def profiled_func(*args, **kwargs):
+        import cProfile, pstats, io
+        pr = cProfile.Profile()
+        pr.enable()
+        retval = func(*args, **kwargs)
+        pr.disable()
+        s = io.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats()
+        print(s.getvalue())
+        return retval
+    return profiled_func
 
 class Sampler:
     def __init__(self, inference_params: pd.Series, model, likelihood, data_processor, n_samples=10000, p_warmup=0.5, n_chains=1, thinning_rate=1, root_results_path='/PhD_project/results/inference_results', controller='sandbox', generator_name=None, optimiser_name=None):
