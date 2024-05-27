@@ -14,7 +14,7 @@ from toolboxes.data_processing_toolbox.data_processor import DataProcessor
 
 
 
-class SimDataProcess(DataProcessor):
+class SimDataProcessor(DataProcessor):
     """
     A class for simulating data based on a given model and domain. Inherits from the DataProcessor class.
 
@@ -82,13 +82,12 @@ class SimDataProcess(DataProcessor):
             'noise_level': self.noise_level,
             'noise_percentage': self.noise_percentage,
             'train_test_split': self.train_test_split,
-            'domain_name': self.domain.domain_select,
-            'model_name': self.model.model_select
         }
-        for model_param in self.model.fixed_model_params.keys():
-            construction[model_param] = self.model.fixed_model_params[model_param]
-        for domain_param in self.domain.domain_params.keys():
-            construction[domain_param] = self.domain.domain_params[domain_param]
+        construction['model_params'] = {}
+        construction['domain_params'] = {}
+        construction['model_params'] = self.model.get_construction()
+        construction['domain_params'] = self.domain.get_construction()
+
         return construction
 
     def _check_data_exists(self):
@@ -139,7 +138,9 @@ class SimDataProcess(DataProcessor):
         points = self.domain.create_domain()
         model_func = self.model.get_model()
         
-        all_points = [points[:,i] for i in range(points.shape[1])]
+        all_points = pd.DataFrame({})
+        for indep_var in self.model.independent_variables:
+            all_points[indep_var] = points[:,self.model.independent_variables.index(indep_var)]
         if not self._check_data_exists():
             mu = model_func(pd.Series({}), all_points)
             if self.noise_percentage is not None:
@@ -162,6 +163,7 @@ class SimDataProcess(DataProcessor):
             for i in range(len(independent_vars)):
                 data[independent_vars[i]] = points[:,i]
             data[self.processor_params['output_header']] = C
+            data.dropna(inplace=True)
             self.processed_data = data
             self._save_data(self.processed_data)
         else:
@@ -170,4 +172,4 @@ class SimDataProcess(DataProcessor):
 
         train_data, test_data = train_test_split(self.processed_data, test_size=1-self.train_test_split, random_state=42)
 
-        return train_data, test_data, self.get_construction()
+        return train_data, test_data

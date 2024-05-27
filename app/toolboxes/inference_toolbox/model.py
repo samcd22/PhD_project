@@ -1,14 +1,33 @@
 import jax.numpy as jnp
 import pandas as pd
 from numpyencoder import NumpyEncoder
+import sympy as sp
 import re
+import jax
 
 from typing import Union, List
 import json
 import os
 ModelInput = Union[str, int, float]
 
+import cProfile
+import pstats
+import io
+from functools import wraps
 
+def profile(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        profiler = cProfile.Profile()
+        profiler.enable()
+        result = func(*args, **kwargs)
+        profiler.disable()
+        s = io.StringIO()
+        ps = pstats.Stats(profiler, stream=s).sort_stats('cumulative')
+        ps.print_stats()
+        print(s.getvalue())
+        return result
+    return wrapper
 
 class Model:
     """
@@ -26,6 +45,7 @@ class Model:
     - __init__(self, model_select: str): Initializes the Model class.
     - add_model_param(self, name: str, val: ModelInput) -> 'Model': Adds a named parameter to the Model class.
     - get_model(self) ->: callable Generates the selected model function using the model parameters.
+    - gen_construction(self) -> dict: Generates the construction parameters for the model.
     """
 
     def __init__(self, model_select: str):
@@ -47,21 +67,46 @@ class Model:
         if model_select not in models_data:
             raise Exception('Model - model does not exist in models.json file! Please add the model first.')
         
-        model_func = models_data[self.model_select]["model"]
+        self.model_string_expr = models_data[self.model_select]["model"]
         self.independent_variables = models_data[self.model_select]["independent_variables"]
         self.dependent_variables = models_data[self.model_select]["dependent_variables"]
         self.all_param_names = models_data[self.model_select]["all_param_names"]
 
-        mathematical_words = ['pi', 'exp', 'log', 'log10', 'sqrt', 'sin', 'cos', 
-                     'tan', 'arcsin', 'arccos', 'arctan', 'sinh', 'cosh', 'tanh',
-                     'arcsinh', 'arccosh', 'arctanh', 'abs', 'ceil', 'floor']
 
-        for word in mathematical_words:
-            model_func = re.sub(r'\b'+word+r'\b', 'jnp.'+word, model_func)
+        self.variables = {}
 
-        for i in self.all_param_names:
-            model_func = re.sub(r'\b'+i+r'\b', 'self.'+i, model_func)
-        self.model_func_string = model_func        
+        for param in self.independent_variables:
+            self.variables[param] = sp.symbols(param)
+        for param in self.all_param_names:
+           self. variables[param] = sp.symbols(param)
+
+        # Define the mathematical words to be used in sympify
+        mathematical_words = {
+            'pi': sp.pi, 
+            'exp': sp.exp, 
+            'log': sp.log, 
+            'log10': lambda x: sp.log(x, 10),
+            'sqrt': sp.sqrt, 
+            'sin': sp.sin, 
+            'cos': sp.cos, 
+            'tan': sp.tan, 
+            'asin': sp.asin, 
+            'acos': sp.acos, 
+            'atan': sp.atan, 
+            'sinh': sp.sinh, 
+            'cosh': sp.cosh, 
+            'tanh': sp.tanh,
+            'asinh': sp.asinh, 
+            'acosh': sp.acosh, 
+            'atanh': sp.atanh
+        }
+
+        # Convert the string to a SymPy expression
+        try:
+            self.sum_expr = sp.sympify(self.model_string_expr, locals={**self.variables, **mathematical_words})
+        except (sp.SympifyError, ValueError) as e:
+            raise Exception('Model - invalid model string!')
+   
 
     def add_fixed_model_param(self, name: str, val) -> 'Model':
         """
@@ -76,27 +121,6 @@ class Model:
         """
         self.fixed_model_params[name] = val
         return self
-        
-    def _set_params(self, inference_model_params):
-        """
-        Set the parameters of the model.
-
-        Args:
-            inference_model_params (dict): A dictionary containing the inference model parameters.
-
-        Raises:
-            Exception: If any required parameter is missing for the model.
-
-        """
-        self.inference_params = inference_model_params
-        for param_name in self.all_param_names:
-            if param_name in inference_model_params:
-                setattr(self, param_name, inference_model_params[param_name])
-            elif param_name in self.fixed_model_params:
-                setattr(self, param_name, self.fixed_model_params[param_name]) 
-            else:
-                raise Exception('Model - missing parameters for the model!')
-            
 
     def get_model(self):
         """
@@ -105,17 +129,36 @@ class Model:
         Returns:
         - _model_func: The model function.
         """
-        def _model_func(inferance_model_params, independent_variables):
-            self._set_params(inferance_model_params)
-            if len(independent_variables) != len(self.independent_variables):
-                raise Exception('Model - incorrect number of independent variables for this model!')
-            for i in range(len(self.independent_variables)):
-                globals()[self.independent_variables[i]] = independent_variables[i]
+        
+        inference_param_vars = [self.variables[param] for param in self.all_param_names if param not in self.fixed_model_params]
 
-            return eval(self.model_func_string)
+        self.sum_expr = sp.simplify(self.sum_expr.subs([(self.variables[param], self.fixed_model_params[param]) for param in self.fixed_model_params.index]))
+        self.expr_func = sp.lambdify([*[self.variables[indep_var] for indep_var in self.independent_variables], *inference_param_vars], self.sum_expr, modules='jax')        
+
+        def _model_func(inference_model_params, independent_variables):
+            ordered_params = [inference_model_params[param] for param in self.all_param_names if param not in self.fixed_model_params]
+            ordered_independent_variables = [jnp.array(independent_variables[indep_var]) for indep_var in self.independent_variables]
+            return self.expr_func(*ordered_independent_variables, *ordered_params)
         
         return _model_func
-        
+    
+    def get_construction(self):
+        """
+        Generates the construction parameters for the model.
+
+        Returns:
+        - dict: The construction parameters.
+        """
+        construction = {
+            'model_select': self.model_select,
+            'fixed_model_params': self.fixed_model_params.to_dict(),
+            'independent_variables': self.independent_variables,
+            'dependent_variables': self.dependent_variables,
+            'all_param_names': self.all_param_names,
+            'model_func_string': self.model_string_expr
+        }
+        return construction
+
 def add_model(model_name: str, model_str: str, independent_variables: List[str], dependent_variables: List[str], all_param_names: List[str]):
     """
     Adds a model to the model.json.
@@ -207,3 +250,4 @@ def delete_model(model_name: str):
             raise Exception('Model - model does not exist!')
     else:
         raise Exception('Model - models.json file does not exist!')
+    

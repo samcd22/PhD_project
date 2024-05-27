@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import numpyro
 import jax.numpy as jnp
+from jax import random
 
 from numpyro import distributions
 from typing import Union, Optional, List
@@ -72,6 +73,22 @@ class Parameter:
         else:
             self.joined_name = self.name            
         self.order = order
+
+    def get_construction(self):
+        """
+        Get the construction parameters of the parameter.
+
+        Returns:
+        - dict: The construction parameters.
+        """
+        construction = {
+            'name': self.name,
+            'prior_select': self.prior_select,
+            'prior_params': self.prior_params.to_dict(),
+            'order': self.order,
+            'multi_mode': self.multi_mode
+        }
+        return construction
 
     def _alpha_gamma(self, mu: Union[float, int, np.ndarray], cov: Union[float, int, np.ndarray]) -> Union[float, int, np.ndarray]:
         """
@@ -472,5 +489,5 @@ class Parameter:
         - tuple: A tuple containing the sampled parameter value and its order.
         """
         prior_func = self.get_prior_function()
-        a = numpyro.sample(self.joined_name, prior_func)
-        return a, self.order
+        sample_val = numpyro.sample(self.joined_name, prior_func)
+        return sample_val

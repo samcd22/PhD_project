@@ -19,7 +19,7 @@ class Domain:
     - add_domain_param(self, name: str, val: float) -> 'Domain': Saves a named parameter to the Domain class.
     - create_domain(self) -> np.ndarray: Generates the selected domain using the domain parameters.
     - create_domain_slice(self, slice_name: str) -> np.ndarray: Creates a slice of the selected domain.
-
+    - get_construction(self) -> dict: Get the construction parameters of the domain.
     """
 
     def __init__(self, domain_select: str):
@@ -36,6 +36,20 @@ class Domain:
 
         if domain_select in ['cone_from_source', 'cuboid_from_cource', 'cone_from_source_z_limited']:
             self.n_dims = 3
+
+    def get_construction(self):
+        """
+        Get the construction parameters.
+
+        Returns:
+        - dict: The construction parameters.
+        """
+        construction = {
+            'domain_select': self.domain_select,
+            'domain_params': self.domain_params.to_dict(),
+            'n_dims': self.n_dims
+        }
+        return construction
 
     def _check_required_params(self, required_params):
         """
