@@ -3,7 +3,6 @@ import pandas as pd
 from numpyencoder import NumpyEncoder
 import sympy as sp
 import re
-import jax
 
 from typing import Union, List
 import json
@@ -114,8 +113,8 @@ class Model:
         inference_param_vars = [self.variables[param] for param in self.all_param_names if param not in self.fixed_model_params]
 
         self.sum_expr = self.sum_expr.subs([(self.variables[param], self.fixed_model_params[param]) for param in self.fixed_model_params.index])
+        a = [*[self.variables[indep_var] for indep_var in self.independent_variables], *inference_param_vars]
         self.expr_func = sp.lambdify([*[self.variables[indep_var] for indep_var in self.independent_variables], *inference_param_vars], self.sum_expr, modules='jax')        
-
         def _model_func(inference_model_params, independent_variables):
             ordered_params = [inference_model_params[param] for param in self.all_param_names if param not in self.fixed_model_params]
             ordered_independent_variables = [jnp.array(independent_variables[indep_var]) for indep_var in self.independent_variables]

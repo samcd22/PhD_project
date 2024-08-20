@@ -10,12 +10,11 @@ import shutil
 
 from controllers.controller import Controller
 from toolboxes.inference_toolbox.parameter import Parameter
-from toolboxes.inference_toolbox.model import Model
+from app.toolboxes.inference_toolbox.model import Model
 from toolboxes.inference_toolbox.likelihood import Likelihood
 from toolboxes.inference_toolbox.sampler import Sampler
 from toolboxes.inference_toolbox.visualiser import Visualiser
 from toolboxes.plotting_toolbox.domain import Domain
-from toolboxes.data_processing_toolbox.get_data import get_data
 
 # Optimiser class - generates multiple instances of the sampler, varying their hyperparameters to optimise the results
 class Optimiser(Controller):

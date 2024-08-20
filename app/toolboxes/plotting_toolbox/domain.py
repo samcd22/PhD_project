@@ -36,6 +36,8 @@ class Domain:
 
         if domain_select in ['cone_from_source', 'cuboid_from_cource', 'cone_from_source_z_limited']:
             self.n_dims = 3
+        if domain_select in ['one_D']:
+            self.n_dims = 1
 
     def get_construction(self):
         """
@@ -44,9 +46,18 @@ class Domain:
         Returns:
         - dict: The construction parameters.
         """
+
+        domain_params = {}
+
+        for key, value in self.domain_params.items():
+            if isinstance(value, np.ndarray):
+                domain_params[key] = value.tolist()
+            else:
+                domain_params[key] = value
+
         construction = {
             'domain_select': self.domain_select,
-            'domain_params': self.domain_params.to_dict(),
+            'domain_params': domain_params,
             'n_dims': self.n_dims
         }
         return construction
@@ -94,6 +105,8 @@ class Domain:
 
         elif self.domain_select == 'cone_from_source_z_limited':
             return self._create_z_limited_cone()
+        elif self.domain_select == 'one_D':
+            return self._create_one_D()
         else:
             raise Exception('Domain - Invalid domain selected!')
 
@@ -116,6 +129,16 @@ class Domain:
             return self._create_cone_slice(slice_name)
         else:
             raise Exception('Domain - Invalid domain selected!')
+
+    def _create_one_D(self):
+        if 'x_min' in self.domain_params and 'x_max' in self.domain_params:
+            x_min = self.domain_params.x_min
+            x_max = self.domain_params.x_max
+            resolution = self.domain_params.resolution
+            return np.linspace(x_min, x_max, resolution)
+        elif 'points' in self.domain_params:
+            self.domain_params.points = np.sort(np.array(self.domain_params.points))
+            return self.domain_params.points
 
     def _create_cone_slice(self, slice_name):
         """
@@ -260,7 +283,7 @@ class Domain:
         required_params = ['source', 'r', 'theta', 'resolution']
         self._check_required_params(required_params)
 
-        r_values = np.linspace(1, self.domain_params.r, self.domain_params.resolution)
+        r_values = np.linspace(200, self.domain_params.r, self.domain_params.resolution)
         x, y, z = [], [], []
 
         # Create a meshgrid of r and theta values

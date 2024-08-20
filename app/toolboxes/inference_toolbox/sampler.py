@@ -2,33 +2,113 @@ import os
 import json
 import numpyro
 import jax.numpy as jnp
-from jax import random, jit
 from numpyencoder import NumpyEncoder
 import pandas as pd
 import numpy as np
-import cProfile
+from jaxlib.xla_extension import ArrayImpl
+from jax import random
+import jax
 
+from toolboxes.inference_toolbox.model import Model
+from toolboxes.inference_toolbox.likelihood import Likelihood
+from toolboxes.data_processing_toolbox.data_processor import DataProcessor
 
-# CPU cores available for sampling (we want this to equal num_chains)
-os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=4'
-
-def profile(func):
-    def profiled_func(*args, **kwargs):
-        import cProfile, pstats, io
-        pr = cProfile.Profile()
-        pr.enable()
-        retval = func(*args, **kwargs)
-        pr.disable()
-        s = io.StringIO()
-        sortby = 'cumulative'
-        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        ps.print_stats()
-        print(s.getvalue())
-        return retval
-    return profiled_func
 
 class Sampler:
-    def __init__(self, inference_params: pd.Series, model, likelihood, data_processor, n_samples=10000, p_warmup=0.5, n_chains=1, thinning_rate=1, root_results_path='/PhD_project/results/inference_results', controller='sandbox', generator_name=None, optimiser_name=None):
+    """
+    A class for performing sampling using the NUTS algorithm.
+
+    Attributes:
+    - inference_params (pd.Series): A pandas Series containing the inference parameters.
+    - n_samples (int): The number of samples to draw.
+    - n_chains (int): The number of chains to run in parallel.
+    - p_warmup (float): The proportion of warmup samples.
+    - n_warmup (int): The number of warmup samples.
+    - thinning_rate (int): The thinning rate for the samples.
+    - data_processor: The data processor object.
+    - model: The model object.
+    - likelihood: The likelihood object.
+    - training_data: The training data.
+    - testing_data: The testing data.
+    - data_construction: The construction of the data processor.
+    - model_func: The model function.
+    - independent_variables: The independent variables of the model.
+    - dependent_variables: The dependent variables of the model.
+    - all_model_param_names: All parameter names of the model.
+    - fixed_model_params: The fixed model parameters.
+    - likelihood_func: The likelihood function.
+    - fixed_likelihood_params: The fixed likelihood parameters.
+    - results_path (str): The path to save the results.
+    - root_results_path (str): The root path to save the results.
+    - sampler_construction: The construction of the sampler.
+    - data_exists (bool): Flag indicating if the data exists.
+    - instance (int): The instance number.
+    - sampled (bool): Flag indicating if the sampler has been sampled.
+    - samples (pd.DataFrame): The samples.
+    - chain_samples (pd.DataFrame): The chain samples.
+    - fields (dict): The fields dictionary.
+
+    Methods:
+    - get_construction: Get the construction of the sampler.
+    - sample_one: Sample one set of parameters.
+    - sample_all: Sample all sets of parameters.
+    """
+
+    def __init__(self, inference_params: pd.Series, 
+                 model: Model, 
+                 likelihood:Likelihood, 
+                 data_processor:DataProcessor, 
+                 n_samples:int=10000, 
+                 p_warmup:float=0.5, 
+                 n_chains:int=1, 
+                 thinning_rate:int=1, 
+                 root_results_path:str='/PhD_project/results/inference_results', 
+                 controller:str='sandbox', 
+                 generator_name:str=None, 
+                 optimiser_name:str=None):
+        """
+        Initializes the Sampler class.
+
+        Args:
+        - inference_params (pd.Series): A pandas Series containing the inference parameters. Each element is a parameter object
+        - model: The model object.
+        - likelihood: The likelihood object.
+        - data_processor: The data processor object.
+        - n_samples (int, optional): The number of samples to draw. Defaults to 10000.
+        - p_warmup (float, optional): The proportion of warmup samples. Defaults to 0.5.
+        - n_chains (int, optional): The number of chains to run in parallel. Defaults to 1.
+        - thinning_rate (int, optional): The thinning rate for the samples. Defaults to 1.
+        - root_results_path (str, optional): The root path to save the results. Defaults to '/PhD_project/results/inference_results'.
+        - controller (str, optional): The controller type. Must be one of 'sandbox', 'generator', or 'optimisor'. Defaults to 'sandbox'.
+        - generator_name (str, optional): The name of the generator. Required if controller is 'generator'. Defaults to None.
+        - optimiser_name (str, optional): The name of the optimiser. Required if controller is 'optimisor'. Defaults to None.
+        """
+        
+        if not isinstance(inference_params, pd.Series):
+            raise TypeError("Sampler - inference_params must be a pandas Series")
+        if not isinstance(model, Model):
+            raise TypeError("Sampler - model must be an instance of the Model class")
+        if not isinstance(likelihood, Likelihood):
+            raise TypeError("Sampler - likelihood must be an instance of the Likelihood class")
+        if not isinstance(data_processor, DataProcessor):
+            raise TypeError("Sampler - data_processor must be an instance of the DataProcessor class")
+        if not isinstance(n_samples, int) and n_samples > 0:
+            raise TypeError("Sampler - n_samples must be a positive integer")
+        if not (isinstance(p_warmup, float) and 0 <= p_warmup <= 1) and not (isinstance(p_warmup, int) and 0 <= p_warmup <= 1):
+            raise TypeError("Sampler - p_warmup must be a float or an int between 0 and 1")
+        if not isinstance(n_chains, int) and n_chains > 0:
+            raise TypeError("Sampler - n_chains must be a positive integer")
+        if not isinstance(thinning_rate, int) and thinning_rate > 0:
+            raise TypeError("Sampler - thinning_rate must be a positive integer")
+        if not isinstance(root_results_path, str):
+            raise TypeError("Sampler - root_results_path must be a string")
+        if not isinstance(controller, str):
+            raise TypeError("Sampler - controller must be a string")
+        if not isinstance(generator_name, str) and generator_name is not None:
+            raise TypeError("Sampler - generator_name must be a string or None")
+        if not isinstance(optimiser_name, str) and optimiser_name is not None:
+            raise TypeError("Sampler - optimiser_name must be a string or None")
+
         self.inference_params = inference_params
         self.n_samples = n_samples
         self.n_chains = n_chains
@@ -51,6 +131,12 @@ class Sampler:
 
         self.likelihood_func = likelihood.get_likelihood_function()
         self.fixed_likelihood_params = likelihood.fixed_likelihood_params
+       
+        self.samples = None
+        self.chain_samples = None
+        self.fields = None
+
+        self.sampled = False
 
         if controller == 'sandbox':
             self.results_path = os.path.join(root_results_path, data_processor.processed_data_name, 'general_instances')
@@ -71,6 +157,12 @@ class Sampler:
         self._check_data_validity(self.testing_data)
 
     def get_construction(self):
+        """
+        Get the construction of the sampler.
+
+        Returns:
+            dict: The construction of the sampler.
+        """
         construction = {
             'inference_params': [param.get_construction() for param in self.inference_params],
             'model': self.model.get_construction(),
@@ -79,15 +171,24 @@ class Sampler:
             'n_samples': self.n_samples,
             'n_chains': self.n_chains,
             'thinning_rate': self.thinning_rate,
+            'p_warmup': self.p_warmup,
         }
         return construction
 
     def _save_samples(self, samples, chain_samples, fields):
+        """
+        Save the samples, chain samples, and fields to disk.
+
+        Args:
+            samples (pd.DataFrame): The samples.
+            chain_samples (pd.DataFrame): The chain samples.
+            fields (dict): The fields dictionary.
+        """
         instance_folder = os.path.join(self.results_path, f'instance_{self.instance}')
         os.makedirs(instance_folder, exist_ok=True)
         samples.to_csv(os.path.join(instance_folder, 'samples.csv'))
         chain_samples.to_csv(os.path.join(instance_folder, 'chain_samples.csv'))
-        fields = json.dumps(fields, cls=NumpyEncoder, separators=(', ',': '), indent=4)
+
         
         with open(os.path.join(instance_folder, 'fields.json'), 'w') as fp:
             json.dump(fields, fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
@@ -96,71 +197,141 @@ class Sampler:
             json.dump(self.sampler_construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
 
     def _load_samples(self):
+        """
+        Load the samples, chain samples, and fields from disk.
+
+        Returns:
+            pd.DataFrame: The samples.
+            pd.DataFrame: The chain samples.
+            dict: The fields dictionary.
+        """
         instance_folder = os.path.join(self.results_path, f'instance_{self.instance}')
-        samples = pd.read_csv(os.path.join(instance_folder, 'samples.csv'))
-        chain_samples = pd.read_csv(os.path.join(instance_folder, 'chain_samples.csv'))
-        with open(os.path.join(instance_folder, 'fields.json'), 'r') as f:
-            fields = json.load(f)
+        try:
+            samples = pd.read_csv(os.path.join(instance_folder, 'samples.csv'))
+        except:
+            raise FileNotFoundError('Sampler - samples.csv not found')
+        try:
+            chain_samples = pd.read_csv(os.path.join(instance_folder, 'chain_samples.csv'))
+        except:
+            raise FileNotFoundError('Sampler - chain_samples.csv not found')
+        try:
+            with open(os.path.join(instance_folder, 'fields.json'), 'r') as f:
+                fields = json.load(f)
+        except:
+            raise FileNotFoundError('Sampler - fields.json not found')
+        
+        if 'Unnamed: 0' in samples.columns:
+            samples.drop(columns=['Unnamed: 0'], inplace=True)
+        if 'Unnamed: 0' in chain_samples.columns:
+            chain_samples.drop(columns=['Unnamed: 0'], inplace=True)
+        
         return samples, chain_samples, fields
 
     def _check_data_validity(self, data):
+        """
+        Check the validity of the data.
+
+        Args:
+            data: The data to check.
+
+        Raises:
+            Exception: If the data contains missing values.
+            Exception: If the data does not contain all independent variables of the model.
+            Exception: If the data does not contain all dependent variables of the model.
+        """
         if data.isnull().values.any():
             raise Exception('Sampler - Data contains missing values!')
+
         if not set(self.independent_variables).issubset(data.columns):
             raise Exception('Sampler - Data does not contain all independent variables of the model!')
         if not set(self.dependent_variables).issubset(data.columns):
             raise Exception('Sampler - Data does not contain all dependent variables of the model!')
 
     def sample_one(self):
+        """
+        Sample one set of parameters.
+
+        Returns:
+            numpyro.sample: The observed samples.
+        """
         current_params_sample = {}
         for param_ind in self.inference_params.index:
             sample = self.inference_params[param_ind].sample_param()
-            current_params_sample[param_ind] = sample * self.inference_params[param_ind].order
-
+            if jnp.isscalar(sample):
+                current_params_sample[param_ind] = jax.lax.cond(sample > 0, lambda sample: self._safe_exponentiation(sample, self.inference_params[param_ind].order), lambda sample: sample, sample)
+            else:
+                current_params_sample[param_ind] = jax.lax.cond(jnp.all(sample > jnp.zeros(sample.shape)), lambda sample: self._safe_exponentiation(sample, self.inference_params[param_ind].order), lambda sample: sample, sample)
         current_params_sample = self._format_params(current_params_sample)
 
         mu = self.model_func(current_params_sample, self.training_data)
+        mu = jnp.where(jnp.isinf(-1*mu), -1e20, mu)
+        
+        try:
+            self.likelihood_func(mu, current_params_sample)
+        except:
+            print(self.training_data[['x','y','z']].values[jnp.isinf(mu)])
+            print('Error in likelihood function')
+
         mu = numpyro.deterministic('mu', mu)
-        return numpyro.sample('obs', self.likelihood_func(mu, current_params_sample), obs=jnp.array(self.training_data[self.dependent_variables[0]].values))
+        with numpyro.plate('data', len(self.training_data[self.dependent_variables[0]])):
+            numpyro.sample('obs', self.likelihood_func(mu, current_params_sample), obs=jnp.array(self.training_data[self.dependent_variables[0]].values))
+
+    def _safe_exponentiation(self, base, exponent):
+        """
+        Use logarithms to handle large exponents safely
+
+        Returns:
+        - float: The result of the exponentiation.
+
+        """
+        res = jnp.exp(jnp.log(base) + exponent * jnp.log(10))
+        return res
 
     def sample_all(self, rng_key=random.PRNGKey(2120)):
+        """
+        Sample all sets of parameters.
+
+        Args:
+        - rng_key: The random number generator key.
+
+        Returns:
+        - pd.DataFrame: The samples.
+        - pd.DataFrame: The chain samples.
+        - dict: The fields dictionary.
+        """
         if not self.data_exists:
             kernel = numpyro.infer.NUTS(self.sample_one)
             mcmc = numpyro.infer.MCMC(kernel, num_warmup=self.n_warmup, num_samples=self.n_samples, num_chains=self.n_chains, thinning=self.thinning_rate, chain_method='parallel')
-            mcmc.run(rng_key=rng_key)
+            with numpyro.validation_enabled():
+                mcmc.run(rng_key=rng_key)
             samples = mcmc.get_samples(group_by_chain=True)
             fields = mcmc.get_extra_fields(group_by_chain=True)
-            fields = self._format_fields(fields)
+            fields = self._convert_arrays_to_lists(fields)
             samples, chain_samples = self._format_samples(samples)
             self._save_samples(samples, chain_samples, fields)
-            return samples, chain_samples, fields
+            self.samples, self.chain_samples, self.fields = samples, chain_samples, fields, 
         else:
-            return self._load_samples()
-
-    def _format_fields(self, fields):
-        # Assuming fields is your dictionary containing serializable and non-serializable objects
-        fields_serializable = {}
-
-        for key, value in fields.items():
-            if isinstance(value, np.ndarray):
-                # Convert NumPy arrays to lists
-                fields_serializable[key] = value.tolist()
-            elif hasattr(value, 'to_dict'):
-                # Check if the object has a to_dict method (e.g., pandas DataFrame)
-                fields_serializable[key] = value.to_dict()
-            elif isinstance(value, (int, float, str, list, dict)):
-                # Keep other serializable objects as is
-                fields_serializable[key] = value
-            else:
-                # For unsupported types, convert to string representation
-                fields_serializable[key] = str(value)
-                
-        return fields_serializable
-
+            print("Samples already exists, loading data...")
+            self.samples, self.chain_samples, self.fields = self._load_samples()
+        self.sampled = True
+        return self.samples, self.chain_samples, self.fields
+  
     def _format_samples(self, samples):
+        """
+        Format the samples.
+
+        Args:
+        - samples (dict): The unformatted samples.
+        
+        Returns:
+        - pd.DataFrame: The formatted samples and chain samples.
+        """
+
         chain_new_samples = pd.DataFrame({}, dtype='float64')
         for param in self.inference_params.index:
+
             if '_and_' in param:
+
                 sub_params = param.split('_and_')
                 for i in range(len(sub_params)):
                     chain_array = np.array([])
@@ -168,32 +339,49 @@ class Sampler:
                     sample_index_array = np.array([])
 
                     sub_param = sub_params[i]
-                    sample_chains = samples[param][:, :, i]
+                    sample_chains = samples[param][:,:,i]
                     chains = range(sample_chains.shape[0])
-
+                
                     for chain in chains:
                         chain_new_samples_array = np.concatenate((chain_new_samples_array, sample_chains[chain]))
-                        chain_array = np.concatenate((chain_array, (chain + 1) * np.ones(sample_chains[chain].shape)))
-                        sample_index_array = np.concatenate((sample_index_array, np.array(range(sample_chains.shape[1])) + 1))
-
+                        chain_array = np.concatenate((chain_array, (chain+1)*np.ones(sample_chains[chain].shape)))
+                        sample_index_array = np.concatenate((sample_index_array, np.array(range(sample_chains.shape[1]))+1))
+                    
                     chain_new_samples[sub_param] = chain_new_samples_array
-                    chain_new_samples[sub_param] *= self.inference_params[param].order
+                    chain_new_samples[sub_param]=chain_new_samples[sub_param]*10**self.inference_params[param].order
             else:
                 chain_array = np.array([])
                 chain_new_samples_array = np.array([])
                 sample_index_array = np.array([])
                 sample_chains = np.array(samples[param])
                 chains = range(sample_chains.shape[0])
-
+                
                 for chain in chains:
+                    a = sample_chains[chain]
                     chain_new_samples_array = np.concatenate((chain_new_samples_array, sample_chains[chain]))
-                    chain_array = np.concatenate((chain_array, (chain + 1) * np.ones(sample_chains[chain].shape)))
-                    sample_index_array = np.concatenate((sample_index_array, np.array(range(sample_chains.shape[1])) + 1))
-
+                    chain_array = np.concatenate((chain_array, (chain+1)*np.ones(sample_chains[chain].shape)))
+                    sample_index_array = np.concatenate((sample_index_array, np.array(range(sample_chains.shape[1]))+1))
+                
                 chain_new_samples[param] = chain_new_samples_array
-        return pd.DataFrame(chain_new_samples), pd.DataFrame(chain_new_samples)
+                chain_new_samples[param]=chain_new_samples[param]*10**self.inference_params[param].order
+        
+        chain_new_samples['chain'] = chain_array
+        chain_new_samples['sample_index'] = sample_index_array
+
+        formatted_samples = chain_new_samples.sort_values(['sample_index']).reset_index().drop(columns=['chain', 'sample_index','index'])
+
+        return formatted_samples, chain_new_samples
 
     def _format_params(self, current_params_sample):
+        """
+        Format the current parameter samples.
+
+        Args:
+            current_params_sample: The current parameter samples.
+
+        Returns:
+            dict: The formatted current parameter samples.
+        """
         formatted_current_params_sample = {}
         for param_ind in self.inference_params.index:
             if 'and' in param_ind:
@@ -205,13 +393,15 @@ class Sampler:
                 formatted_current_params_sample[param_ind] = current_params_sample[param_ind]
         return formatted_current_params_sample
 
-    def copy_params(self, params):
-        new_params = params.copy()
-        for ind in params.index:
-            new_params[ind] = new_params[ind].copy()
-        return new_params
-
     def _check_data_exists(self):
+        """
+        Check if the data exists.
+
+        Returns:
+            bool: Flag indicating if the data exists.
+            int: The instance number where the data is to be saved if the data does not exist. Or the instance number where the data is saved if the data exists.
+        """
+
         data_exists = False
         if not os.path.exists(self.results_path):
             return False, 1
@@ -220,7 +410,7 @@ class Sampler:
             folder_path = self.results_path + '/' + instance_folder
             with open(folder_path + '/sampler_construction.json') as f:
                 instance_hyperparams = json.load(f)
-            if self.convert_arrays_to_lists(self.get_construction()) == instance_hyperparams:
+            if self._convert_arrays_to_lists(self.get_construction()) == instance_hyperparams:
                 data_exists = True
                 instance = int(instance_folder.split('_')[1])
         if not data_exists:
@@ -228,9 +418,9 @@ class Sampler:
             instance = 1 if len(instances) == 0 else min(i for i in range(1, max(instances) + 2) if i not in instances)
         return data_exists, instance
     
-    def convert_arrays_to_lists(self, obj):
+    def _convert_arrays_to_lists(self, obj):
         """
-        Recursively convert NumPy arrays to lists within a dictionary.
+        Utility function which recursively converts NumPy arrays to lists within a dictionary.
 
         Args:
         - obj (dict or list or np.ndarray): The input object to convert.
@@ -240,13 +430,15 @@ class Sampler:
         """
         if isinstance(obj, dict):
             # If the object is a dictionary, convert arrays within its values
-            return {k: self.convert_arrays_to_lists(v) for k, v in obj.items()}
+            return {k: self._convert_arrays_to_lists(v) for k, v in obj.items()}
         elif isinstance(obj, list):
             # If the object is a list, convert arrays within its elements
-            return [self.convert_arrays_to_lists(elem) for elem in obj]
+            return [self._convert_arrays_to_lists(elem) for elem in obj]
         elif isinstance(obj, np.ndarray):
             # If the object is a NumPy array, convert it to a list
             return obj.tolist()
+        elif isinstance(obj, ArrayImpl):
+            return np.asarray(obj).tolist()
         else:
             # If the object is neither a dictionary, list, nor NumPy array, return it unchanged
             return obj

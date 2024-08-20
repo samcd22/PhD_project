@@ -78,7 +78,20 @@ class Likelihood:
             Returns:
             - numpyro.distributions.Normal: Gaussian likelihood distribution.
             """
-            return numpyro.distributions.Normal(mu, self.fixed_likelihood_params.sigma)
+            return numpyro.distributions.Normal(mu, self.fixed_likelihood_params.sigma**2)
+        
+        def _gaussian_likelihood_percentage_error(mu: float, params: dict) -> numpyro.distributions.Normal:
+            """
+            Gaussian likelihood function.
+            
+            Args:
+            - mu (float): Mean value.
+            - params (dict): Dictionary of parameters.
+                
+            Returns:
+            - numpyro.distributions.Normal: Gaussian likelihood distribution.
+            """
+            return numpyro.distributions.Normal(mu, (mu*params['error'])**2)
         
         def _gaussian_likelihood(mu: float, params: dict) -> numpyro.distributions.Normal:
             """
@@ -91,10 +104,12 @@ class Likelihood:
             Returns:
             - numpyro.distributions.Normal: Gaussian likelihood distribution.
             """
-            return numpyro.distributions.Normal(mu, params['sigma'])
+            return numpyro.distributions.Normal(mu, params['sigma']**2)
         
         if self.likelihood_select == 'gaussian_fixed_sigma':
-            return _gaussian_likelihood_fixed_sigma        
+            return _gaussian_likelihood_fixed_sigma       
+        elif self.likelihood_select == 'gaussian_percentage_error':
+            return _gaussian_likelihood_percentage_error 
         elif self.likelihood_select == 'gaussian':
             return _gaussian_likelihood
         else:

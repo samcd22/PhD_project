@@ -26,7 +26,7 @@ class RawDataProcessor(DataProcessor):
     - get_construction: Get the construction parameters for the data processor.
     """
 
-    def __init__(self, raw_data_filename: str, processed_data_name: str, processor_select: str, processor_params: dict, train_test_split: float = 0.8, data_path = '/PhD_project/data'):
+    def __init__(self, raw_data_filename: str, processed_data_name: str, processor_select: str, processor_params: dict, train_test_split: float = 0.8, data_path = '/PhD_project/data', plot_data = True):
         super().__init__(processed_data_name, processor_params, train_test_split, data_path)
         """
         Initializes the RawDataProcessor class.
@@ -43,13 +43,14 @@ class RawDataProcessor(DataProcessor):
        
         self.raw_data_filename = raw_data_filename
         self.processor_select = processor_select
+        self.plot_data = plot_data
        
     def get_construction(self):
         """
         Get the construction parameters.
 
         Returns:
-            dict: The construction parameters.
+        - dict: The construction parameters.
         """
         construction = {
             'raw_data_filename': self.raw_data_filename,
@@ -65,7 +66,7 @@ class RawDataProcessor(DataProcessor):
         Processes the data. If data has already been processed, loads the data. Saves the processed data as a csv file.
 
         Returns:
-            tuple: A tuple containing the training data and test data.
+        - tuple: A tuple containing the training data and test data.
         """
         if not self._check_data_exists():
             if self.processor_select == 'GBR_processor':
@@ -78,6 +79,12 @@ class RawDataProcessor(DataProcessor):
             print('Data already processed, loading data...')
             self.processed_data = pd.read_csv('data/processed_raw_data/' + self.processed_data_name + '/data.csv')
 
+        if self.plot_data:
+            if self.processor_select == 'GBR_processor':
+                self._plot_GBR_data(self.processed_data)
+            else:
+                raise Exception('RawDataProcessor - Invalid data processor selected!')
+
         train_data, test_data = train_test_split(self.processed_data, test_size=1-self.train_test_split, random_state=42)
         return train_data, test_data
 
@@ -86,11 +93,11 @@ class RawDataProcessor(DataProcessor):
         Check if the processed data already exists.
 
         Returns:
-            bool: True if the data exists, False otherwise.
+        - bool: True if the data exists, False otherwise.
         
         Raises:
-            FileNotFoundError: If the construction.json file is not found.
-            Exception: If the construction.json file does not match the processor parameters.
+        - FileNotFoundError: If the construction.json file is not found.
+        - Exception: If the construction.json file does not match the processor parameters.
         """
         if not os.path.exists('data/processed_raw_data/' + self.processed_data_name):
             return False
@@ -111,7 +118,7 @@ class RawDataProcessor(DataProcessor):
         Save the processed data. Saves the data as a csv file and the construction parameters as a json file.
 
         Args:
-            processed_data (pd.DataFrame): The processed data.
+        - processed_data (pd.DataFrame): The processed data.
         """
         if not os.path.exists('data/processed_raw_data/' + self.processed_data_name):
             os.makedirs('data/processed_raw_data/' + self.processed_data_name)
@@ -120,18 +127,30 @@ class RawDataProcessor(DataProcessor):
             json.dump(self.get_construction(), f, cls=NumpyEncoder, separators=(', ',': '), indent=4)
 
 
+    def _plot_GBR_data(self, processed_data):
+        """
+        Plot the processed GBR data.
+        
+        Args:
+        - processed_data (pd.DataFrame): The processed data.
+        """
+        box_gridder = BoxGridder(output_path='data/processed_raw_data/' + self.processed_data_name, averages_df=processed_data)
+        box_gridder.get_sample_histograms()
+        box_gridder.visualise_average_data('values')
+        box_gridder.visualise_average_data('counts')
+
+
     def _GBR_processor(self):
         """
         Process the data using the GBR processor.
 
         Returns:
-            pd.DataFrame: The processed data.
+        - pd.DataFrame: The processed data.
         
         Raises:
-            FileNotFoundError: If the raw data file or meta data file is not found.
+        - FileNotFoundError: If the raw data file or meta data file is not found.
         """
 
-        print(self.data_path + '/raw_data/' + self.raw_data_filename + '.csv')
         try:
             raw_data = pd.read_csv(self.data_path + '/raw_data/' + self.raw_data_filename + '.csv')
         except:
@@ -177,15 +196,14 @@ class RawDataProcessor(DataProcessor):
 
         if self.processor_params['gridding']:
             box_gridder = BoxGridder(normalised_data, grid_size=self.processor_params['gridding'], 
-                                     output_path='data/processed_data/' + self.processed_data_name, 
+                                     output_path='data/processed_raw_data/' + self.processed_data_name, 
                                      input_data_logged=self.processor_params['log_output_data'], 
                                      output_data_logged=self.processor_params['log_output_data'])
             processed_data = box_gridder.averages_df
-            box_gridder.get_sample_histograms()
-            box_gridder.visualise_average_data('values')
-            box_gridder.visualise_average_data('counts')
         else:
             processed_data = normalised_data
         
+        processed_data = processed_data[processed_data['x'] > 150]
+
         return processed_data
     # ADD OTHER PROCESSORS HERE!
