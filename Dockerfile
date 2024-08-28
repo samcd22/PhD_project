@@ -10,7 +10,14 @@ RUN apt-get update && \
     python3-pip \
     python3-dev \
     build-essential \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*\
+    && apt-get install -y locales \
+    && locale-gen en_US.UTF-8 \
+    && update-locale LANG=en_US.UTF-8
+
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
 
 # Clone the GitHub repository
 RUN git clone https://github.com/samcd22/PhD_project.git /PhD_project
