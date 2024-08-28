@@ -36,11 +36,11 @@ class Likelihood:
         Utility function for converting mean and standard deviation to alpha in a Gamma distribution.
         
         Args:
-            mu (float): Mean value.
-            sigma (float): Standard deviation value.
+        - mu (float): Mean value.
+        - sigma (float): Standard deviation value.
         
         Returns:
-            float: The alpha value.
+        - float: The alpha value.
         """
         return mu**2 / sigma**2
 
@@ -50,11 +50,11 @@ class Likelihood:
         Utility function for converting mean and standard deviation to beta in a Gamma distribution.
         
         Args:
-            mu (float): Mean value.
-            sigma (float): Standard deviation value.
+        - mu (float): Mean value.
+        - sigma (float): Standard deviation value.
         
         Returns:
-            float: The beta value.
+        - float: The beta value.
         """
         return mu / sigma**2
 
@@ -64,11 +64,11 @@ class Likelihood:
         Saves a named parameter to the Likelihood class before generating the likelihood function.
         
         Args:
-            name (str): The name of the parameter.
-            val (int or float): The value of the parameter.
+        - name (str): The name of the parameter.
+        - val (int or float): The value of the parameter.
         
         Returns:
-            Likelihood: The Likelihood object.
+        - Likelihood: The Likelihood object.
         """
         self.likelihood_params[name] = val
         return self
@@ -79,7 +79,7 @@ class Likelihood:
         Generates the selected likelihood function using the likelihood parameters.
         
         Returns:
-            function: The selected likelihood function.
+        - function: The selected likelihood function.
         """
 
         def _gaussian_likelihood_fixed_sigma(mu: float, params: dict) -> numpyro.distributions.Normal:
@@ -87,11 +87,11 @@ class Likelihood:
             Gaussian likelihood function without estimating sigma.
             
             Args:
-                mu (float): Mean value.
-                params (dict): Dictionary of parameters.
+            - mu (float): Mean value.
+            - params (dict): Dictionary of parameters.
                 
             Returns:
-                numpyro.distributions.Normal: Gaussian likelihood distribution.
+            - numpyro.distributions.Normal: Gaussian likelihood distribution.
             """
             return numpyro.distributions.Normal(mu, self.likelihood_params.sigma)
         
@@ -100,11 +100,11 @@ class Likelihood:
             Gaussian likelihood function.
             
             Args:
-                mu (float): Mean value.
-                params (dict): Dictionary of parameters.
+            - mu (float): Mean value.
+            - params (dict): Dictionary of parameters.
                 
             Returns:
-                numpyro.distributions.Normal: Gaussian likelihood distribution.
+            - numpyro.distributions.Normal: Gaussian likelihood distribution.
             """
             return numpyro.distributions.Normal(mu, params['sigma'])
 
@@ -113,11 +113,11 @@ class Likelihood:
             Gamma likelihood function without estimating sigma.
             
             Args:
-                mu (float): Mean value.
-                params (dict): Dictionary of parameters.
+            - mu (float): Mean value.
+            - params (dict): Dictionary of parameters.
                 
             Returns:
-                numpyro.distributions.Gamma: Gamma likelihood distribution.
+            - numpyro.distributions.Gamma: Gamma likelihood distribution.
             """
             return numpyro.distributions.Gamma(self._alpha(mu, self.likelihood_params.sigma), 1/self._beta(mu, self.likelihood_params.sigma))
         
@@ -126,11 +126,11 @@ class Likelihood:
             Gamma likelihood function.
             
             Args:
-                mu (float): Mean value.
-                params (dict): Dictionary of parameters.
+            - mu (float): Mean value.
+            - params (dict): Dictionary of parameters.
                 
             Returns:
-                numpyro.distributions.Gamma: Gamma likelihood distribution.
+            - numpyro.distributions.Gamma: Gamma likelihood distribution.
             """
             sigma = params['sigma']
             return numpyro.distributions.Gamma(self._alpha(mu, sigma), 1/self._beta(mu, sigma))

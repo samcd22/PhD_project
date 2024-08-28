@@ -1,3 +1,4 @@
+from typing import List, Tuple
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -5,51 +6,111 @@ import bisect
 import os
 
 class BoxGridder:
+    """
+    Class to create a 3D grid of boxes and average the data points within each box
+
+    Parameters:
+    - data: DataFrame containing the 3D data points
+    - grid_size: List containing the size of the grid in each dimension
+    - output_path: String, path to the data directory
+    - independent_variables: List of strings, names of the independent variables
+    - dependent_variable: String, name of the dependent variable
+    - input_data_logged: Boolean, indicates if the input data is logged
+    - output_data_logged: Boolean, indicates if the results should be logged
+    - averages_df: DataFrame containing the already averaged data
+
+    Methods:
+    - visualise_average_data: Visualize the 3D grid of the averaged data
+    - get_sample_histograms: Generate histograms for a random sample of grid squares
+    """
     
-    # Takes the data as an input to initialise the box gridder
-    def __init__(self, data, grid_size, data_path = None, data_logged = True, log_results = True):
-        self.data = data
-        self.data_path = data_path
-        self.grid_size = grid_size
-        self.data_logged = data_logged
-        self.log_results = log_results
-
-        self.data_path = data_path
-        if not os.path.exists(self.data_path):
-            os.makedirs(self.data_path)
-
+    def __init__(self, data: pd.DataFrame, grid_size: List[float], 
+                 output_path: str = None, independent_variables: List[str] = ['x','y','z'], 
+                 dependent_variable: str = 'Concentration', input_data_logged: bool = False, 
+                 output_data_logged: bool = False, averages_df = None) -> None:
         
-    # Function which rounds down to the next base number
-    def myround(self, x, base):
+        
+        """
+        Initialize the BoxGridder object and  generates the averaged data if not already inputted.
+
+        Args:
+        - data: DataFrame containing the 3D data points
+        - grid_size: Tuple containing the size of the grid in each dimension
+        - output_path: String, path to the data directory
+        - independent_variables: List of strings, names of the independent variables
+        - dependent_variable: String, name of the dependent variable
+        - input_data_logged: Boolean, indicates if the input data is logged
+        - output_data_logged: Boolean, indicates if the results should be logged
+        - averages_df: DataFrame containing the averaged data
+        """
+
+        self.data = data
+        self.output_path = output_path
+        self.grid_size = grid_size
+        self.independent_variables = independent_variables
+        self.dependent_variable = dependent_variable
+        self.input_data_logged = input_data_logged
+        self.output_data_logged = output_data_logged
+
+        if os.path.exists(self.output_path + '/data.csv'):
+            self.averages_df = pd.read_csv(self.output_path + '/data.csv')
+        else:
+            os.makedirs(self.output_path, exist_ok=True)
+            if averages_df is not None:
+                self.averages_df = averages_df
+            else:
+                self.averages_df = self._get_averages()
+                self.averages_df.to_csv(self.output_path + '/data.csv', index=False)
+        
+        
+    def _myround(self, x: float, base: float) -> float:
+        """
+        Round down to the next base number.
+
+        Args:
+        - x: Float, number to be rounded
+        - base: Float, base number
+
+        Returns:
+        - Float, rounded number
+        """
         return base * np.floor(x/base)
+    
+    def _get_bounds(self, haystack: np.ndarray, needle: float) -> Tuple[float, float]:
+        """
+        Check which boundary points in the grid the point of interest lies between.
 
-    # Function which generates the grid boundaries
-    def get_grid(self):
-        min_x = self.myround(np.min(self.data.x),self.grid_size[0])
-        min_y = self.myround(np.min(self.data.y),self.grid_size[1])
-        min_z = self.myround(np.min(self.data.z),self.grid_size[2])
-        max_x = self.myround(np.max(self.data.x),self.grid_size[0])+self.grid_size[0]
-        max_y = self.myround(np.max(self.data.y),self.grid_size[1])+self.grid_size[1]
-        max_z = self.myround(np.max(self.data.z),self.grid_size[2])+self.grid_size[2]
+        Args:
+        - haystack: Numpy array, grid points
+        - needle: Float, point of interest
 
-        grid_x = np.arange(min_x,max_x+self.grid_size[0],self.grid_size[0])
-        grid_y = np.arange(min_y,max_y+self.grid_size[1],self.grid_size[1])
-        grid_z = np.arange(min_z,max_z+self.grid_size[2],self.grid_size[2])
-
-        grid = (grid_x,grid_y,grid_z)
-
-        return grid
-
-    # Function which checks which boundary points in the grid the point of interest lies between i.e. which grid square the point is in
-    def get_bounds(self, haystack, needle):
+        Returns:
+        - Tuple of floats, lower and upper bounds
+        """
         idx = bisect.bisect(haystack, needle)
         if 0 < idx < len(haystack):
             return haystack[idx-1], haystack[idx]
         else:
-            raise ValueError(f"{needle} is out of bounds of {haystack}")
+            raise ValueError(f"BoxGridder - {needle} is out of bounds of {haystack}") 
 
-    # Function which generates the centroid points of the grid, along with their associated index
-    def get_indices_and_centroids(self, grid):
+
+    def _get_averages(self) -> pd.DataFrame:
+        """
+        Calculate the averages of the data points within each box.
+
+        Returns:
+        - DataFrame, averaged data
+        """
+        min_x = self._myround(np.min(self.data[self.independent_variables[0]]),self.grid_size[0])
+        min_y = self._myround(np.min(self.data[self.independent_variables[1]]),self.grid_size[1])
+        min_z = self._myround(np.min(self.data[self.independent_variables[2]]),self.grid_size[2])
+        max_x = self._myround(np.max(self.data[self.independent_variables[0]]),self.grid_size[0])+self.grid_size[0]
+        max_y = self._myround(np.max(self.data[self.independent_variables[1]]),self.grid_size[1])+self.grid_size[1]
+        max_z = self._myround(np.max(self.data[self.independent_variables[2]]),self.grid_size[2])+self.grid_size[2]
+        grid_x = np.arange(min_x,max_x+self.grid_size[0],self.grid_size[0])
+        grid_y = np.arange(min_y,max_y+self.grid_size[1],self.grid_size[1])
+        grid_z = np.arange(min_z,max_z+self.grid_size[2],self.grid_size[2])
+        grid = (grid_x,grid_y,grid_z)
         indices = []
         centroids = []
         for i in range(len(grid[0])-1):
@@ -57,154 +118,118 @@ class BoxGridder:
                 for k in range(len(grid[2])-1):
                     indices.append([i,j,k])
                     centroids.append([np.mean([grid[0][i],grid[0][i+1]]),np.mean([grid[1][j],grid[1][j+1]]),np.mean([grid[2][k],grid[2][k+1]])])
-        return indices, np.array(centroids)      
+        
+        centroids = np.array(centroids)     
 
-    # Function which takes the point and the grid and attaches the 3D box bounds of that point in the grid
-    def get_box_bounds_of_point(self, grid, point):
-        x_lower, x_upper = self.get_bounds(grid[0], point[0])
-        y_lower, y_upper = self.get_bounds(grid[1], point[1])
-        z_lower, z_upper = self.get_bounds(grid[2], point[2])
-
-        box_bounds = np.array([[x_lower,x_upper],[y_lower,y_upper],[z_lower,z_upper]])
-
-        return box_bounds
-
-    def get_averages(self, input_column_name = 'Concentration'):
-        data_name = self.data_path + '/data.csv'
-        if os.path.exists(data_name):
-            averaged_df = pd.read_csv(data_name)
-        else:
-            print('Generating grid averages...')
-            grid = self.get_grid()
-
-            indices, centroids = self.get_indices_and_centroids(grid)
-
-            sums = np.zeros((len(grid[0])-1,len(grid[1])-1,len(grid[2])-1))
-            counts = np.zeros((len(grid[0])-1,len(grid[1])-1,len(grid[2])-1))
-            self.samples = np.empty((len(grid[0])-1,len(grid[1])-1,len(grid[2])-1), object)
-            self.samples.fill(())
-
-            for i in range(self.data.shape[0]):
-                point = [self.data.loc[i,'x'],self.data.loc[i,'y'],self.data.loc[i,'z']]
-
-                if self.data_logged:
-                    conc = 10**self.data.loc[i,input_column_name]
-                else:
-                    conc = self.data.loc[i,input_column_name]
-
-                box_bounds = self.get_box_bounds_of_point(grid, point)
-                centroid = np.mean(box_bounds,axis=1)
-
-                idx = np.where(np.all(centroid == centroids, axis=1))[0][0]
-
-                a = indices[idx][0]
-                b = indices[idx][1]
-                c = indices[idx][2]
-                
-                d = self.samples[indices[idx][0],indices[idx][1],indices[idx][2]]
-
-                sums[indices[idx][0],indices[idx][1],indices[idx][2]] += conc
-                counts[indices[idx][0],indices[idx][1],indices[idx][2]] += 1
-                self.samples[indices[idx][0],indices[idx][1],indices[idx][2]]+=(conc,)
-
+        sums = np.zeros((len(grid[0])-1,len(grid[1])-1,len(grid[2])-1))
+        counts = np.zeros((len(grid[0])-1,len(grid[1])-1,len(grid[2])-1))
+        self.samples = np.empty((len(grid[0])-1,len(grid[1])-1,len(grid[2])-1), object)
+        self.samples.fill(())
+        for i in range(self.data.shape[0]):
+            point = [self.data.loc[i,self.independent_variables[0]],self.data.loc[i,self.independent_variables[1]],self.data.loc[i,self.independent_variables[2]]]
+            if self.input_data_logged:
+                conc = 10**self.data.loc[i,self.dependent_variable]
+            else:
+                conc = self.data.loc[i,self.dependent_variable]
+            y_lower, y_upper = self._get_bounds(grid[1], point[1])
+            z_lower, z_upper = self._get_bounds(grid[2], point[2])
+            x_lower, x_upper = self._get_bounds(grid[0], point[0])
+            box_bounds = np.array([[x_lower,x_upper],[y_lower,y_upper],[z_lower,z_upper]])
+            centroid = np.mean(box_bounds,axis=1)
+            idx = np.where(np.all(centroid == centroids, axis=1))[0][0]
+            sums[indices[idx][0],indices[idx][1],indices[idx][2]] += conc
+            counts[indices[idx][0],indices[idx][1],indices[idx][2]] += 1
+            self.samples[indices[idx][0],indices[idx][1],indices[idx][2]]+=(conc,)
             averages = sums/counts
-
             averages_data = []
             counts_data = []
             samples_data = []
             centroid_x = []
             centroid_y = []
             centroid_z = []
-
             for i in range(len(indices)):
                 averages_data.append(averages[indices[i][0],indices[i][1],indices[i][2]])
                 counts_data.append(counts[indices[i][0],indices[i][1],indices[i][2]])
-                # print(self.samples[indices[i][0],indices[i][1],indices[i][2]])
                 samples_data.append(list(self.samples[indices[i][0],indices[i][1],indices[i][2]]))
                 centroid_x.append(centroids[i][0])
                 centroid_y.append(centroids[i][1])
                 centroid_z.append(centroids[i][2])
+            averages_df = pd.DataFrame({self.independent_variables[0]:centroid_x,
+                                        self.independent_variables[1]:centroid_y,
+                                        self.independent_variables[2]:centroid_z, 
+                                        self.dependent_variable: averages_data, 
+                                        'counts': counts_data, 'samples':samples_data})
+            averages_df = averages_df.dropna()
+        return averages_df
+    
+    def visualise_average_data(self, type: str = 'values') -> None:
+        """
+        Visualize the 3D grid of the averaged data.
 
-            averaged_df = pd.DataFrame({'x':centroid_x,'y':centroid_y,'z':centroid_z,'Concentration':averages_data, 'Counts': counts_data, 'Samples':samples_data})
-            averaged_df = averaged_df.dropna()
-
-            averaged_df.to_csv(data_name)
-
-        return averaged_df
-
-    def visualise_averaged_slices(self, averaged_df):
-        for z in averaged_df.z.unique():
-            data_slice = averaged_df[averaged_df.z == z]
-            plt.scatter(data_slice.x,data_slice.y,s=data_slice.Concentration/1e8)
-            plt.xlabel('Distance Downwind')
-            plt.ylabel('Distance Crosswind')
-            plt.title('Slice of plume data at a height of ' + str(z) + 'm')
-            plt.tight_layout()
-            plt.show()
-
-    def visualise_average_data(self, averaged_df, type = 'Concentration'):
-        file_name = self.data_path + '/' + type.lower() + '_grid_plot.png'
+        Args:
+        - averages_df: DataFrame containing the averaged data
+        - type: String, either 'value' or 'counts' depending on what you want to visualize
+        """
+        file_name = self.output_path + '/' + type.lower() + '_grid_plot.png'
         if not os.path.exists(file_name):
             fig = plt.figure(figsize = (10,10))
-
-            if type == 'Concentration':
-                if self.log_results:
-                    colour_output = np.log10(averaged_df.Concentration)
-                    title = 'Average log concentration across all experiments'
+            if type == 'values':
+                if self.output_data_logged:
+                    colour_output = np.log10(self.averages_df[self.dependent_variable])
+                    title = 'Average log ' + self.dependent_variable + ' across all experiments'
                 else:
-                    colour_output = averaged_df.Concentration
-                    title = 'Average log concentration across all experiments'
-
-
-            elif type == 'Counts':
-                colour_output = averaged_df.Counts
+                    colour_output = self.averages_df[self.dependent_variable]
+                    title = 'Average log ' + self.dependent_variable + ' across all experiments'
+            elif type == 'counts':
+                colour_output = self.averages_df['counts']
                 title = 'Number of data points within each grid square'
-
             else:
                 raise Exception('Type not found')
-
             ax = fig.add_subplot(111, projection = '3d')
-            p = ax.scatter(averaged_df.x, averaged_df.y, averaged_df.z, c=colour_output, s = 20, cmap='jet', vmin = np.percentile(colour_output,5), vmax = np.percentile(colour_output,95))
-
-            ax.set_xlabel('Distance Downwind', fontsize=15)
-            ax.set_ylabel('Distance Crosswind', fontsize=15)
-
+            p = ax.scatter(self.averages_df[self.independent_variables[0]],
+                           self.averages_df[self.independent_variables[1]],
+                           self.averages_df[self.independent_variables[2]], 
+                           c=colour_output, s = 20, cmap='jet', vmin = np.percentile(colour_output,5), vmax = np.percentile(colour_output,95))
+            ax.set_xlabel(self.independent_variables[0], fontsize=15)
+            ax.set_ylabel(self.independent_variables[1], fontsize=15)
+            ax.set_zlabel(self.independent_variables[2], fontsize=15)
             ax.set_title(title, fontsize=20)
             fig.colorbar(p)
             plt.tight_layout()
             fig.savefig(file_name)
             plt.close()
+    
+    def get_sample_histograms(self, n_hists: int = 5) -> None:
+        """
+        Generate histograms for a random sample of grid squares.
 
-    def get_sample_histograms(self, averaged_df, n_hists = 5):
-        samples = averaged_df.Samples.sample(n_hists, random_state=1)
-        samples_dir = self.data_path + '/sample_grid_squares'
+        Args:
+        - averages_df: DataFrame containing the averaged data
+        - n_hists: Integer, number of histograms to generate
+        """
+
+        samples = self.averages_df.samples.sample(n_hists, random_state=1)
+
+        samples_dir = self.output_path + '/sample_grid_squares'
         if not os.path.exists(samples_dir):
             os.makedirs(samples_dir)
-
         for i in samples.index:
             sample = samples[i]
             if type(sample) == str:
                 string_elements = sample[1:-1].split(", ")
-
                 # Convert the string elements to floats and create a new tuple
                 sample = [float(element) for element in string_elements]
-
             plot_path = samples_dir + '/sample_grid_square_' + str(i) + '.png'
-
-            x = averaged_df.x[i]
-            y = averaged_df.y[i]
-            z = averaged_df.z[i]
-
+            x = self.averages_df[self.independent_variables[0]][i]
+            y = self.averages_df[self.independent_variables[1]][i]
+            z = self.averages_df[self.independent_variables[2]][i]
             title = str([x,y,z])
-
-            if self.log_results:
+            if self.output_data_logged:
                 sample_results = np.log10(sample)
             else:
                 sample_results = sample
-
-
             plt.hist(sample_results)
-            plt.xlabel('Concentration')
+            plt.xlabel(self.dependent_variable.capitalize())
             plt.ylabel('Count')
             plt.title(title)
             plt.savefig(plot_path)

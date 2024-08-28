@@ -3,8 +3,8 @@ import numpy as np
 import os
 from matplotlib import pyplot as plt
 
-from toolboxes.data_processing_toolbox.data_simulator import DataSimulator
-from toolboxes.data_processing_toolbox.data_normaliser import DataNormaliser
+from app.toolboxes.data_processing_toolbox.sim_data_processor import DataSimulator
+from app.toolboxes.data_processing_toolbox.raw_data_processor import DataNormaliser
 
 
 def get_data(data_params):
