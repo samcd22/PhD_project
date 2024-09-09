@@ -4,6 +4,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import bisect
 import os
+import matplotlib.gridspec as gridspec
 
 class BoxGridder:
     """
@@ -24,7 +25,7 @@ class BoxGridder:
     - get_sample_histograms: Generate histograms for a random sample of grid squares
     """
     
-    def __init__(self, data: pd.DataFrame, grid_size: List[float], 
+    def __init__(self, data: pd.DataFrame=None, grid_size: List[float]=None, 
                  output_path: str = None, independent_variables: List[str] = ['x','y','z'], 
                  dependent_variable: str = 'Concentration', input_data_logged: bool = False, 
                  output_data_logged: bool = False, averages_df = None) -> None:
@@ -101,6 +102,12 @@ class BoxGridder:
         Returns:
         - DataFrame, averaged data
         """
+        if self.data is None:
+            raise Exception('RawDataProcessor - Data not provided')
+        if self.grid_size is None:
+            raise Exception('RawDataProcessor - Grid size not provided')
+
+        print('Generating gridded averages...')
         min_x = self._myround(np.min(self.data[self.independent_variables[0]]),self.grid_size[0])
         min_y = self._myround(np.min(self.data[self.independent_variables[1]]),self.grid_size[1])
         min_z = self._myround(np.min(self.data[self.independent_variables[2]]),self.grid_size[2])
@@ -154,6 +161,10 @@ class BoxGridder:
                 centroid_x.append(centroids[i][0])
                 centroid_y.append(centroids[i][1])
                 centroid_z.append(centroids[i][2])
+
+            if self.output_data_logged:
+                averages_data = np.log10(averages_data)
+
             averages_df = pd.DataFrame({self.independent_variables[0]:centroid_x,
                                         self.independent_variables[1]:centroid_y,
                                         self.independent_variables[2]:centroid_z, 
@@ -172,30 +183,33 @@ class BoxGridder:
         """
         file_name = self.output_path + '/' + type.lower() + '_grid_plot.png'
         if not os.path.exists(file_name):
-            fig = plt.figure(figsize = (10,10))
             if type == 'values':
                 if self.output_data_logged:
-                    colour_output = np.log10(self.averages_df[self.dependent_variable])
                     title = 'Average log ' + self.dependent_variable + ' across all experiments'
                 else:
-                    colour_output = self.averages_df[self.dependent_variable]
-                    title = 'Average log ' + self.dependent_variable + ' across all experiments'
+                    title = 'Average ' + self.dependent_variable + ' across all experiments'
+                colour_output = self.averages_df[self.dependent_variable]
             elif type == 'counts':
                 colour_output = self.averages_df['counts']
                 title = 'Number of data points within each grid square'
             else:
                 raise Exception('Type not found')
-            ax = fig.add_subplot(111, projection = '3d')
+            fig = plt.figure(figsize = (10,10))
+            gs = gridspec.GridSpec(2, 1, height_ratios=[5, 0.2])  # Create grid for plot and colorbar
+
+            ax = fig.add_subplot(gs[0], projection = '3d')
             p = ax.scatter(self.averages_df[self.independent_variables[0]],
                            self.averages_df[self.independent_variables[1]],
                            self.averages_df[self.independent_variables[2]], 
-                           c=colour_output, s = 20, cmap='jet', vmin = np.percentile(colour_output,5), vmax = np.percentile(colour_output,95))
+                           c=colour_output, s = 15, cmap='viridis', vmin = np.percentile(colour_output,5), vmax = np.percentile(colour_output,95),alpha=1)
             ax.set_xlabel(self.independent_variables[0], fontsize=15)
             ax.set_ylabel(self.independent_variables[1], fontsize=15)
             ax.set_zlabel(self.independent_variables[2], fontsize=15)
             ax.set_title(title, fontsize=20)
-            fig.colorbar(p)
-            plt.tight_layout()
+            cbr_ax = fig.add_subplot(gs[1])
+            fig.colorbar(p,cax=cbr_ax,orientation='horizontal')
+
+            fig.tight_layout()
             fig.savefig(file_name)
             plt.close()
     

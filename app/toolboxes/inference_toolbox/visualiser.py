@@ -7,491 +7,288 @@ from numpyencoder import NumpyEncoder
 import imageio.v2 as imageio
 from matplotlib.gridspec import GridSpec
 from fractions import Fraction
-from scipy import stats
 from labellines import labelLines
 np.seterr(divide='ignore', invalid='ignore')
 import warnings
 warnings.filterwarnings("ignore")
 import statsmodels.api as sm
 
-# Visualiser class - Used for processing and visualising the results from the sampler
+from toolboxes.inference_toolbox.sampler import Sampler
+from toolboxes.plotting_toolbox.domain import Domain
+from toolboxes.data_processing_toolbox.sim_data_processor import SimDataProcessor
+
 class Visualiser:
-    # Initialises the Visualiser class saving all relevant variables and performing some initialising tasks
-    def __init__(self, 
-                 test_data,
-                 sampler, 
-                 model, 
-                 previous_instance = -1, 
-                 data_path = 'results/inference_results/simulated_data/general_instances', 
-                 include_test_points = True, 
-                 suppress_prints = False,
-                 actual_values = []):
+    """
+    Visualiser class - Used for processing and visualising the results from the sampler
+
+    Attributes:
+    - n_samples (int): Number of samples
+    - n_chains (int): Number of chains
+    - samples (pd.DataFrame): Samples from the sampler
+    - chain_samples (pd.DataFrame): Samples from each chain
+    - fields (list): Fields of the sampler
+    - data_processor (SimDataProcessor or RawDataProcessor): Data processor object
+    - training_data (pd.DataFrame): Training data
+    - testing_data (pd.DataFrame): Testing data
+    - model_func (function): Model function
+    - dependent_variables (list): Dependent variables of the model
+    - independent_variables (list): Independent variables of the model
+    - inference_params (list): Inference parameters
+    - likelihood_func (function): Likelihood function
+    - results_path (str): Path to save results
+    - instance (int): Instance number
+    - params_min (pd.Series): Minimum parameter values from the sampled results
+    - params_lower (pd.Series): Lower bound parameter values from the sampled results
+    - params_median (pd.Series): Median parameter values from the sampled results
+    - params_upper (pd.Series): Upper bound parameter values from the sampled results
+    - params_max (pd.Series): Maximum parameter values from the sampled results
+    - RMSE (float): Root Mean Squared Error
+    - AIC (float): Akaike Information Criterion
+    - BIC (float): Bayesian Information Criterion
+    - autocorrs (dict): Autocorrelations
+
+    Methods:
+    - get_traceplots: Checks whether traceplots exist, if not, generates and saves them
+    - show_predictions: Outputs the plots for visualising the modelled system
+    - get_autocorrs: Generates the autocorrelation plots
+    - get_summary: Generates a summary of the results
+    - plot_prior: Plots the prior distribution for the inputted parameter
+
+    """
+
+    def __init__(self, sampler: Sampler):
+        """
+        Initialises the Visualiser class saving all relevant variables and performing some initialising tasks
+
+        Args:
+            sampler (Sampler): The sampler object
+
+        Raises:
+            Exception: If the sampler has not been run
+        """
+        if not sampler.sampled:
+            raise Exception('Visualiser - sampler has not been run!')
         
-        # Save variables
-        self.suppress_prints = suppress_prints
-        self.test_data = test_data
-        self.model = model
-        self.model_func = model.get_model()
-        self.hyperparams = sampler.hyperparams
-        self.data_path = data_path
-        self.instance = self.get_instance(previous_instance)
-        self.num_chains = 1
-        self.include_test_points = include_test_points
+        self.n_samples = sampler.n_samples
+        self.n_chains = sampler.n_chains
+        self.samples = sampler.samples
+        self.chain_samples = sampler.chain_samples
         self.fields = sampler.fields
-        self.sampler = sampler
 
-        # Save the hyperparameter object
-        self.save_hyperparams()
-
-        # Defines some variables for saving and loading the samples
-        self.sample_data_generated = True
-        self.chain_data_generated = True
-        if type(sampler.samples) == list and sampler.samples == []:
-            self.sample_data_generated = False
-
-        if type(sampler.chain_samples) == list and sampler.chain_samples == []:
-            self.chain_data_generated = False
+        self.data_processor = sampler.data_processor
         
-        # Decides whether to load the chain samples or not
-        if not self.chain_data_generated:
-            self.chain_samples = self.load_samples(chain=True)
-        else:
-            self.chain_samples = sampler.chain_samples
-        self.num_chains = int(np.max(self.chain_samples['chain'].unique()))
+        self.training_data = sampler.training_data
+        self.testing_data = sampler.testing_data
+        
+        self.model_func = sampler.model_func
+        self.dependent_variables = sampler.dependent_variables
+        self.independent_variables = sampler.independent_variables
+        self.inference_params = sampler.inference_params
 
-        # Decides whether to load the samples or not
-        if not self.sample_data_generated:
-            self.samples = self.load_samples()
-        else:
-            self.samples = sampler.samples
+        self.likelihood_func= sampler.likelihood_func
+        
+        self.results_path = sampler.results_path
+        self.instance = sampler.instance
 
-        # If parameters' actual values are inputted, then they are saved 
-        self.actual_values = {}
-        for i, param in enumerate(self.samples.columns):
-            if actual_values == []:
-                self.actual_values[param] = 'NaN'
-            else:
-                self.actual_values[param] = actual_values[i]
-
-        # Calculates the lower, median and upper bound parameters from the samples
         self.params_min = self.samples.min()
-        self.params_lower = self.get_ag_samples(self.samples, 0.05)
-        self.params_mean = self.get_ag_samples(self.samples, 0.5)
-        self.params_upper = self.get_ag_samples(self.samples, 0.95)
+        self.params_lower = self._get_ag_samples(self.samples, 0.05)
+        self.params_median = self._get_ag_samples(self.samples, 0.5)
+        self.params_upper = self._get_ag_samples(self.samples, 0.95)
         self.params_max = self.samples.max()
 
-        # Calculates the Root Mean Squared Error
-        self.RMSE = 'n/a'
-        if self.include_test_points:
-            mean_test_pred_C = self.model_func(self.params_mean, self.test_data['x'], self.test_data['y'], self.test_data['z'])
-            mean_test_actual_C = self.test_data['Concentration']
-            self.RMSE = np.sqrt(np.mean((mean_test_pred_C-mean_test_actual_C)**2))
+        test_predictions = self.model_func(self.params_median, self.testing_data)
+        test_measured = self.testing_data[self.dependent_variables[0]]
+        log_likelihood = self.likelihood_func(test_predictions, self.params_median).log_prob(test_measured).sum()
+        
+        self.RMSE = np.sqrt(np.mean((test_predictions-test_measured)**2))
+        self.AIC = 2*self.params_median.size - log_likelihood
+        self.BIC = self.params_median.size*np.log(self.testing_data.shape[0]) - 2*log_likelihood
 
-        # Calculates other success metrics
-        self.log_likelihood = self.get_log_likelihood(self.test_data, self.params_mean)
-        self.AIC = 2*self.params_mean.size - self.log_likelihood
-        self.BIC = self.params_mean.size*np.log(self.test_data.shape[0]) - 2*self.log_likelihood
+        self.autocorrs = self._calculate_autocorrs()
 
-        # Calculates the autocorrelations
-        self.calculate_autocorrs()
-
-        # Saves the samples
-        self.save_samples()
-
-    # Checks whether traceplots exist, if they don't they are generated and saved
-    def get_traceplot(self):
-        traceplot_folder = self.data_path + '/instance_' + str(self.instance) + '/traceplots'
+    def get_traceplots(self):
+        """
+        Generates and saves the traceplots from the sampled results
+        """
+        traceplot_folder = self.results_path + '/instance_' + str(self.instance) + '/traceplots'
         if not os.path.exists(traceplot_folder):
             os.mkdir(traceplot_folder)
 
-        for chain in range(self.num_chains):
+        for chain in range(self.n_chains):
             full_path = traceplot_folder + '/traceplot_' + str(chain + 1) + '.png'
-            if self.num_chains == 1:
+            if self.n_chains == 1:
                 title = 'MCMC samples'
                 samples = self.samples
             else:
                 title = 'MCMC samples for chain ' + str(chain + 1)
-                samples = self.chain_samples[self.chain_samples['chain'] == chain + 1].drop(columns = ['chain', 'sample_index'])
+                samples = self.chain_samples[self.chain_samples['chain'] == chain + 1].drop(columns=['chain', 'sample_index'])
             
-            if os.path.exists(full_path):
-                if not self.suppress_prints:
-                    print('Traceplot ' + str(chain + 1) + ' already exists')
-            else:
-                tp = self.traceplots(samples.values, xnames = self.samples.columns, title = title)
+            if not os.path.exists(full_path):
+                tp = self._traceplots(samples.values, xnames=self.samples.columns, title=title)
                 tp.savefig(full_path)
 
-    # Calculates the log likelihood based on inputted data and parameters and selected likelihood and model functions
-    def get_log_likelihood(self, data, params):
-        likelihood_func = self.sampler.likelihood_func
-        model_func = self.model_func
-        mu = model_func(params, data.x, data.y, data.z)
-        
-        test_vals = data.Concentration
 
-        log_likelihoods = likelihood_func(mu, params).log_prob(test_vals)
-        return np.sum(log_likelihoods)
+    def _traceplots(self, x, xnames=None, title=None):
+        """
+        Generates a traceplot based on inputted samples
 
-    # Generates a traceplot based on inputted samples
-    def traceplots(self, x, xnames = None, title = None):
+        Args:
+            x (np.ndarray): Input samples
+            xnames (list): Names of the variables
+            title (str): Title of the traceplot
+
+        Returns:
+            matplotlib.figure.Figure: The generated traceplot figure
+        """
         _, d = x.shape
-        fig = plt.figure()
+        fig = plt.figure(figsize=(9, 6))
         left, tracewidth, histwidth = 0.1, 0.65, 0.15
-        bottom, rowheight = 0.1, 0.8/d
+        bottom, rowheight = 0.1, 0.8 / d
 
         for i in range(d):
             rowbottom = bottom + i * rowheight
-            rect_trace = (left, rowbottom, tracewidth, rowheight)
-            rect_hist = (left + tracewidth, rowbottom, histwidth, rowheight)
+            rect_trace = (left, rowbottom, tracewidth, rowheight * 0.8)
+            rect_hist = (left + tracewidth, rowbottom, histwidth, rowheight * 0.8)
 
             if i == 0:
                 ax_trace = fig.add_axes(rect_trace)
-                ax_trace.plot(x[:,i])
+                ax_trace.plot(x[:, i])
                 ax_trace.set_xlabel("Sample Count")
                 ax_tr0 = ax_trace
 
             elif i > 0:
                 ax_trace = fig.add_axes(rect_trace, sharex=ax_tr0)
-                ax_trace.plot(x[:,i])
+                ax_trace.plot(x[:, i])
                 plt.setp(ax_trace.get_xticklabels(), visible=False)
 
-            if i == d-1 and title is not None:
+            if i == d - 1 and title is not None:
                 plt.title(title)
 
             if xnames is not None:
                 ax_trace.set_ylabel(xnames[i])
 
             ax_hist = fig.add_axes(rect_hist, sharey=ax_trace)
+
             try:
-                ax_hist.hist(x[:,i], orientation='horizontal', bins=50)
-            except:
-                if not self.suppress_prints:
-                    print('Traceplot histogram invalid!')
+                ax_hist.hist(x[:, i], orientation='horizontal', bins=50)
+            except Exception as e:
+                raise Exception('Visualiser - Traceplot histogram invalid!') from e
 
             plt.setp(ax_hist.get_xticklabels(), visible=False)
             plt.setp(ax_hist.get_yticklabels(), visible=False)
             xlim = ax_hist.get_xlim()
-            ax_hist.set_xlim([xlim[0], 1.1*xlim[1]])
+            ax_hist.set_xlim([xlim[0], 1.1 * xlim[1]])
+
+        # Adjust layout to add more padding between subplots
+        plt.subplots_adjust(hspace=0.5, left=0.15, right=0.85, top=0.95, bottom=0.1)
+
         plt.close()
         return fig
 
-    # Outputs the plots for visualising the modelled system based on the concluded lower, median and upper bound parameters and an inputted domain
-    # There are multiple ways of visualising these results
-    def visualise_results(self, domain, name, plot_type = '3D', log_results = True, title = 'Concentration of Droplets'):
 
-        # Output plots are 3D
+    def show_predictions(self, domain: Domain, plot_name: str, plot_type: str = '3D', title: str = None):
+        """
+        Outputs the plots for visualising the modelled system based on the concluded lower, median and upper bound parameters and an inputted domain
+
+        Args:
+            domain (Domain): The domain object
+            plot_name (str): Name of the plot for saving purposes
+            plot_type (str, optional): Type of plot. Defaults to '3D'. Options are:
+                - '3D': 3D plot
+                - '2D_slice': 2D slice plot
+            title (str, optional): Overall title of the plot. Defaults to None.
+
+        """
         if plot_type == '3D':
-
             if domain.n_dims != 3:
-                raise Exception('Domain does not have the correct number of spatial dimensions!')
+                raise Exception('Visualiser - domain does not have the correct number of spatial dimensions!')
             
-            # Generates domain plots
-            points = domain.create_3D_domain()
+            points = domain.create_domain()
 
-            X, Y, Z = points[:,0], points[:,1], points[:,2]
-            C_lower = self.model_func(self.params_lower, X,Y,Z)
-            C_mean = self.model_func(self.params_mean, X,Y,Z)
-            C_upper = self.model_func(self.params_upper, X,Y,Z)
+            results_df = pd.DataFrame({})
+            for i, var in enumerate(self.independent_variables):
+                results_df[var] = points[:,i].flatten()
 
-            results_df = pd.DataFrame({'x': X.flatten(), 'y': Y.flatten(), 'z': Z.flatten(), 'C_lower': C_lower, 'C_mean': C_mean,'C_upper': C_upper})
+            lower_res = self.model_func(self.params_lower, results_df)
+            mean_res = self.model_func(self.params_median, results_df)
+            upper_res = self.model_func(self.params_upper, results_df)
 
-            self.threeD_plots(results_df, name, log_results=log_results, title=title)
+            results_df['lower_res'] = lower_res
+            results_df['mean_res'] = mean_res
+            results_df['upper_res'] = upper_res
+            
+            self._threeD_plots(results_df, plot_name, title=title)
 
         elif plot_type == '2D_slice':
+            if domain.n_dims != 3:
+                raise Exception('Visualiser - domain does not have the correct number of spatial dimensions!')
             count = 0
-            for slice_name in ['x_slice', 'y_slice', 'z_slice']:
+            for slice_name in [indep_var + '_slice' for indep_var in self.independent_variables]:
                 if slice_name in domain.domain_params:
                     count+=1
-                    points = domain.create_2D_slice_domain(slice_name)
+                    points = domain.create_domain_slice(slice_name)
 
-                    X, Y, Z = points[:,0], points[:,1], points[:,2]
+                    results_df = pd.DataFrame({})
+                    for i, var in enumerate(self.independent_variables):
+                        results_df[var] = points[:,i].flatten()
 
-                    C_lower = self.model_func(self.params_lower, X,Y,Z)
-                    C_mean = self.model_func(self.params_mean, X,Y,Z)
-                    C_upper = self.model_func(self.params_upper, X,Y,Z)
+                    lower_res = self.model_func(self.params_lower, results_df)
+                    mean_res = self.model_func(self.params_median, results_df)
+                    upper_res = self.model_func(self.params_upper, results_df)
 
-                    results_df = pd.DataFrame({'x': X.flatten(), 'y': Y.flatten(), 'z': Z.flatten(), 'C_lower': C_lower, 'C_mean': C_mean,'C_upper': C_upper})
+                    results_df['lower_res'] = lower_res
+                    results_df['mean_res'] = mean_res
+                    results_df['upper_res'] = upper_res
 
-                    self.twoD_slice_plots(results_df, name,  slice_name = slice_name, log_results=log_results, title=title)
+                    self._twoD_slice_plots(results_df, plot_name,  slice_name = slice_name, title=title)
 
             if count == 0:
                 raise Exception('No slice parameter inputted')
-
-    def gamma_setup(self, mu, sigma):
-        alpha =  mu**2/sigma**2
-        beta = mu/sigma**2
-        return stats.gamma(a = alpha, scale = 1/beta).pdf
-
-    def log_norm_setup(self, mu, sigma):
-        alpha = np.log(mu) - 0.5*np.log(1+sigma**2/mu**2)
-        beta = np.sqrt(np.log(1+sigma**2/mu**2))
-        def log_norm(x):
-            p = 1/(x*beta*np.sqrt(2*np.pi))*np.exp(-(np.log(x)-alpha)**2/(2*beta**2))
-            return p
-        return log_norm
-    
-    def multi_var_log_norm_setup(self, mu, cov):
-        mu = np.array(mu)
-        cov = np.array(cov)
-        n_dim = len(mu)
-        alpha = np.zeros(n_dim)
-        beta = np.zeros((n_dim, n_dim))
-
-        for i in range(n_dim):
-            alpha[i] = np.log(mu[i]) - 1/2*np.log(cov[i,i]/mu[i]**2 +1)
-            for j in range(len(mu)):
-                beta[i,j] = np.log(cov[i,j]/(mu[i]*mu[j])+1)
-        def multi_var_log_norm(x):
-            n_points = x.shape[0]
-            p = np.ones(n_points)
-            for i in range(n_points):
-                vals = x[i]
-                for j in range(n_dim):
-                    p[i] *= (2*np.pi)**(-n_dim/2)*np.linalg.det(beta)**(-1/2)*1/vals[j]*np.exp(-1.2*(np.log(vals)-alpha).T@np.linalg.inv(beta)@(np.log(vals)-alpha))
-                    p[i] *= 1/vals[j]
-            return p
-        return multi_var_log_norm
-    
-    def multi_mode_log_norm_setup(self, mus, sigmas):
-        mus = np.array(mus)
-        sigmas = np.array(sigmas)
-        mixture_size = mus.size
-        alphas = np.log(mus) - 0.5*np.log(1+sigmas**2/mus**2)
-        betas = np.sqrt(np.log(1+sigmas**2/mus**2))
-        def multi_mode_log_norm(x):
-            p = []
-            for i in range(mixture_size):
-                p.append(1/(x*betas[i]*np.sqrt(2*np.pi))*np.exp(-(np.log(x)-alphas[i])**2/(2*betas[i]**2)))
-            return np.sum(p,axis = 0)/mixture_size
-        return multi_mode_log_norm
-    
-    def multi_mode_multi_var_log_norm_setup(self, mus, covs):
-        mus = np.array(mus)
-        covs = np.array(covs)
-        mixture_size = mus.shape[0]
-        n_dim = mus.shape[1]
-        alphas = np.zeros((mixture_size, n_dim))
-        betas = np.zeros((mixture_size, n_dim, n_dim))
-
-        for mode in range(mixture_size):
-            for i in range(n_dim):
-                alphas[mode, i] = np.log(mus[mode, i]) - 1/2*np.log(covs[mode, i,i]/mus[mode, i]**2 +1)
-                for j in range(n_dim):
-                    betas[mode, i,j] = np.log(covs[mode,i,j]/(mus[mode,i]*mus[mode,j])+1)
-
-
-        def multi_mode_multi_var_log_norm(x):
-            n_points = x.shape[0]
-            p = np.ones((mixture_size, n_points))
-            for mode in range(mixture_size):
-                for i in range(n_points):
-                    vals = x[i]
-                    for j in range(n_dim):
-
-                        p[mode,i] *= (2*np.pi)**(-n_dim/2)*np.linalg.det(betas[mode])**(-1/2)*1/vals[j]*np.exp(-1.2*(np.log(vals)-alphas[mode]).T@np.linalg.inv(betas[mode])@(np.log(vals)-alphas[mode]))
-                        p[mode,i] *= 1/vals[j]
-            return np.sum(p, axis = 0)/mixture_size
-                
-        return multi_mode_multi_var_log_norm    
-    
-    def get_prior_plots(self, prior_plots):
-        for i in range(len(prior_plots)):
-            prior_plot_info = prior_plots[i]
-            keys = prior_plot_info.keys()
-            params = [x for x in keys if x != 'references']
-            references = None
-            if 'references' in prior_plot_info:
-                references = prior_plot_info['references']
-            if len(params) == 2:
-                self.plot_two_priors(params[0], params[1], prior_plot_info[params[0]], prior_plot_info[params[1]], references)
-            elif len(params) == 1:
-                self.plot_one_prior(params[0], prior_plot_info[params[0]], references)
-
-    def plot_two_priors(self, param_1, param_2, param_1_range, param_2_range, references = None):
-        if param_1_range[0] > self.params_mean[param_1]:
-            param_1_range[0] = self.params_mean[param_1]
-        elif param_1_range[1] < self.params_mean[param_1]:
-            param_1_range[1] = self.params_mean[param_1]
-
-        if param_2_range[0] > self.params_mean[param_2]:
-            param_2_range[0] = self.params_mean[param_2]
-        elif param_2_range[1] < self.params_mean[param_2]:
-            param_2_range[1] = self.params_mean[param_2]
-
-        param_1_linspace = np.linspace(param_1_range[0], param_1_range[1], 100)
-        param_2_linspace = np.linspace(param_2_range[0], param_2_range[1], 100)
-        param_1_mesh, param_2_mesh = np.meshgrid(param_1_linspace, param_2_linspace)
-        shape = param_1_mesh.shape
-
-        P = np.zeros(shape)
-
-        multi_var_param = param_1+'_and_'+param_2
-        
-        if self.hyperparams['params'][multi_var_param]['prior_func'] == 'log_norm':
-            prior_dist = self.multi_var_log_norm_setup(self.hyperparams['params'][multi_var_param]['prior_params']['mu'], self.hyperparams['params'][multi_var_param]['prior_params']['cov'])
-
-        # elif self.hyperparams['params'][param_1]['prior_func'] == 'gamma':
-        #     prior_dist_1 = self.gamma_setup(self.hyperparams['params'][param_1]['prior_params']['mu'], self.hyperparams['params'][param_1]['prior_params']['sigma'])
-        #     prior_dist_2 = self.gamma_setup(self.hyperparams['params'][param_2]['prior_params']['mu'], self.hyperparams['params'][param_2]['prior_params']['sigma'])
-
-        elif self.hyperparams['params'][multi_var_param]['prior_func'] == 'multi_mode_log_norm':
-            prior_dist = self.multi_mode_multi_var_log_norm_setup(self.hyperparams['params'][multi_var_param]['prior_params']['mus'], self.hyperparams['params'][multi_var_param]['prior_params']['covs'])
-        else:
-            raise Exception('Prior distribution not listed!')
-
-        P = prior_dist(np.array([param_1_mesh.flatten(), param_2_mesh.flatten()]).T)
-        P = np.reshape(P, shape)
-
-        plt.figure(figsize=(8, 8))
-        plt.contourf(param_1_mesh, param_2_mesh, P, levels=30, cmap='plasma', vmin = np.percentile(P,5))
-        plt.xlabel(param_1, fontsize = 15)
-        plt.ylabel(param_2, fontsize = 15)
-        plt.title('Product of the distribution of ' + param_1 + ' and ' + param_2, fontsize = 20)
-
-        handles = []
-
-        if references:
-            reference_labels = references['labels']
-            reference_x = references[param_1]
-            reference_y = references[param_2]
-
-            refs = plt.plot(reference_x,reference_y,'.r', label = 'References')
-            handles.append(refs[0])
-
-            for i, (reference_x_point,reference_y_point) in enumerate(zip(reference_x,reference_y)):
-                label = reference_labels[i]
-                plt.annotate(label, (reference_x_point,reference_y_point), textcoords="offset points", 
-                xytext=(0,5), ha='center', color = 'r')
-
-        est_val = plt.scatter([self.params_mean[param_1]], [self.params_mean[param_2]], color = 'w', marker='s', edgecolors='k', label = 'Estimated Value')
-        handles.append(est_val)
-        if self.actual_values[param_1] !='NaN' and self.actual_values[param_2] !='NaN':
-            act_val = plt.scatter([self.actual_values[param_1]], [self.actual_values[param_2]], color = 'orange', marker='*', edgecolors='black', label = "Actual Value")
-            handles.append(act_val)
-
-        plt.legend(handles = handles, fontsize = 15)
-
-        filename = 'prior_dist_' + param_1 + '_' + param_2 +'.png'
-        folder_name = self.data_path + '/instance_' + str(self.instance) + '/prior_dists'
-        full_path = folder_name + '/' + filename
-        if not os.path.exists(folder_name):
-            os.makedirs(folder_name)
-
-        plt.savefig(full_path)
-        plt.close()
-
-    def plot_one_prior(self, param, param_range, references = None):
-        
-        # Correction to fit estimated value into distribution
-        if param_range[0] > self.params_mean[param]:
-            param_range[0] = self.params_mean[param]
-        elif param_range[1] < self.params_mean[param]:
-            param_range[1] = self.params_mean[param]
-        
-        param_linspace = np.linspace(param_range[0], param_range[1], 100)
-        
-        if self.hyperparams['params'][param]['prior_func'] == 'log_norm':
-            prior_dist = self.log_norm_setup(self.hyperparams['params'][param]['prior_params']['mu'], self.hyperparams['params'][param]['prior_params']['cov'])
-        elif self.hyperparams['params'][param]['prior_func'] == 'gamma':
-            prior_dist = self.gamma_setup(self.hyperparams['params'][param]['prior_params']['mu'], self.hyperparams['params'][param]['prior_params']['cov'])
-        elif self.hyperparams['params'][param]['prior_func'] == 'multi_mode_log_norm':
-            prior_dist = self.multi_mode_log_norm_setup(self.hyperparams['params'][param]['prior_params']['mus'], self.hyperparams['params'][param]['prior_params']['covs'])
-        else:
-            raise Exception('Prior distribution not listed!')
-        
-        P = prior_dist(param_linspace)
-        
-        plt.figure(figsize=(8, 8))
-        dist_plot = plt.plot(param_linspace, P, color = 'k', label = 'Prior Distribution')
-        plt.xlabel(param, fontsize=15)
-        plt.ylabel('P', fontsize=15)
-        plt.title('Prior distribution of ' + param, fontsize=20)
-        plt.yticks([])
-
-        handles = [dist_plot[0]]
-
-        if references:
-            reference_labels = references['labels']
-            reference_x = references[param]
-            refs = []
-
-            for  i, reference_x_point in enumerate(reference_x):
-                label = reference_labels[i]
-
-                ref = plt.axvline(reference_x_point, color ='r', linestyle='dotted', label=label)
-                refs.append(ref)
-
-            offset = np.linspace(-np.percentile(P,99)/2,np.percentile(P,99)/2,len(reference_labels))
-            labelLines(refs, zorder=2.5, align=True, yoffsets=offset)#, yoffsets=offset)
             
-            ref.set_label('References')
-            handles.append(ref)
+        elif plot_type == '1D':
+            if domain.n_dims != 1:
+                raise Exception('Visualiser - domain does not have the correct number of spatial dimensions!')
+            points = domain.create_domain()
+
+            results_df = pd.DataFrame({})
+            for i, var in enumerate(self.independent_variables):
+                if points.ndim == 1:
+                    if len(self.independent_variables) == 1:
+                        results_df[var] = points
+                    else:
+                        raise Exception('Visualiser - domain does not have the correct number of spatial dimensions!')
+                else:
+                    results_df[var] = points[:,i].flatten()
+
+            lower_res = self.model_func(self.params_lower, results_df)
+            mean_res = self.model_func(self.params_median, results_df)
+            upper_res = self.model_func(self.params_upper, results_df)
+
+            results_df['lower_res'] = lower_res
+            results_df['mean_res'] = mean_res
+            results_df['upper_res'] = upper_res
+
+            self._oneD_plots(results_df, plot_name, title=title)
+        else:
+            raise Exception('Visualiser - plot type not recognised!')
         
-        est_val = plt.axvline(self.params_mean[param], color = 'b', linestyle = 'dashed', label = 'Estimated Value')
-        handles.append(est_val)
+    def _oneD_plots(self, results, name, title=None):
+        """
+        Plotting function for 1D plots
 
-        if self.actual_values[param] != 'NaN':
-            act_val = plt.axvline(self.actual_values[param], color = 'g', linestyle = 'dashed', label = 'Actual Value')
-            handles.append(act_val)
+        Args:
+            results (pd.DataFrame): Results dataframe
+            name (str): Name of the plot for saving purposes
+            title (str, optional): Title of the plot. Defaults to None.
+        """
+        results[self.independent_variables[0]]
+        lower_res = results.lower_res
+        mean_res = results.mean_res
+        upper_res = results.upper_res
 
-        plt.legend(handles = handles, fontsize=15)
-
-
-        filename = 'prior_dist_' + param + '.png'
-        folder_name = self.data_path + '/instance_' + str(self.instance) + '/prior_dists'
-        full_path = folder_name + '/' + filename
-        if not os.path.exists(folder_name):
-            os.makedirs(folder_name)
-
-        plt.savefig(full_path)
-        plt.close()
-
-    def twoD_slice_plots(self, results, name, slice_name = None, log_results=False, title=None):
-        full_path = self.data_path + '/instance_' + str(self.instance) + '/' + name + '_2D_' + slice_name + '.png'
-        if os.path.exists(full_path):
-            print('2D slice plot already exists!')
-        else:        
-            if slice_name == 'x_slice':
-                X = results.y
-                Y = results.z
-                final_title = title + '\nslice at x = ' + str(results.x[0])
-                xlab = 'y'
-                ylab = 'z'
-            elif slice_name == 'y_slice':
-                X = results.x
-                Y = results.z
-                final_title = title + '\nslice at y = ' + str(results.y[0])
-                xlab = 'x'
-                ylab = 'z'
-            elif slice_name == 'z_slice':
-                X = results.x
-                Y = results.y
-                final_title = title + '\nslice at z = ' + str(results.z[0])
-                xlab = 'x'
-                ylab = 'y'
-            else:
-                raise Exception('No slice inputted!')
-
-            C_lower = results.C_lower
-            C_mean = results.C_mean
-            C_upper = results.C_upper
-
-
-            # Modifying C depending on if the results need logging
-            if log_results:
-                C_lower[C_lower<1] = 1
-                C_lower = np.log10(C_lower)
-                
-                C_mean[C_mean<1] = 1
-                C_mean = np.log10(C_mean)
-                
-                C_upper[C_upper<1] = 1
-                C_upper = np.log10(C_upper)
-
-            # Define min and max values for colorbar
-            min_val = np.percentile([C_lower, C_mean, C_upper],10)
-            max_val = np.percentile([C_lower, C_mean, C_upper],90)
-
-            fin_alpha = len(self.params_mean)*0.75
+        full_path = self.results_path + '/instance_' + str(self.instance) + '/' + name + '_1D_scatter.png'
+        if not os.path.exists(full_path):
+            fin_alpha = len(self.params_median)*0.75
 
             y = 12
             r = 0.8
@@ -512,142 +309,132 @@ class Visualiser:
             ax3 = fig.add_subplot(spec[0,4:])
             ax4 = fig.add_subplot(spec[1,:3])
             ax5 = fig.add_subplot(spec[1,3:])
-            
+                
             # Defines the lower bound subplot
-            plot_1 = ax1.tricontourf(X, Y, results.C_lower, vmin=min_val, vmax=max_val, levels = 100)
+            ax1.plot(results[self.independent_variables[0]], lower_res, label='Predicted ' + self.dependent_variables[0])
             ax1.set_title('Generated by the lower bound parameters', fontsize = 20)
-            ax1.set_xlabel(xlab)
-            ax1.set_ylabel(ylab)
-            ax1.set_xlim(np.min(X), np.max(X))
-            ax1.set_ylim(np.min(Y), np.max(Y))
+            ax1.set_xlabel(self.independent_variables[0])
+            ax1.set_ylabel(self.dependent_variables[0])
 
-            # Defines the mean subplot
-            ax2.tricontourf(X, Y, results.C_mean, vmin=min_val, vmax=max_val, levels = 100)
-            ax2.set_title('Generated by the mean parameters', fontsize = 20)
-            ax2.set_xlabel(xlab)
-            ax2.set_ylabel(ylab)
-            ax2.set_xlim(np.min(X), np.max(X))
-            ax2.set_ylim(np.min(Y), np.max(Y))
+            # Defines the median subplot
+            ax2.plot(results[self.independent_variables[0]], mean_res, label='Predicted ' + self.dependent_variables[0])
+            ax2.set_title('Generated by the median parameters', fontsize = 20)
+            ax2.set_xlabel(self.independent_variables[0])
+            ax2.set_ylabel(self.dependent_variables[0])
 
-            # Defines the upper bound subplot
-            ax3.tricontourf(X, Y, results.C_upper, vmin=min_val, vmax=max_val, levels = 100)
+            # Defines the upper subplot
+            ax3.plot(results[self.independent_variables[0]], upper_res, label='Predicted ' + self.dependent_variables[0])
             ax3.set_title('Generated by the upper bound parameters', fontsize = 20)
-            ax3.set_xlabel(xlab)
-            ax3.set_ylabel(ylab)
-            ax3.set_xlim(np.min(X), np.max(X))
-            ax3.set_ylim(np.min(Y), np.max(Y))
+            ax3.set_xlabel(self.independent_variables[0])
+            ax3.set_ylabel(self.dependent_variables[0])
 
-            # Generates the test point data on each graph
-            if self.include_test_points:
-                formatter = "{:.2e}" 
-                if  np.floor(np.log10(self.RMSE)) < 2: formatter = "{:.2f}"
-                RMSE_string = 'RMSE = ' + formatter.format(self.RMSE)
-                AIC_string = 'AIC = ' + formatter.format(self.AIC)
-                BIC_string = 'BIC = ' + formatter.format(self.BIC)
+            ax1.scatter(self.testing_data[self.independent_variables[0]],self.testing_data[self.dependent_variables[0]], s = 20, c = 'r', label='Measured ' + self.dependent_variables[0] + ' test values')
+            ax2.scatter(self.testing_data[self.independent_variables[0]],self.testing_data[self.dependent_variables[0]], s = 20, c = 'r', label='Measured ' + self.dependent_variables[0] + ' test values')
+            ax3.scatter(self.testing_data[self.independent_variables[0]],self.testing_data[self.dependent_variables[0]], s = 20, c = 'r', label='Measured ' + self.dependent_variables[0] + ' test values')
+            
+            ax1.legend()
+            ax2.legend()
+            ax3.legend()
 
-            else:
-                RMSE_string = 'RMSE = n/a'
-                AIC_string = 'AIC = n/a'
-                BIC_string = 'BIC = n/a'
+            RMSE_formatter = "{:.2e}" 
+            AIC_formatter = "{:.2e}"
+            BIC_formatter = "{:.2e}"
+
+            if self.RMSE < 0:
+                raise Exception('Visualiser - RMSE is negative!')
+            if  np.floor(np.log10(self.RMSE)) < 2 and np.floor(np.log10(self.RMSE)) > -2: RMSE_formatter = "{:.2f}"
+            if  np.floor(np.log10(np.abs(self.AIC))) < 2 and np.floor(np.log10(np.abs(self.AIC))) > -2: AIC_formatter = "{:.2f}"
+            if  np.floor(np.log10(np.abs(self.BIC))) < 2 and np.floor(np.log10(np.abs(self.BIC))) > -2: BIC_formatter = "{:.2f}"
+            RMSE_string = 'RMSE = ' + RMSE_formatter.format(self.RMSE)
+            AIC_string = 'AIC = ' + AIC_formatter.format(self.AIC)
+            BIC_string = 'BIC = ' + BIC_formatter.format(self.BIC)
 
             # Creates an axis to display the parameter values
-            param_string = self.get_param_string()
+            param_string = self._get_param_string()
             ax4.text(0.5,0.5,param_string, fontsize = 30, va = "center", ha = 'center')
             ax4.set_xticks([])
             ax4.set_yticks([])
 
-            param_accuracy_string = self.get_param_accuracy_string()
+            param_accuracy_string = self._get_param_accuracy_string()
 
             # Creates an axis to display the sampling information
             ax5.text(0.5,0.5, RMSE_string + ',   ' + AIC_string + ',   ' + BIC_string + '\n' + param_accuracy_string, fontsize = 30, va = "center", ha = 'center')
             ax5.set_xticks([])
             ax5.set_yticks([])
 
-            # Defines the two colorbars
-            cbar1 = plt.colorbar(plot_1, ax = ax4, location = 'top', shrink = 2)
-
-            cbar1.ax.set_title('Predicted Concentration', fontsize = 10)
-
             # Defines the overall title, including the range of values for each plot
-            fig.suptitle(final_title, fontsize = 32)
+            fig.suptitle(title, fontsize = 40)
 
             # Saves the figures if required
-
-            fig.savefig(full_path)
+            if not os.path.exists(full_path):
+                fig.savefig(full_path)
             plt.close()
+                              
 
-    # Plotting function for 3D plots
-    def threeD_plots(self, results, name, q=10, log_results = True, title = 'Concentration of Droplets'):
-        X = results.x
-        Y = results.y
-        Z = results.z
-        C_lower = results.C_lower
-        C_mean = results.C_mean
-        C_upper = results.C_upper
+    def _threeD_plots(self, results, name, q=10, title=None):
+        """
+        Plotting function for 3D plots
 
-        # Modifying C depending on if the results need logging
-        if log_results:
-            C_lower[C_lower<1] = 1
-            C_lower = np.log10(C_lower)
-            
-            C_mean[C_mean<1] = 1
-            C_mean = np.log10(C_mean)
-            
-            C_upper[C_upper<1] = 1
-            C_upper = np.log10(C_upper)
+        Args:
+            results (pd.DataFrame): Results dataframe
+            name (str): Name of the plot for saving purposes
+            q (int, optional): Number of bins i.e. number of figures generated. Defaults to 10.
+            title (str, optional): Title of the plot. Defaults to None.
+        """
+        X = results[self.independent_variables[0]]
+        Y = results[self.independent_variables[1]]
+        Z = results[self.independent_variables[2]]
+        lower_res = results.lower_res
+        mean_res = results.mean_res
+        upper_res = results.upper_res
 
-        # Define the bin numbers and their labels
-        lower_bin_nums = pd.qcut(C_lower,q, labels = False, duplicates='drop')
-        lower_bin_labs = np.array(pd.qcut(C_mean,q, duplicates='drop').unique())
+        lower_bin_nums = pd.qcut(lower_res,q, labels = False, duplicates='drop')
 
-        mean_bin_nums = pd.qcut(C_mean,q, labels = False, duplicates='drop')
-        mean_bin_labs = np.array(pd.qcut(C_mean,q, duplicates='drop').unique())
+        mean_bin_nums = pd.qcut(mean_res,q, labels = False, duplicates='drop')
+        mean_bin_labs = np.array(pd.qcut(mean_res,q, duplicates='drop').unique())
 
-        upper_bin_nums = pd.qcut(C_upper,q, labels = False, duplicates='drop')
-        upper_bin_labs = np.array(pd.qcut(C_mean,q, duplicates='drop').unique())
+        upper_bin_nums = pd.qcut(upper_res,q, labels = False, duplicates='drop')
 
-        # Define the dataframe of results with bin numbers attached
-        lower_conc_and_bins = pd.DataFrame([X, Y, Z, C_lower, lower_bin_nums]).T
-        lower_conc_and_bins.columns=['x', 'y', 'z', 'conc', 'bin']
+        lower_conc_and_bins = pd.DataFrame([X, Y, Z, lower_res, lower_bin_nums]).T
+        lower_conc_and_bins.columns=[self.independent_variables[0],self.independent_variables[1], self.independent_variables[2], 'val', 'bin']
 
-        mean_conc_and_bins = pd.DataFrame([X, Y, Z, C_mean, mean_bin_nums]).T
-        mean_conc_and_bins.columns=['x', 'y', 'z', 'conc', 'bin']
+        mean_conc_and_bins = pd.DataFrame([X, Y, Z, mean_res, mean_bin_nums]).T
+        mean_conc_and_bins.columns=[self.independent_variables[0],self.independent_variables[1], self.independent_variables[2], 'val', 'bin']
 
-        upper_conc_and_bins = pd.DataFrame([X, Y, Z, C_upper, upper_bin_nums]).T
-        upper_conc_and_bins.columns=['x', 'y', 'z', 'conc', 'bin']
+        upper_conc_and_bins = pd.DataFrame([X, Y, Z, upper_res, upper_bin_nums]).T
+        upper_conc_and_bins.columns=[self.independent_variables[0],self.independent_variables[1], self.independent_variables[2], 'val', 'bin']
 
         # Define min and max values for colorbar
-        min_val = np.percentile([C_lower, C_mean, C_upper],10)
-        max_val = np.percentile([C_lower, C_mean, C_upper],90)
+        min_val = np.percentile([lower_res, mean_res, upper_res],10)
+        max_val = np.percentile([lower_res, mean_res, upper_res],90)
 
         # Calculates the percentage differances and RMSE if the test points are set to be included
-        if self.include_test_points:
-            lower_test_pred_C = self.model_func(self.params_lower, self.test_data['x'], self.test_data['y'], self.test_data['z'])
-            lower_test_actual_C = self.test_data['Concentration']
-            lower_percentage_difference = 2*np.abs(lower_test_actual_C-lower_test_pred_C)/(lower_test_actual_C + lower_test_pred_C) * 100
+        lower_test_pred = self.model_func(self.params_lower, self.testing_data)
+        lower_test_measured = self.testing_data[self.dependent_variables[0]]
+        lower_percentage_difference = 2*np.abs(lower_test_measured-lower_test_pred)/(lower_test_measured + lower_test_pred) * 100
 
-            mean_test_pred_C = self.model_func(self.params_mean, self.test_data['x'], self.test_data['y'], self.test_data['z'])
-            mean_test_actual_C = self.test_data['Concentration']
-            mean_percentage_difference = 2*np.abs(mean_test_actual_C-mean_test_pred_C)/(mean_test_actual_C + mean_test_pred_C) * 100
+        mean_test_pred = self.model_func(self.params_median, self.testing_data)
+        mean_test_measured = self.testing_data[self.dependent_variables[0]]
+        mean_percentage_difference = 2*np.abs(mean_test_measured-mean_test_pred)/(mean_test_measured + mean_test_pred) * 100
 
-            upper_test_pred_C = self.model_func(self.params_upper, self.test_data['x'], self.test_data['y'], self.test_data['z'])
-            upper_test_actual_C = self.test_data['Concentration']
-            upper_percentage_difference = 2*np.abs(lower_test_actual_C-upper_test_pred_C)/(upper_test_actual_C + upper_test_pred_C) * 100
+        upper_test_pred = self.model_func(self.params_upper, self.testing_data)
+        upper_test_measured = self.testing_data[self.dependent_variables[0]]
+        upper_percentage_difference = 2*np.abs(upper_test_measured-upper_test_pred)/(upper_test_measured + upper_test_pred) * 100
 
         # Creates a directory for the instance if the save parameter is selected
-        if not os.path.exists(self.data_path + '/instance_' + str(self.instance) + '/' + str(name) + '_3D_scatter/figures'):
-            os.makedirs(self.data_path + '/instance_' + str(self.instance) + '/' + str(name) + '_3D_scatter/figures')
+        if not os.path.exists(self.results_path + '/instance_' + str(self.instance) + '/' + str(name) + '_3D_scatter/figures'):
+            os.makedirs(self.results_path + '/instance_' + str(self.instance) + '/' + str(name) + '_3D_scatter/figures')
         
         # Loops through each bin number and generates a figure with the bin data 
         for bin_num in np.sort(np.unique(mean_bin_nums)):
             fig_name = 'fig_' + str(bin_num + 1) + '_of_' + str(np.max(mean_bin_nums + 1)) + '.png'
-            full_path = self.data_path + '/instance_' + str(self.instance) + '/' + name + '_3D_scatter' + '/figures/' + fig_name
+            full_path = self.results_path + '/instance_' + str(self.instance) + '/' + name + '_3D_scatter' + '/figures/' + fig_name
             if not os.path.exists(full_path):
                 lower_bin_data = lower_conc_and_bins[lower_conc_and_bins['bin'] >= bin_num]
                 mean_bin_data = mean_conc_and_bins[mean_conc_and_bins['bin'] >= bin_num]
                 upper_bin_data = upper_conc_and_bins[upper_conc_and_bins['bin'] >= bin_num]
 
-                fin_alpha = len(self.params_mean)*0.75
+                fin_alpha = len(self.params_median)*0.75
 
                 y = 12
                 r = 0.8
@@ -670,74 +457,74 @@ class Visualiser:
                 ax5 = fig.add_subplot(spec[1,3:])
                 
                 # Defines the lower bound subplot
-                plot_1 = ax1.scatter(lower_bin_data.x, lower_bin_data.y, lower_bin_data.z, c = lower_bin_data.conc, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
+                plot_1 = ax1.scatter(lower_bin_data[self.independent_variables[0]], lower_bin_data[self.independent_variables[1]], lower_bin_data[self.independent_variables[2]], c = lower_bin_data.val, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
                 ax1.set_title('Generated by the lower bound parameters', fontsize = 20)
-                ax1.set_xlabel('x')
-                ax1.set_ylabel('y')
-                ax1.set_zlabel('z')
+                ax1.set_xlabel(self.independent_variables[0])
+                ax1.set_ylabel(self.independent_variables[1])
+                ax1.set_zlabel(self.independent_variables[2])
                 ax1.set_xlim(np.min(X), np.max(X))
                 ax1.set_ylim(np.min(Y), np.max(Y))
                 ax1.set_zlim(np.min(Z), np.max(Z))
 
                 # Defines the mean subplot
-                ax2.scatter(mean_bin_data.x, mean_bin_data.y, mean_bin_data.z, c = mean_bin_data.conc, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
+                ax2.scatter(mean_bin_data[self.independent_variables[0]], mean_bin_data[self.independent_variables[1]], mean_bin_data[self.independent_variables[2]], c = mean_bin_data.val, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
                 ax2.set_title('Generated by the mean parameters', fontsize = 20)
-                ax2.set_xlabel('x')
-                ax2.set_ylabel('y')
-                ax2.set_zlabel('z')
+                ax2.set_xlabel(self.independent_variables[0])
+                ax2.set_ylabel(self.independent_variables[1])
+                ax2.set_zlabel(self.independent_variables[2])
                 ax2.set_xlim(np.min(X), np.max(X))
                 ax2.set_ylim(np.min(Y), np.max(Y))
                 ax2.set_zlim(np.min(Z), np.max(Z))
 
                 # Defines the upper bound subplot
-                ax3.scatter(upper_bin_data.x, upper_bin_data.y, upper_bin_data.z, c = upper_bin_data.conc, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
+                ax3.scatter(upper_bin_data[self.independent_variables[0]], upper_bin_data[self.independent_variables[1]], upper_bin_data[self.independent_variables[2]], c = upper_bin_data.val, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
                 ax3.set_title('Generated by the upper bound parameters', fontsize = 20)
-                ax3.set_xlabel('x')
-                ax3.set_ylabel('y')
-                ax3.set_zlabel('z')
+                ax3.set_xlabel(self.independent_variables[0])
+                ax3.set_ylabel(self.independent_variables[1])
+                ax3.set_zlabel(self.independent_variables[2])
                 ax3.set_xlim(np.min(X), np.max(X))
                 ax3.set_ylim(np.min(Y), np.max(Y))
                 ax3.set_zlim(np.min(Z), np.max(Z))
 
                 # Generates the test point data on each graph
-                if self.include_test_points:
-                    pd_min = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
-                    pd_max = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
+                pd_min = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
+                pd_max = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
 
-                    self.all_test_data = self.test_data
-                    self.all_test_data['lower_p_diff'] = lower_percentage_difference
-                    self.all_test_data['mean_p_diff'] = mean_percentage_difference
-                    self.all_test_data['upper_p_diff'] = upper_percentage_difference
+                all_test_data = self.testing_data
+                all_test_data['lower_p_diff'] = lower_percentage_difference
+                all_test_data['mean_p_diff'] = mean_percentage_difference
+                all_test_data['upper_p_diff'] = upper_percentage_difference
 
-                    self.all_test_data = self.all_test_data[self.all_test_data['y']>np.min(Y)]
-                    self.all_test_data = self.all_test_data[self.all_test_data['x']<np.max(X)]
-                    self.all_test_data = self.all_test_data[self.all_test_data['x']>np.min(X)]
-                    self.all_test_data = self.all_test_data[self.all_test_data['y']<np.max(Y)]
-                    self.all_test_data = self.all_test_data[self.all_test_data['z']>np.min(Z)]
-                    self.all_test_data = self.all_test_data[self.all_test_data['z']<np.max(Z)]
+                all_test_data = all_test_data[all_test_data[self.independent_variables[0]]<np.max(X)]
+                all_test_data = all_test_data[all_test_data[self.independent_variables[0]]>np.min(X)]
+                all_test_data = all_test_data[all_test_data[self.independent_variables[1]]<np.max(Y)]
+                all_test_data = all_test_data[all_test_data[self.independent_variables[1]]>np.min(Y)]
+                all_test_data = all_test_data[all_test_data[self.independent_variables[2]]>np.min(Z)]
+                all_test_data = all_test_data[all_test_data[self.independent_variables[2]]<np.max(Z)]
 
-                    plot_2 = ax1.scatter(self.all_test_data['x'],self.all_test_data['y'],self.all_test_data['z'], s = 20, c = self.all_test_data['lower_p_diff'], cmap='jet', vmin = pd_min, vmax = pd_max)
-                    ax2.scatter(self.all_test_data['x'],self.all_test_data['y'],self.all_test_data['z'], s = 20, c = self.all_test_data['mean_p_diff'], cmap='jet', vmin = pd_min, vmax = pd_max)
-                    ax3.scatter(self.all_test_data['x'],self.all_test_data['y'],self.all_test_data['z'], s = 20, c = self.all_test_data['upper_p_diff'], cmap='jet', vmin = pd_min, vmax = pd_max)
-                    formatter = "{:.2e}" 
-                    if  np.floor(np.log10(self.RMSE)) < 2: formatter = "{:.2f}"
-                    RMSE_string = 'RMSE = ' + formatter.format(self.RMSE)
-                    AIC_string = 'AIC = ' + formatter.format(self.AIC)
-                    BIC_string = 'BIC = ' + formatter.format(self.BIC)
+                plot_2 = ax1.scatter(all_test_data[self.independent_variables[0]],all_test_data[self.independent_variables[1]],all_test_data[self.independent_variables[2]], s = 20, c = all_test_data['lower_p_diff'], cmap='jet', vmin = pd_min, vmax = pd_max)
+                ax2.scatter(all_test_data[self.independent_variables[0]],all_test_data[self.independent_variables[1]],all_test_data[self.independent_variables[2]], s = 20, c = all_test_data['mean_p_diff'], cmap='jet', vmin = pd_min, vmax = pd_max)
+                ax3.scatter(all_test_data[self.independent_variables[0]],all_test_data[self.independent_variables[1]],all_test_data[self.independent_variables[2]], s = 20, c = all_test_data['upper_p_diff'], cmap='jet', vmin = pd_min, vmax = pd_max)
+                RMSE_formatter = "{:.2e}" 
+                AIC_formatter = "{:.2e}"
+                BIC_formatter = "{:.2e}"
 
-                    
-                else:
-                    RMSE_string = 'RMSE = n/a'
-                    AIC_string = 'AIC = n/a'
-                    BIC_string = 'BIC = n/a'
+                if self.RMSE < 0:
+                    raise Exception('Visualiser - RMSE is negative!')
+                if  np.floor(np.log10(self.RMSE)) < 2 and np.floor(np.log10(self.RMSE)) > -2: RMSE_formatter = "{:.2f}"
+                if  np.floor(np.log10(np.abs(self.AIC))) < 2 and np.floor(np.log10(np.abs(self.AIC))) > -2: AIC_formatter = "{:.2f}"
+                if  np.floor(np.log10(np.abs(self.BIC))) < 2 and np.floor(np.log10(np.abs(self.BIC))) > -2: BIC_formatter = "{:.2f}"
+                RMSE_string = 'RMSE = ' + RMSE_formatter.format(self.RMSE)
+                AIC_string = 'AIC = ' + AIC_formatter.format(self.AIC)
+                BIC_string = 'BIC = ' + BIC_formatter.format(self.BIC)
 
                 # Creates an axis to display the parameter values
-                param_string = self.get_param_string()
+                param_string = self._get_param_string()
                 ax4.text(0.5,0.5,param_string, fontsize = 30, va = "center", ha = 'center')
                 ax4.set_xticks([])
                 ax4.set_yticks([])
 
-                param_accuracy_string = self.get_param_accuracy_string()
+                param_accuracy_string = self._get_param_accuracy_string()
 
                 # Creates an axis to display the sampling information
                 ax5.text(0.5,0.5, RMSE_string + ',   ' + AIC_string + ',   ' + BIC_string + '\n' + param_accuracy_string, fontsize = 30, va = "center", ha = 'center')
@@ -761,267 +548,719 @@ class Visualiser:
 
                 # Saves the figures if required
                 fig_name = 'fig_' + str(bin_num + 1) + '_of_' + str(np.max(mean_bin_nums + 1)) + '.png'
-                full_path = self.data_path + '/instance_' + str(self.instance) + '/' + name + '_3D_scatter' + '/figures/' + fig_name
+                full_path = self.results_path + '/instance_' + str(self.instance) + '/' + name + '_3D_scatter' + '/figures/' + fig_name
                 if not os.path.exists(full_path):
                     fig.savefig(full_path)
                 plt.close()
         
-        self.animate(name = name + '_3D_scatter')
+        self._animate(name = name + '_3D_scatter')
 
-    # Generates a string of all parameter accuracy results
-    def get_param_accuracy_string(self):
+    def _get_param_accuracy_string(self):
+        """
+        Returns a string representation of the accuracy of each parameter in the samples.
+
+        The accuracy is calculated as the percentage error between the mean value of the parameter
+        in the samples and the corresponding fixed model parameter value.
+
+        Returns:
+            str: A string representation of the accuracy of each parameter.
+        """
         param_accuracy_string_array = []
         for param in self.samples.columns:
-            if not self.actual_values[param] == 'NaN':
-                percentage_error = 100*np.abs(self.params_mean[param]-self.actual_values[param])/(self.params_max[param] - self.params_min[param])
+            if type(self.data_processor) == SimDataProcessor and param in self.data_processor.model.fixed_model_params:
+                value1 = self.params_median[param]
+                value2 = self.data_processor.model.fixed_model_params[param]
+                if value1 == 0 or value2 == 0:
+                    print('Visualiser - cannot calculate percentage error for ' + param)
+                elif abs(value1 + value2)/2 < 1e-6:
+                    print('Visualiser - cannot calculate percentage error for ' + param)
+                elif value1 < 0 or value2 < 0:
+                    print("Visualiser - Negative values encountered; ensure the context makes sense for percentage difference.")
+
+                percentage_error = 100 * abs(value1 - value2) / ((value1 + value2) / 2)
                 param_accuracy_string_array.append(param + ' error = ' + f'{percentage_error:.3}' + '%')
         return ('\n').join(param_accuracy_string_array)
 
-    # Generates a string of all of the parameter results
-    def get_param_string(self):
+    def _get_param_string(self):
+        """
+        Returns a formatted string representation of the parameters.
+
+        Returns:
+            str: A string representation of the parameters in the format:
+                 "<param_name> = [<lower_value>, <mean_value>, <upper_value>]"
+        """
         param_string_array = []
-        for param in self.params_mean.index:
-            if np.floor(np.log10(self.params_mean[param])) < 2:
+        for param in self.params_median.index:
+            if np.floor(np.log10(self.params_median[param])) < 2:
                 lower_string =  "{:.3f}".format(self.params_lower[param])
-                mean_string = "{:.3f}".format(self.params_mean[param])
+                mean_string = "{:.3f}".format(self.params_median[param])
                 upper_string = "{:.3f}".format(self.params_upper[param])
             else:
                 lower_string =  "{:.3e}".format(self.params_lower[param])
-                mean_string = "{:.3e}".format(self.params_mean[param])
+                mean_string = "{:.3e}".format(self.params_median[param])
                 upper_string = "{:.3e}".format(self.params_upper[param])
             param_string_array.append(param + ' = [' + lower_string + ', ' + mean_string + ', ' + upper_string + ']')
 
         return ('\n').join(param_string_array)
         
-    # Outputs the next available instance number and generates a folder for that instance
-    def get_instance(self, previous_instance):
-        if previous_instance != -1:
-            instance = previous_instance
-        else:
-            instance_folders = os.listdir(self.data_path)
-            instances = [int(x.split('_')[1]) for x in instance_folders]
-            missing_elements = []
-            if len(instances) == 0:
-                instance = 1
-            else:
-                for el in range(1,np.max(instances) + 2):
-                    if el not in instances:
-                        missing_elements.append(el)
-                instance = np.min(missing_elements)
+    def _get_ag_samples(self, samples, q_val):
+        """
+        Calculate the aggregated samples for each column in the given DataFrame.
 
-        instance_path = self.data_path + '/instance_' + str(instance)
-        if not os.path.exists(instance_path):
-            if not self.suppress_prints:
-                print('Creating instance')
-            os.mkdir(instance_path)
-        return instance
+        Parameters:
+        samples (pd.DataFrame): The DataFrame containing the samples.
+        q_val (float): The quantile value used to calculate the aggregated sample.
 
-    # Saves the hyperparameter object
-    def save_hyperparams(self):
-        with open(self.data_path + '/instance_' + str(self.instance) + '/hyperparams.json', "w") as fp:
-            json.dump(self.hyperparams,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
-        
-    # Gathers all of the figures under the inputted name, creates an animation of them and saves that animation
-    def animate(self, name, frame_dur = 500):
-        folder_name = 'instance_' + str(self.instance) + '/' + name + '/figures'
-        gif_name = name + '.gif'
-        gif_path = self.data_path + '/' + 'instance_' + str(self.instance) + '/' + name + '/' + gif_name
-        if not os.path.exists(self.data_path + '/' + folder_name):
-            if not self.suppress_prints:
-                print('Images for animation do not exist')
-        elif os.path.exists(gif_path):
-            if not self.suppress_prints:
-                print('Animation already exist!')
-        else:
-            files = os.listdir(self.data_path + '/' + folder_name)
-
-            images = []
-            for i in range(len(files))[::-1]:
-                images.append(imageio.imread(self.data_path + '/' + folder_name + '/' + files[i]))
-
-            imageio.mimsave(gif_path, images, duration = frame_dur, loop=0)
-    
-    # Saves the samples and chain samples objects
-    def save_samples(self):
-        full_path = self.data_path + '/instance_' + str(self.instance) + '/samples.csv'
-        if type(self.samples) == list and self.samples == []:
-            raise Exception('Samples data is empty!')    
-        pd.DataFrame(self.samples).to_csv(full_path, index=False)
-
-        chain_full_path = self.data_path + '/instance_' + str(self.instance) + '/chain_samples.csv'
-        if type(self.chain_samples) == list and self.chain_samples == []:
-            raise Exception('Samples data is empty!')    
-        pd.DataFrame(self.chain_samples).to_csv(chain_full_path, index=False)
-        
-    # Loads either the chain samples of samples object
-    def load_samples(self, chain = False):
-        if chain:
-            chain_full_path = self.data_path + '/instance_' + str(self.instance) + '/chain_samples.csv'
-            if os.path.exists(chain_full_path):
-                if not self.suppress_prints:
-                    print('Loading Chain Samples...')
-                return pd.read_csv(chain_full_path)
-            else:
-                raise Exception('Chain samples file does not exist!')
-        else:
-            full_path = self.data_path + '/instance_' + str(self.instance) + '/samples.csv'
-            if os.path.exists(full_path):
-                if not self.suppress_prints:
-                    print('Loading Samples...')
-                return pd.read_csv(full_path)
-            else:
-                raise Exception('Samples file does not exist!')
-
-    # Checks whether autocorrelation plots exist, if they don't they are generated and saved
-    def get_autocorrelations(self):
-        autocorr_folder = self.data_path + '/instance_' + str(self.instance) + '/autocorrelations'
-        if not os.path.exists(autocorr_folder):
-            os.mkdir(autocorr_folder)
-
-        for chain in range(self.num_chains):
-            for param in self.samples.columns:
-                full_path = autocorr_folder + '/autocorrelations_' + param + '_chain_' + str(chain + 1) + '.png'
-                
-                if self.num_chains == 1:
-                    title = 'MCMC autocorrelations for ' + param
-                else:
-                    title = 'MCMC autocorrelations for ' + param + ', chain ' + str(chain + 1)
-
-                if os.path.exists(full_path):
-                    if not self.suppress_prints:
-                        print('Autocorrelations plot ' + param + ', chain ' + str(chain + 1) + ' already exists')
-                else:
-                    ac = self.autocorr_fig(param, chain, title = title)
-                    ac.savefig(full_path)
-    
-    # Generates a autocorrelation plots based on the samples
-    def autocorr_fig(self, param, chain_num = 1, title = ''):
-        fig = plt.figure(figsize=(6,4))
-        autocorrelations = self.autocorrs['chain_' + str(chain_num + 1)][param]['Ct']
-        tau = self.autocorrs['chain_' + str(chain_num + 1)][param]['tau']
-        ci = self.autocorrs['chain_' + str(chain_num + 1)][param]['ci']
-        formatted_tau = "{:.2f}".format(tau)
-        plt.bar(range(autocorrelations.size), autocorrelations, label = param + ', tau = ' + formatted_tau)
-        plt.axhline(y = ci, color = 'r', linestyle = '--')
-        plt.axhline(y = -ci, color = 'r', linestyle = '--')
-        
-        plt.legend(fontsize=15)
-        plt.xlabel('Lag', fontsize=15)
-        plt.ylabel('Autocorrelation', fontsize=15)
-        plt.title(title + '\nDiscrete Autocorrelation', fontsize=20)
-        plt.tight_layout()
-        plt.close()
-
-        return fig
-    
-    # Calculates the autocorrelations based on the samples and saves them to an object
-    def calculate_autocorrs(self, D=-1):
-        self.autocorrs = {}
-        for chain_num in range(self.num_chains):
-            if self.num_chains > 1:
-                samples = self.chain_samples[self.chain_samples['chain'] == chain_num + 1].drop(columns = ['chain', 'sample_index'])
-            else:
-                samples = self.samples
-
-            if D == -1:
-                D = int(samples.shape[0])
-            
-            self.autocorrs['chain_' + str(chain_num+1)] = {}
-            for col in samples.columns:
-                x = samples[col]
-                acf = sm.tsa.acf(x)
-                ci = np.sqrt(1/x.size*(1+2*np.sum(acf)))
-                tau = 1 + 2*sum(acf)
-                self.autocorrs['chain_' + str(chain_num+1)][col] = {}
-                self.autocorrs['chain_' + str(chain_num+1)][col]['tau'] = tau
-                self.autocorrs['chain_' + str(chain_num+1)][col]['Ct'] = acf
-                self.autocorrs['chain_' + str(chain_num+1)][col]['ci'] = ci
-        
-        self.autocorrs['overall'] = {}
-        for param in self.samples.columns:
-            tau_overall = np.mean([self.autocorrs['chain_' + str(x + 1)][param]['tau'] for x in range(self.num_chains)])
-            self.autocorrs['overall'][param] = {}
-            self.autocorrs['overall'][param]['tau'] = tau_overall
-    
-    # Outputs the specified quantile of the parameter samples
-    def get_ag_samples(self,samples, q_val):
-        ags = pd.Series({},dtype='float64')
+        Returns:
+        pd.Series: A Series containing the aggregated samples for each column.
+        """
+        ags = pd.Series({}, dtype='float64')
         for col in samples.columns:
             param_samples = samples[col]
             ag = np.quantile(param_samples, q_val)
             ags[col] = ag
         return ags
     
-    # Outputs the fields object from the sampler
-    def get_fields(self, chain_num):
-        output = {}
-        if self.fields.keys() != []:
-            for key in self.fields.keys():
-                field_output = self.fields[key][chain_num]
-                if key == 'diverging':
-                    field_output = sum(field_output.tolist())
+    def _animate(self, name, frame_dur=500):
+        """
+        Gathers all of the figures under the inputted name, creates an animation of them and saves that animation
 
-                output[key] = field_output
-        return output
+        Args:
+            name (str): The name of the animation.
+            frame_dur (int, optional): The duration of each frame in milliseconds. Defaults to 500.
 
-    # Generates an object which summarises the results of the sampler and saves it
+        Raises:
+            Exception: If the images for animation do not exist.
+
+        Returns:
+            None
+        """
+        folder_name = 'instance_' + str(self.instance) + '/' + name + '/figures'
+        gif_name = name + '.gif'
+        gif_path = self.results_path + '/' + 'instance_' + str(self.instance) + '/' + name + '/' + gif_name
+
+        if not os.path.exists(self.results_path + '/' + folder_name):
+            raise Exception('Visualiser - Images for animation do not exist')
+        elif os.path.exists(gif_path):
+            pass
+        else:
+            files = os.listdir(self.results_path + '/' + folder_name)
+
+            images = []
+            for i in range(len(files))[::-1]:
+                images.append(imageio.imread(self.results_path + '/' + folder_name + '/' + files[i]))
+
+            imageio.mimsave(gif_path, images, duration=frame_dur, loop=0)
+
+    def plot_prior(self, param_name: str, param_range: list, references: dict = None, show_estimate: bool = False):
+        """
+        Plots the prior distribution for a given parameter.
+
+        Args:
+            param_name (str): The name of the parameter.
+            param_range (list): The range of the parameter values.
+            references (dict, optional): A dictionary of reference values for the parameter. Defaults to None.
+            show_estimate (bool, optional): Whether to show the estimated median value. Defaults to False.
+        """
+        if param_name not in self.inference_params:
+            raise Exception('Visualiser - parameter not listed as an inference parameter!')
+        if self.inference_params[param_name].n_dims == 1:
+            self._plot_one_prior(param_name, param_range, references, show_estimate)
+        elif self.inference_params[param_name].n_dims == 2:
+            self._plot_two_priors(param_name, param_range, references, show_estimate)
+        else:
+            raise Exception('Visualiser - visualising more than 2 dimensions is not supported!')
+            
+    def _plot_two_priors(self, param_name, param_range, references=None, show_estimate = False):
+        """
+        Plot the two priors for a given parameter.
+
+        Args:
+            param_name (str): The name of the parameter.
+            param_range (list): A list of two lists, each containing two floats or integers, representing the range of the parameter.
+            references (dict, optional): A dictionary containing references for the parameter. 
+                It should have keys 'labels' and 'vals', where 'labels' is a list of strings and 'vals' is a list of lists, 
+                each containing two floats or integers. Defaults to None.
+            show_estimate (bool, optional): Whether to show the estimated median value. Defaults to False.
+
+        """
+        plt.figure(figsize=(8, 8))
+        handles = []
+
+        if references is not None:
+            if not isinstance(references, dict):
+                raise ValueError("Visualiser - Invalid references format. Expected references to be a dictionary.")
+            if "labels" not in references or "vals" not in references:
+                raise ValueError("Visualiser - Invalid references format. Expected references to have keys 'labels' and 'vals'.")
+            if not isinstance(references["labels"], list) or not isinstance(references["vals"], list):
+                raise ValueError("Visualiser - Invalid references format. Expected 'labels' and 'vals' to be lists.")
+            if len(references["labels"]) != len(references["vals"]):
+                raise ValueError("Visualiser - Invalid references format. Expected 'labels' and 'vals' to have the same length.")
+            reference_labels = references["labels"]
+            reference_vals = np.array(references["vals"])
+            if not all(isinstance(label, str) for label in references["labels"]):
+                raise ValueError("Visualiser - Invalid references format. Expected 'labels' to contain only strings.")
+            if not all(isinstance(val, list) and len(val) == 2 and all(isinstance(sub_val,(int,float)) for sub_val in val) for val in references["vals"]):
+                raise ValueError("Visualiser - Invalid references format. Expected 'vals' to contain only lists of two floats or integers.")
+            
+            refs = plt.plot(reference_vals[:,0], reference_vals[:,1], ".r", label="References")
+            handles.append(refs[0])
+            for i, (reference_x_point, reference_y_point) in enumerate(zip(reference_vals[:,0], reference_vals[:,1])):
+                label = reference_labels[i]
+                plt.annotate(label, (reference_x_point, reference_y_point), textcoords="offset points", 
+                                xytext=(0, 5), ha="center", color="r", zorder=3)
+
+        if not isinstance(param_range, list) or len(param_range) != 2 or not isinstance(param_range[0], list) or not isinstance(param_range[1], list) or len(param_range[0]) != 2 or len(param_range[1]) != 2 or not all(isinstance(val, (float, int)) for val in param_range[0]) or not all(isinstance(val, (float, int)) for val in param_range[1]):
+            raise ValueError("Invalid param_range format. Expected param_range to be a list of two lists, each containing two floats or integers.")
+        param_1_range = [param_range[0][0], param_range[0][1]]
+        param_2_range = [param_range[1][0], param_range[1][1]]
+
+        param_1_name = self.inference_params[param_name].name[0]
+        param_2_name = self.inference_params[param_name].name[1]
+
+        if param_1_range[0] > self.params_median[param_1_name]:
+            param_1_range[0] = self.params_median[param_1_name]
+        elif param_1_range[1] < self.params_median[param_1_name]:
+            param_1_range[1] = self.params_median[param_1_name]
+
+        if param_2_range[0] > self.params_median[param_2_name]:
+            param_2_range[0] = self.params_median[param_2_name]
+        elif param_2_range[1] < self.params_median[param_2_name]:
+            param_2_range[1] = self.params_median[param_2_name]
+
+        param_1_linspace = np.linspace(param_1_range[0], param_1_range[1], 100)
+        param_2_linspace = np.linspace(param_2_range[0], param_2_range[1], 100)
+        param_1_mesh, param_2_mesh = np.meshgrid(param_1_linspace, param_2_linspace)
+        shape = param_1_mesh.shape
+
+        parameter = self.inference_params[param_name]
+        prior_dist = parameter.get_prior_function()
+
+        log_P = prior_dist.log_prob(np.array([param_1_mesh.flatten()/(10**parameter.order), param_2_mesh.flatten()/(10**parameter.order)]).T)
+        log_P = np.reshape(log_P, shape)
+
+        plt.contourf(param_1_mesh, param_2_mesh, np.exp(log_P), levels=30, cmap='Greys', vmin = np.percentile(np.exp(log_P),5))
+        plt.xlabel(param_1_name, fontsize = 15)
+        plt.ylabel(param_2_name, fontsize = 15)
+        plt.title('Joint prior distribution of ' + param_1_name + ' and ' + param_2_name, fontsize = 20)
+
+        if show_estimate:
+            est_median_val = plt.scatter([self.params_median[param_1_name]], [self.params_median[param_2_name]], color = 'w', marker='s', edgecolors='k', s=30, label = 'Estimated Median Value')
+            handles.append(est_median_val)
+
+            if self.data_processor and type(self.data_processor) == SimDataProcessor and param_1_name in self.data_processor.model.fixed_model_params and param_2_name in self.data_processor.model.fixed_model_params:
+                act_val = plt.scatter([self.data_processor.model.fixed_model_params[param_1_name]], [self.data_processor.model.fixed_model_params[param_2_name]], color = 'white', marker='*', edgecolors='black', label = "Actual Value")
+                handles.append(act_val)
+
+        plt.legend(handles = handles, fontsize = 15)
+
+        filename = 'prior_dist_' + param_1_name + '_' + param_2_name +'.png'
+        folder_name = self.results_path + '/instance_' + str(self.instance) + '/prior_dists'
+        full_path = folder_name + '/' + filename
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+
+        plt.savefig(full_path)
+        plt.close()
+
+    def _plot_one_prior(self, param_name, param_range, references=None, show_estimate = False):
+        """
+        Plot the prior distribution for a given parameter.
+
+        Args:
+            param_name (str): The name of the parameter.
+            param_range (list): A list with two floats or integers indicating the maximum and minimum values to plot the prior between.
+            references (dict, optional): A dictionary containing reference values for the parameter. The dictionary must have keys 'labels' and 'vals', which are lists of labels and values respectively. Defaults to None.
+        """
+        if not isinstance(param_range, list) or len(param_range) != 2 or not all(isinstance(val, (float, int)) for val in param_range):
+            raise Exception('Visualiser - Invalid param_range. It should be a list with two floats or integers indicating the maximum and minimum values to plot the prior between.')
+
+        if references:
+            if not isinstance(references, dict):
+                raise ValueError("Visualiser - References must be a dictionary.")
+            if "labels" not in references or "vals" not in references:
+                raise ValueError("Visualiser - References dictionary must contain keys 'labels' and 'vals'.")
+            if not isinstance(references["labels"], list) or not isinstance(references["vals"], list):
+                raise ValueError("Visualiser - References 'labels' and 'vals' must be lists.")
+            if len(references["labels"]) != len(references["vals"]):
+                raise ValueError("Visualiser - References 'labels' and 'vals' must have the same length.")
+            if not all(isinstance(label, str) for label in references["labels"]):
+                raise ValueError("Visualiser - References 'labels' must contain only strings.")
+            if not all(isinstance(val, (int, float)) for val in references["vals"]):
+                raise ValueError("Visualiser - References 'vals' must contain only integers or floats.")
+
+        # Correction to fit estimated value into distribution
+        if param_range[0] > self.params_median[param_name]:
+            param_range[0] = self.params_median[param_name]
+        elif param_range[1] < self.params_median[param_name]:
+            param_range[1] = self.params_median[param_name]
+
+        param_linspace = np.linspace(param_range[0], param_range[1], 500)
+
+        parameter = self.inference_params[param_name]
+        prior_func = parameter.get_prior_function()
+        log_prior_P = prior_func.log_prob(param_linspace/(10**parameter.order))
+        
+        plt.figure(figsize=(8, 8))
+        dist_plot = plt.plot(param_linspace, np.exp(log_prior_P), color='k', label='Prior Distribution')
+        plt.xlabel(param_name, fontsize=15)
+        plt.ylabel('log(P)', fontsize=15)
+        plt.title('Prior distribution of ' + param_name, fontsize=20)
+        plt.yticks([])
+
+        handles = [dist_plot[0]]
+
+        if references:
+            reference_labels = references['labels']
+            reference_x = references['vals']
+            refs = []
+
+            for i, reference_x_point in enumerate(reference_x):
+                label = reference_labels[i]
+
+                ref = plt.axvline(reference_x_point, color='r', linestyle='dotted', label=label)
+                refs.append(ref)
+
+            offset = np.linspace(-np.percentile(log_prior_P,99)/2,np.percentile(log_prior_P,99)/2,len(reference_labels))
+            labelLines(refs, zorder=2.5, align=True)
+
+            ref.set_label('References')
+            handles.append(ref)
+
+
+        if show_estimate:
+            est_val = plt.axvline(self.params_median[param_name], color='b', linestyle='dashed', label='Estimated Value')
+            handles.append(est_val)
+
+            if type(self.data_processor) == SimDataProcessor and param_name in self.data_processor.model.fixed_model_params:
+                act_val = plt.axvline(self.data_processor.model.fixed_model_params[param_name], color='g', linestyle='dashed', label='Actual Value')
+                handles.append(act_val)
+
+        plt.legend(handles=handles, fontsize=15)
+
+        filename = 'prior_dist_' + param_name + '.png'
+        folder_name = self.results_path + '/instance_' + str(self.instance) + '/prior_dists'
+        full_path = folder_name + '/' + filename
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+
+        plt.savefig(full_path)
+        plt.close()
+
+    def _twoD_slice_plots(self, results, name, slice_name=None, title=None):
+        """
+        Generates plots for a 2D slice of the 3D modelled system based on the concluded lower, median and upper bound parameters and an inputted domain
+
+        Args:
+            results (dict): The results data containing the independent variables and their corresponding values.
+            name (str): The name of the plot.
+            slice_name (str, optional): The name of the slice variable. Defaults to None.
+            title (str, optional): The title of the plot. Defaults to None.
+
+        """
+        full_path = self.results_path + '/instance_' + str(self.instance) + '/' + name + '_2D_' + slice_name + '.png'
+        if not os.path.exists(full_path):
+            slice_var = slice_name.split('_')[0]
+            if slice_var in self.independent_variables:
+                other_vars = [var for var in self.independent_variables if var != slice_var]
+
+                X = results[other_vars[0]]
+                Y = results[other_vars[1]]
+                final_title = title + '\nslice at ' + slice_var + ' = ' + str(results[slice_var][0])
+                xlab = other_vars[0]
+                ylab = other_vars[1]
+            else:
+                raise Exception('Visualiser - Invalid slice inputted!')
+
+            lower_res = results.lower_res
+            mean_res = results.mean_res
+            upper_res = results.upper_res
+
+            # Define min and max values for colorbar
+            min_val = np.percentile([lower_res, mean_res, upper_res], 10)
+            max_val = np.percentile([lower_res, mean_res, upper_res], 90)
+
+            fin_alpha = len(self.params_median) * 0.75
+
+            y = 12
+            r = 0.8
+            alpha = (1 - r) * y
+
+            delta_alpha = fin_alpha - alpha
+
+            y_prime = y + delta_alpha
+            r_prime = r * y / y_prime
+
+            r_prime_frac = Fraction(r_prime)
+
+            fig = plt.figure(constrained_layout=True, figsize=(24, y_prime))
+            spec = GridSpec(2, 6, figure=fig, height_ratios=[r_prime_frac.numerator, r_prime_frac.denominator - r_prime_frac.numerator])
+
+            ax1 = fig.add_subplot(spec[0, :2])
+            ax2 = fig.add_subplot(spec[0, 2:4])
+            ax3 = fig.add_subplot(spec[0, 4:])
+            ax4 = fig.add_subplot(spec[1, :3])
+            ax5 = fig.add_subplot(spec[1, 3:])
+
+            # Defines the lower bound subplot
+            plot_1 = ax1.tricontourf(X, Y, lower_res, vmin=min_val, vmax=max_val, levels=100)
+            ax1.set_title('Generated by the lower bound parameters', fontsize=20)
+            ax1.set_xlabel(xlab)
+            ax1.set_ylabel(ylab)
+            ax1.set_xlim(np.min(X), np.max(X))
+            ax1.set_ylim(np.min(Y), np.max(Y))
+
+            # Defines the mean subplot
+            ax2.tricontourf(X, Y, mean_res, vmin=min_val, vmax=max_val, levels=100)
+            ax2.set_title('Generated by the mean parameters', fontsize=20)
+            ax2.set_xlabel(xlab)
+            ax2.set_ylabel(ylab)
+            ax2.set_xlim(np.min(X), np.max(X))
+            ax2.set_ylim(np.min(Y), np.max(Y))
+
+            # Defines the upper bound subplot
+            ax3.tricontourf(X, Y, upper_res, vmin=min_val, vmax=max_val, levels=100)
+            ax3.set_title('Generated by the upper bound parameters', fontsize=20)
+            ax3.set_xlabel(xlab)
+            ax3.set_ylabel(ylab)
+            ax3.set_xlim(np.min(X), np.max(X))
+            ax3.set_ylim(np.min(Y), np.max(Y))
+
+            # Generates the test point data on each graph
+            RMSE_formatter = "{:.2e}" 
+            AIC_formatter = "{:.2e}"
+            BIC_formatter = "{:.2e}"
+
+            if self.RMSE < 0:
+                raise Exception('Visualiser - RMSE is negative!')
+            if  np.floor(np.log10(self.RMSE)) < 2 and np.floor(np.log10(self.RMSE)) > -2: RMSE_formatter = "{:.2f}"
+            if  np.floor(np.log10(np.abs(self.AIC))) < 2 and np.floor(np.log10(np.abs(self.AIC))) > -2: AIC_formatter = "{:.2f}"
+            if  np.floor(np.log10(np.abs(self.BIC))) < 2 and np.floor(np.log10(np.abs(self.BIC))) > -2: BIC_formatter = "{:.2f}"
+            RMSE_string = 'RMSE = ' + RMSE_formatter.format(self.RMSE)
+            AIC_string = 'AIC = ' + AIC_formatter.format(self.AIC)
+            BIC_string = 'BIC = ' + BIC_formatter.format(self.BIC)
+
+
+            # Creates an axis to display the parameter values
+            param_string = self._get_param_string()
+            ax4.text(0.5, 0.5, param_string, fontsize=30, va="center", ha='center')
+            ax4.set_xticks([])
+            ax4.set_yticks([])
+
+            param_accuracy_string = self._get_param_accuracy_string()
+
+            # Creates an axis to display the sampling information
+            ax5.text(0.5, 0.5, RMSE_string + ',   ' + AIC_string + ',   ' + BIC_string + '\n' + param_accuracy_string, fontsize=30, va="center", ha='center')
+            ax5.set_xticks([])
+            ax5.set_yticks([])
+
+            # Defines the two colorbars
+            cbar1 = plt.colorbar(plot_1, ax=ax4, location='top', shrink=2)
+
+            cbar1.ax.set_title('Predicted ' + self.dependent_variables[0], fontsize=10)
+
+            # Defines the overall title, including the range of values for each plot
+            fig.suptitle(final_title, fontsize=32)
+
+            # Saves the figures if required
+            plt.close()
+
+    def get_autocorrelations(self):
+        """
+        Generate and save autocorrelation plots for each parameter in the MCMC samples.
+        """
+        autocorr_folder = self.results_path + '/instance_' + str(self.instance) + '/autocorrelations'
+        if not os.path.exists(autocorr_folder):
+            os.mkdir(autocorr_folder)
+
+        for chain in range(self.n_chains):
+            for param in self.samples.columns:
+                full_path = autocorr_folder + '/autocorrelations_' + param + '_chain_' + str(chain + 1) + '.png'
+
+                if self.n_chains == 1:
+                    title = 'MCMC autocorrelations for ' + param
+                else:
+                    title = 'MCMC autocorrelations for ' + param + ', chain ' + str(chain + 1)
+
+                if not os.path.exists(full_path):
+                    fig = plt.figure(figsize=(6,4))
+                    autocorrelations = self.autocorrs['chain_' + str(chain + 1)][param]['Ct']
+                    tau = self.autocorrs['chain_' + str(chain + 1)][param]['tau']
+                    ci = self.autocorrs['chain_' + str(chain + 1)][param]['ci']
+                    formatted_tau = "{:.2f}".format(tau)
+                    plt.bar(range(autocorrelations.size), autocorrelations, label = param + ', tau = ' + formatted_tau)
+                    plt.axhline(y = ci, color = 'r', linestyle = '--')
+                    plt.axhline(y = -ci, color = 'r', linestyle = '--')
+
+                    plt.legend(fontsize=15)
+                    plt.xlabel('Lag', fontsize=15)
+                    plt.ylabel('Autocorrelation', fontsize=15)
+                    plt.title(title + '\nDiscrete Autocorrelation', fontsize=20)
+                    plt.tight_layout()
+                    plt.close()
+
+                    fig.savefig(full_path)
+    
+    def _calculate_autocorrs(self, D=-1):
+        """
+        Calculate autocorrelation values for the samples.
+
+        Parameters:
+            D (int, optional): The number of samples to consider for autocorrelation calculation. 
+                               If not provided, it defaults to the total number of samples.
+
+        Returns:
+            dict: A dictionary containing autocorrelation values for each chain and overall.
+
+        """
+        autocorrs = {}
+        for chain_num in range(self.n_chains):
+            if self.n_chains > 1:
+                samples = self.chain_samples[self.chain_samples['chain'] == chain_num + 1].drop(columns=['chain', 'sample_index'])
+            else:
+                samples = self.samples
+
+            if D == -1:
+                D = int(samples.shape[0])
+
+            autocorrs['chain_' + str(chain_num + 1)] = {}
+            for col in samples.columns:
+                x = samples[col]
+                acf = sm.tsa.acf(x)
+                ci = np.sqrt(1 / x.size * (1 + 2 * np.sum(acf)))
+                tau = 1 + 2 * sum(acf)
+                autocorrs['chain_' + str(chain_num + 1)][col] = {}
+                autocorrs['chain_' + str(chain_num + 1)][col]['tau'] = tau
+                autocorrs['chain_' + str(chain_num + 1)][col]['Ct'] = acf
+                autocorrs['chain_' + str(chain_num + 1)][col]['ci'] = ci
+
+        autocorrs['overall'] = {}
+        for param in self.samples.columns:
+            tau_overall = np.mean([autocorrs['chain_' + str(x + 1)][param]['tau'] for x in range(self.n_chains)])
+            autocorrs['overall'][param] = {}
+            autocorrs['overall'][param]['tau'] = tau_overall
+
+        return autocorrs
+
     def get_summary(self):
+        """
+        Generates and saves the summary of the inference results.
+
+        Returns:
+            dict: A dictionary containing the summary of the inference results.
+        """
         summary = {}
-        full_path = self.data_path + '/instance_' + str(self.instance) + '/summary.json'
+        full_path = self.results_path + '/instance_' + str(self.instance) + '/summary.json'
         if os.path.exists(full_path):
-            f = open(full_path)
-            summary = json.load(f)
-            f.close()
+            with open(full_path) as f:
+                summary = json.load(f)
         else:
             summary['RMSE'] = self.RMSE
             summary['AIC'] = self.AIC
             summary['BIC'] = self.BIC
-            for chain_num in range(self.num_chains):
+            for chain_num in range(self.n_chains):
                 summary['chain_' + str(chain_num + 1)] = {}
-                samples = self.chain_samples[self.chain_samples['chain'] == chain_num + 1].drop(columns = ['chain', 'sample_index'])
-                params_lower = self.get_ag_samples(samples, 0.05)
-                params_mean = self.get_ag_samples(samples, 0.5)
-                params_upper = self.get_ag_samples(samples, 0.95)
-
-                summary['chain_' + str(chain_num + 1)]['fields'] = self.get_fields(chain_num)
+                samples = self.chain_samples[self.chain_samples['chain'] == chain_num + 1].drop(columns=['chain', 'sample_index'])
+                params_lower = self._get_ag_samples(samples, 0.05)
+                params_median = self._get_ag_samples(samples, 0.5)
+                params_upper = self._get_ag_samples(samples, 0.95)
 
                 for param in self.samples.columns:
                     summary['chain_' + str(chain_num + 1)][param] = {}
                     
                     summary['chain_' + str(chain_num + 1)][param]['lower'] = params_lower[param]
-                    summary['chain_' + str(chain_num + 1)][param]['mean'] = params_mean[param]
+                    summary['chain_' + str(chain_num + 1)][param]['mean'] = params_median[param]
                     summary['chain_' + str(chain_num + 1)][param]['upper'] = params_upper[param]
                     
                     summary['chain_' + str(chain_num + 1)][param]['tau'] = self.autocorrs['chain_' + str(chain_num + 1)][param]['tau']
                     
-                    if self.actual_values[param] !='NaN':
-                        proposed = params_mean[param]
-                        actual = self.actual_values[param]
-                        summary['chain_' + str(chain_num + 1)][param]['param_accuracy'] = np.abs(100*np.abs(proposed-actual)/(self.params_max[param] - self.params_min[param]))
+                    if type(self.data_processor) == SimDataProcessor and param in self.data_processor.model.fixed_model_params:
+                        proposed = params_median[param]
+                        actual = self.data_processor.model.fixed_model_params[param]
+                        summary['chain_' + str(chain_num + 1)][param]['param_accuracy'] = np.abs(100 * np.abs(proposed - actual) / (self.params_max[param] - self.params_min[param]))
 
                 
             overall_samples = self.samples
             summary['overall'] = {}
 
-            overall_params_lower = self.get_ag_samples(overall_samples, 0.05)
-            overall_params_mean = self.get_ag_samples(overall_samples, 0.5)
-            overall_params_upper = self.get_ag_samples(overall_samples, 0.95)
-
-            summary['chain_' + str(chain_num + 1)]['fields'] = self.get_fields(0)
+            overall_params_lower = self._get_ag_samples(overall_samples, 0.05)
+            overall_params_median = self._get_ag_samples(overall_samples, 0.5)
+            overall_params_upper = self._get_ag_samples(overall_samples, 0.95)
 
             for param in self.samples.columns:
                 summary['overall'][param] = {}
 
                 summary['overall'][param]['lower'] = overall_params_lower[param]
-                summary['overall'][param]['mean'] = overall_params_mean[param]
+                summary['overall'][param]['mean'] = overall_params_median[param]
                 summary['overall'][param]['upper'] = overall_params_upper[param]
                 summary['overall'][param]['tau'] = self.autocorrs['overall'][param]['tau']
 
-                if self.actual_values[param] !='NaN':
-                    summary['overall'][param]['param_accuracy'] = np.abs(np.abs(overall_params_mean[param]-self.actual_values[param])/(self.params_max[param] - self.params_min[param])*100)
+                if type(self.data_processor) == SimDataProcessor and param in self.data_processor.model.fixed_model_params:
+                    proposed = overall_params_median[param]
+                    actual = self.data_processor.model.fixed_model_params[param]
+                    summary['overall'][param]['param_accuracy'] = np.abs(np.abs(proposed - actual) / (self.params_max[param] - self.params_min[param]) * 100)
 
 
-            with open(self.data_path + '/instance_' + str(self.instance) + '/summary.json', "w") as fp:
-                json.dump(summary,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
+            with open(self.results_path + '/instance_' + str(self.instance) + '/summary.json', "w") as fp:
+                json.dump(summary, fp, cls=NumpyEncoder, separators=(', ', ': '), indent=4)
 
         return summary
+
+    def plot_posterior(self, param_name: str, param_range: list, references: dict = None):
+        if param_name not in self.inference_params:
+            raise Exception('Visualiser - parameter not listed as an inference parameter!')
+        if self.inference_params[param_name].n_dims == 1:
+            self._plot_one_posterior(param_name, param_range, references)
+        elif self.inference_params[param_name].n_dims == 2:
+            self._plot_two_posteriors(param_name, param_range, references)
+        else:
+            raise Exception('Visualiser - visualising more than 2 dimensions is not supported!')
+    
+    def _plot_one_posterior(self, param_name, param_range, references=None):
+        if not isinstance(param_range, list) or len(param_range) != 2 or not all(isinstance(val, (float, int)) for val in param_range):
+            raise Exception('Visualiser - Invalid param_range. It should be a list with two floats or integers indicating the maximum and minimum values to plot the prior between.')
+
+        if references:
+            if not isinstance(references, dict):
+                raise ValueError("Visualiser - References must be a dictionary.")
+            if "labels" not in references or "vals" not in references:
+                raise ValueError("Visualiser - References dictionary must contain keys 'labels' and 'vals'.")
+            if not isinstance(references["labels"], list) or not isinstance(references["vals"], list):
+                raise ValueError("Visualiser - References 'labels' and 'vals' must be lists.")
+            if len(references["labels"]) != len(references["vals"]):
+                raise ValueError("Visualiser - References 'labels' and 'vals' must have the same length.")
+            if not all(isinstance(label, str) for label in references["labels"]):
+                raise ValueError("Visualiser - References 'labels' must contain only strings.")
+            if not all(isinstance(val, (int, float)) for val in references["vals"]):
+                raise ValueError("Visualiser - References 'vals' must contain only integers or floats.")
+
+        # Correction to fit estimated value into distribution
+        if param_range[0] > self.params_median[param_name]:
+            param_range[0] = self.params_median[param_name]
+        elif param_range[1] < self.params_median[param_name]:
+            param_range[1] = self.params_median[param_name]
+
+        # Distribute self.samples[param_name] into multiple bins of equal size
+        bins = np.linspace(param_range[0], param_range[1], num=self.samples.shape[0]//100)
+        counts, _ = np.histogram(self.samples[param_name], bins=bins)
+        
+
+        plt.figure(figsize=(8, 8))
+        dist_plot = plt.plot(bins[:-1], counts, color='k', label='Sampled Posterior Distribution')
+        plt.xlabel(param_name, fontsize=15)
+        plt.ylabel('Sampled Probability', fontsize=15)
+        plt.title('Sampled posterior distribution of ' + param_name, fontsize=20)
+        plt.yticks([])
+
+        handles = [dist_plot[0]]
+
+        if references:
+            reference_labels = references['labels']
+            reference_x = references['vals']
+            refs = []
+
+            for i, reference_x_point in enumerate(reference_x):
+                label = reference_labels[i]
+
+                ref = plt.axvline(reference_x_point, color='r', linestyle='dotted', label=label)
+                refs.append(ref)
+
+            # offset = np.linspace(-np.percentile(log_prior_P,99)/2,np.percentile(log_prior_P,99)/2,len(reference_labels))
+            labelLines(refs, zorder=2.5, align=True)
+
+            ref.set_label('References')
+            handles.append(ref)
+
+        est_val = plt.axvline(self.params_median[param_name], color='b', linestyle='dashed', label='Estimated Value')
+        handles.append(est_val)
+
+        if type(self.data_processor) == SimDataProcessor and param_name in self.data_processor.model.fixed_model_params:
+            act_val = plt.axvline(self.data_processor.model.fixed_model_params[param_name], color='g', linestyle='dashed', label='Actual Value')
+            handles.append(act_val)
+
+        plt.legend(handles=handles, fontsize=15)
+
+        filename = 'posterior_dist_' + param_name + '.png'
+        folder_name = self.results_path + '/instance_' + str(self.instance) + '/posterior_dists'
+        full_path = folder_name + '/' + filename
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+
+        plt.savefig(full_path)
+        plt.close()
+
+    def _plot_two_posteriors(self, param_name, param_range, references=None):
+        plt.figure(figsize=(8, 8))
+        handles = []
+
+        if references is not None:
+            if not isinstance(references, dict):
+                raise ValueError("Visualiser - Invalid references format. Expected references to be a dictionary.")
+            if "labels" not in references or "vals" not in references:
+                raise ValueError("Visualiser - Invalid references format. Expected references to have keys 'labels' and 'vals'.")
+            if not isinstance(references["labels"], list) or not isinstance(references["vals"], list):
+                raise ValueError("Visualiser - Invalid references format. Expected 'labels' and 'vals' to be lists.")
+            if len(references["labels"]) != len(references["vals"]):
+                raise ValueError("Visualiser - Invalid references format. Expected 'labels' and 'vals' to have the same length.")
+            reference_labels = references["labels"]
+            reference_vals = np.array(references["vals"])
+            if not all(isinstance(label, str) for label in references["labels"]):
+                raise ValueError("Visualiser - Invalid references format. Expected 'labels' to contain only strings.")
+            if not all(isinstance(val, list) and len(val) == 2 and all(isinstance(sub_val,(int,float)) for sub_val in val) for val in references["vals"]):
+                raise ValueError("Visualiser - Invalid references format. Expected 'vals' to contain only lists of two floats or integers.")
+            
+            refs = plt.plot(reference_vals[:,0], reference_vals[:,1], ".r", label="References")
+            handles.append(refs[0])
+            for i, (reference_x_point, reference_y_point) in enumerate(zip(reference_vals[:,0], reference_vals[:,1])):
+                label = reference_labels[i]
+                plt.annotate(label, (reference_x_point, reference_y_point), textcoords="offset points", 
+                                xytext=(0, 5), ha="center", color="r", zorder=3)
+
+        if not isinstance(param_range, list) or len(param_range) != 2 or not isinstance(param_range[0], list) or not isinstance(param_range[1], list) or len(param_range[0]) != 2 or len(param_range[1]) != 2 or not all(isinstance(val, (float, int)) for val in param_range[0]) or not all(isinstance(val, (float, int)) for val in param_range[1]):
+            raise ValueError("Invalid param_range format. Expected param_range to be a list of two lists, each containing two floats or integers.")
+        param_1_range = [param_range[0][0], param_range[0][1]]
+        param_2_range = [param_range[1][0], param_range[1][1]]
+
+        param_1_name = self.inference_params[param_name].name[0]
+        param_2_name = self.inference_params[param_name].name[1]
+
+        if param_1_range[0] > self.params_median[param_1_name]:
+            param_1_range[0] = self.params_median[param_1_name]
+        elif param_1_range[1] < self.params_median[param_1_name]:
+            param_1_range[1] = self.params_median[param_1_name]
+
+        if param_2_range[0] > self.params_median[param_2_name]:
+            param_2_range[0] = self.params_median[param_2_name]
+        elif param_2_range[1] < self.params_median[param_2_name]:
+            param_2_range[1] = self.params_median[param_2_name]
+
+        param_1_linspace = np.linspace(param_1_range[0], param_1_range[1], 100)
+        param_2_linspace = np.linspace(param_2_range[0], param_2_range[1], 100)
+
+        x_vals = self.samples[param_1_name]
+        y_vals = self.samples[param_2_name]
+
+        counts, _, _ = np.histogram2d(x_vals, y_vals, bins=[100, 100], range=[(param_1_range[0], param_1_range[1]), (param_2_range[0], param_2_range[1])])
+
+        plt.contourf(param_1_linspace, param_2_linspace, counts.T, levels=20, cmap='Greys', vmin = np.percentile(counts,5))
+        plt.xlabel(param_1_name, fontsize = 15)
+        plt.ylabel(param_2_name, fontsize = 15)
+        plt.title('Sampled joint posterior distribution of ' + param_1_name + ' and ' + param_2_name, fontsize = 20)
+
+        est_val = plt.scatter([self.params_median[param_1_name]], [self.params_median[param_2_name]], color = 'w', marker='s', edgecolors='k', label = 'Estimated Value')
+        handles.append(est_val)
+        
+        if self.data_processor and type(self.data_processor) == SimDataProcessor and param_1_name in self.data_processor.model.fixed_model_params and param_2_name in self.data_processor.model.fixed_model_params:
+            act_val = plt.scatter([self.data_processor.model.fixed_model_params[param_1_name]], [self.data_processor.model.fixed_model_params[param_2_name]], color = 'w', marker='*', edgecolors='black', label = "Actual Value")
+            handles.append(act_val)
+
+        plt.legend(handles = handles, fontsize = 15)
+
+        filename = 'posterior_dist_' + param_1_name + '_' + param_2_name +'.png'
+        folder_name = self.results_path + '/instance_' + str(self.instance) + '/posterior_dists'
+        full_path = folder_name + '/' + filename
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+
+        plt.savefig(full_path)
+        plt.close()        
