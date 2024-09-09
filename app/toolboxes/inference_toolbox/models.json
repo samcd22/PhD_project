@@ -13,7 +13,7 @@
         ]
     }, 
     "curve": {
-        "model": "m*x**2+c", 
+        "model": "m*x^2+c", 
         "independent_variables": [
             "x"
         ], 
@@ -26,7 +26,7 @@
         ]
     }, 
     "gpm_norm": {
-        "model": "Q/(2*pi*I_y*I_z*x**2)*exp(-y**2/(2*I_y**2*x**2))*(exp(-(z-H)**2/(2*I_z**2*x**2))+exp(-(z+H)**2/(2*I_z**2*x**2)))", 
+        "model": "Q/(2*pi*I_y*I_z*x^2)*exp(-y^2/(2*I_y^2*x^2))*(exp(-(z-H)^2/(2*I_z^2*x^2))+exp(-(z+H)^2/(2*I_z^2*x^2)))", 
         "independent_variables": [
             "x", 
             "y", 
@@ -43,7 +43,7 @@
         ]
     }, 
     "log_gpm_norm": {
-        "model": "log10(Q/(2*pi*I_y*I_z*x**2)*exp(-y**2/(2*I_y**2*x**2))*(exp(-(z-H)**2/(2*I_z**2*x**2))+exp(-(z+H)**2/(2*I_z**2*x**2))))", 
+        "model": "log10(Q/(2*pi*I_y*I_z*x^2)*exp(-y^2/(2*I_y^2*x^2))*(exp(-(z-H)^2/(2*I_z^2*x^2))+exp(-(z+H)^2/(2*I_z^2*x^2))))", 
         "independent_variables": [
             "x", 
             "y", 
@@ -60,7 +60,7 @@
         ]
     }, 
     "full_log_gpm": {
-        "model": "log10(Q/(2*u*pi*I_y*I_z*(x-x_0)**2)*exp(-(y-y_0)**2/(2*I_y**2*(x-x_0)**2))*(exp(-(z-z_0)**2/(2*I_z**2*(x-x_0)**2))+exp(-(z+z_0)**2/(2*I_z**2*(x-x_0)**2))))", 
+        "model": "log10(Q/(2*u*pi*I_y*I_z*(x-x_0)^2)*exp(-(y-y_0)^2/(2*I_y^2*(x-x_0)^2))*(exp(-(z-z_0)^2/(2*I_z^2*(x-x_0)^2))+exp(-(z+z_0)^2/(2*I_z^2*(x-x_0)^2))))", 
         "independent_variables": [
             "x", 
             "y", 
@@ -78,6 +78,19 @@
             "x_0", 
             "y_0", 
             "z_0"
+        ]
+    }, 
+    "rocket_motor_regression": {
+        "model": "a*P**n", 
+        "independent_variables": [
+            "P"
+        ], 
+        "dependent_variables": [
+            "r"
+        ], 
+        "all_param_names": [
+            "a", 
+            "n"
         ]
     }
 }
