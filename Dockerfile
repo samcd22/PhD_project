@@ -42,9 +42,9 @@ RUN /build/miniconda3/envs/myenv/bin/pip install -r /PhD_project/requirements.tx
 ENV PATH="/build/miniconda3/envs/myenv/bin:$PATH"
 ENV CONDA_DEFAULT_ENV=myenv
 
-ENV LANG=C.UTF-8
-ENV LANGUAGE=C.UTF-8
-ENV LC_ALL=C.UTF-8
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8
 
 # Set the working directory
 WORKDIR /PhD_project

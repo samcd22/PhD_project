@@ -4,7 +4,7 @@ import os
 from sklearn.model_selection import train_test_split
 
 from toolboxes.inference_toolbox.parameter import Parameter
-from app.toolboxes.inference_toolbox.model import Model
+from toolboxes.inference_toolbox.model import Model
 from toolboxes.inference_toolbox.likelihood import Likelihood
 from toolboxes.inference_toolbox.sampler import Sampler
 from toolboxes.inference_toolbox.visualiser import Visualiser

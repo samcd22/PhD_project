@@ -5,21 +5,19 @@ class Domain:
     """
     A class used for creating different domains, used for plotting results.
 
-    Attributes:
-    - domain_params (pd.Series): A pandas Series object to store the domain parameters.
-    - domain_select (str): The selected domain type. Options are:
-        - 'cone_from_source': A cone domain from the source.
-        - 'cuboid_from_source': A cuboid domain from the source.
-        - 'cone_from_source_z_limited': A cone domain from the source with z limited to >= 0.
-    - n_dims (int): The number of dimensions of the domain.
-    - resolution (int): The resolution of the domain.
+    Args:
+        - domain_select (str): The selected domain type. Options are:
+            - 'cone_from_source': A cone domain from the source.
+            - 'cuboid_from_source': A cuboid domain from the source.
+            - 'cone_from_source_z_limited': A cone domain from the source with z limited to >= 0.
+            - 'one_D': A one dimensional domain.
 
-    Methods:
-    - __init__(self, domain_select: str): Initialises the Domain class.
-    - add_domain_param(self, name: str, val: float) -> 'Domain': Saves a named parameter to the Domain class.
-    - create_domain(self) -> np.ndarray: Generates the selected domain using the domain parameters.
-    - create_domain_slice(self, slice_name: str) -> np.ndarray: Creates a slice of the selected domain.
-    - get_construction(self) -> dict: Get the construction parameters of the domain.
+    Attributes:
+        - domain_params (pd.Series): A pandas Series object to store the domain parameters.
+        - domain_select (str): The selected domain type.
+        - n_dims (int): The number of dimensions of the domain.
+        - resolution (int): The resolution of the domain.
+
     """
 
     def __init__(self, domain_select: str):
@@ -27,7 +25,7 @@ class Domain:
         Initialises the Domain class saving all relevant variables.
 
         Args:
-        - domain_select (str): The selected domain type.
+            - domain_select (str): The selected domain type.
 
         """
         self.domain_params = pd.Series({}, dtype='float64')
@@ -39,12 +37,10 @@ class Domain:
         if domain_select in ['one_D']:
             self.n_dims = 1
 
-    def get_construction(self):
+    def get_construction(self) -> dict:
         """
         Get the construction parameters.
 
-        Returns:
-        - dict: The construction parameters.
         """
 
         domain_params = {}
@@ -67,30 +63,28 @@ class Domain:
         Checks if all required parameters are present in the domain_params.
 
         Args:
-        - required_params (list): A list of required parameters.
+            - required_params (list): A list of required parameters.
 
         Raises:
-        - Exception: If a required parameter is missing.
+            - Exception: If a required parameter is missing.
         """
         for param in required_params:
             if param not in self.domain_params:
                 raise Exception(f'Domain - {param} is a required parameter for the {self.domain_select} domain! Please add this parameter.')
 
-    def add_domain_param(self, name, val):
+    def add_domain_param(self, name, val) -> 'Domain':
         """
         Saves a named parameter to the Domain class before generating the domain.
 
         Args:
-        - name (str): The name of the parameter.
-        - val: The value of the parameter.
+            - name (str): The name of the parameter.
+            - val: The value of the parameter.
 
-        Returns:
-        - self: The Domain object.
         """
         self.domain_params[name] = val
         return self
 
-    def create_domain(self):
+    def create_domain(self) -> np.ndarray:
         """
         Generates the selected domain using the domain parameters.
 
@@ -110,18 +104,18 @@ class Domain:
         else:
             raise Exception('Domain - Invalid domain selected!')
 
-    def create_domain_slice(self, slice_name):
+    def create_domain_slice(self, slice_name) -> np.ndarray:
         """
         Creates a slice of the selected domain.
 
         Args:
-        - slice_name (str): The name of the slice. Options are:
-            - 'x_slice': A slice along the x-axis.
-            - 'y_slice': A slice along the y-axis.
-            - 'z_slice': A slice along the z-axis.
+            - slice_name (str): The name of the slice. Options are:
+                - 'x_slice': A slice along the x-axis.
+                - 'y_slice': A slice along the y-axis.
+                - 'z_slice': A slice along the z-axis.
 
         Returns:
-        - points (numpy.ndarray): The generated slice points.
+            - points (numpy.ndarray): The generated slice points.
         """
         if self.domain_select == 'cone_from_source_z_limited':
             return self._create_z_limited_cone_slice(slice_name)
@@ -130,7 +124,7 @@ class Domain:
         else:
             raise Exception('Domain - Invalid domain selected!')
 
-    def _create_one_D(self):
+    def _create_one_D(self) -> np.ndarray:
         if 'x_min' in self.domain_params and 'x_max' in self.domain_params:
             x_min = self.domain_params.x_min
             x_max = self.domain_params.x_max
@@ -140,21 +134,21 @@ class Domain:
             self.domain_params.points = np.sort(np.array(self.domain_params.points))
             return self.domain_params.points
 
-    def _create_cone_slice(self, slice_name):
+    def _create_cone_slice(self, slice_name) -> np.ndarray:
         """
         Creates a slice of the cone domain.
 
         Args:
-        - slice_name (str): The name of the slice.
+            - slice_name (str): The name of the slice.
 
         Required parameters
-        - source (list): The position of the tip of the cone.
-        - r (float): The length of the cone away from the source.
-        - theta (float): The angle the cone sweeps out.
-        - resolution (int): The resolution of the domain.
+            - source (list): The position of the tip of the cone.
+            - r (float): The length of the cone away from the source.
+            - theta (float): The angle the cone sweeps out.
+            - resolution (int): The resolution of the domain.
 
         Returns:
-            points (numpy.ndarray): The generated slice points.
+            - points (numpy.ndarray): The generated slice points.
         """
 
         required_params = ['source', 'r', 'theta', 'resolution']
@@ -215,21 +209,21 @@ class Domain:
         else:
             raise Exception('No slice inputted!')
 
-    def _create_z_limited_cone_slice(self, slice_name):
+    def _create_z_limited_cone_slice(self, slice_name) -> np.ndarray:
         """
         Deletes all points of the cone which are below the x-y plane (z=0).
 
         Args:
-        - slice_name (str): The name of the slice.
+            - slice_name (str): The name of the slice.
 
         Required parameters
-        - source (list): The position of the tip of the cone.
-        - r (float): The length of the cone away from the source.
-        - theta (float): The angle the cone sweeps out.
-        - resolution (int): The resolution of the domain.
+            - source (list): The position of the tip of the cone.
+            - r (float): The length of the cone away from the source.
+            - theta (float): The angle the cone sweeps out.
+            - resolution (int): The resolution of the domain.
 
         Returns:
-        - points (numpy.ndarray): The generated slice points.
+            - points (numpy.ndarray): The generated slice points.
         """
 
         required_params = ['source', 'r', 'theta', 'resolution']
@@ -238,19 +232,19 @@ class Domain:
         points = self._create_cone_slice(slice_name)
         return points[points[:, 2] >= 0]
 
-    def _create_cuboid(self):
+    def _create_cuboid(self) -> np.ndarray:
         """
         Creates a cuboid of points.
 
         Required parameters
-        - source (list): The source of the cuboid.
-        - x (float): The x length of the cuboid.
-        - y (float): The y length of the cuboid.
-        - z (float): The z length of the cuboid.
-        - resolution (int): The resolution of the domain.
+            - source (list): The source of the cuboid.
+            - x (float): The x length of the cuboid.
+            - y (float): The y length of the cuboid.
+            - z (float): The z length of the cuboid.
+            - resolution (int): The resolution of the domain.
 
         Returns:
-        - points (numpy.ndarray): The generated cuboid points.
+            - points (numpy.ndarray): The generated cuboid points.
         """
 
         required_params = ['source', 'x', 'y', 'z', 'resolution']
@@ -266,18 +260,18 @@ class Domain:
         return points
 
 
-    def _create_cone(self):
+    def _create_cone(self) -> np.ndarray:
         """
         Creates a cone of points from the source.
 
         Required parameters
-        - source (list): The position of the tip of the cone.
-        - r (float): The length of the cone away from the source.
-        - theta (float): The angle the cone sweeps out.
-        - resolution (int): The resolution of the domain.
+            - source (list): The position of the tip of the cone.
+            - r (float): The length of the cone away from the source.
+            - theta (float): The angle the cone sweeps out.
+            - resolution (int): The resolution of the domain.
 
         Returns:
-        - points (numpy.ndarray): The generated cone points.
+            - points (numpy.ndarray): The generated cone points.
         """
 
         required_params = ['source', 'r', 'theta', 'resolution']
@@ -302,18 +296,18 @@ class Domain:
 
         return points
 
-    def _create_z_limited_cone(self):
+    def _create_z_limited_cone(self) -> np.ndarray:
         """
         Deletes all points of the cone which are below the x-y plane (z=0).
         
         Required parameters
-        - source (list): The position of the tip of the cone.
-        - r (float): The length of the cone away from the source.
-        - theta (float): The angle the cone sweeps out.
-        - resolution (int): The resolution of the domain.
+            - source (list): The position of the tip of the cone.
+            - r (float): The length of the cone away from the source.
+            - theta (float): The angle the cone sweeps out.
+            - resolution (int): The resolution of the domain.
         
         Returns:
-        - points (numpy.ndarray): The generated cone points.
+            - points (numpy.ndarray): The generated cone points.
         """
         points = self._create_cone()
         return points[points[:, 2] >= 0]

@@ -8,49 +8,59 @@ from matplotlib import pyplot as plt
 from sklearn.model_selection import train_test_split
 import matplotlib.gridspec as gridspec
 
-from toolboxes.plotting_toolbox.domain import Domain
-from toolboxes.inference_toolbox.model import Model
-from toolboxes.data_processing_toolbox.data_processor import DataProcessor
+from plotting_toolbox.domain import Domain
+from inference_toolbox.model import Model
+from data_processing.data_processor import DataProcessor
 
 class SimDataProcessor(DataProcessor):
     """
-    A class for simulating data based on a given model and domain. Inherits from the DataProcessor class.
+    A class for simulating data for use with the Bayesian Inference tool. This is a subclass of DataProcessor. This class generates data using an analytical model within a specified domain using the processor parameters. The processed data is then saved as a csv file and the construction parameters (the config) are saved as a json file.
 
-    Attributes:
-    - processed_data_name (str): The name of the simulated data.
-    - model (Model): The model used for data simulation.
-    - domain (Domain): The domain used for data simulation.
-    - processor_params (dict): Additional parameters for the data simulator.
-    - train_test_split (float): The ratio of training data to test data
-    - noise_dist (str): The distribution of noise. Defaults to 'no_noise'.
-    - noise_level (float): The level of noise. Can be used interchangeably with noise_percentage.
-    - noise_percentage (float): The percentage of noise reletive to the predicted values of the model. Can be used interchangeably with noise_level.
-    - simulated_data (pd.DataFrame): The simulated data.
-    - data_path (str): The root data path.
-
-    Methods:
-    - process_data: Simulate the data based on the given model and domain. If data has already been simulated, loads the data.
-    - get_construction: Get the construction parameters for the data simulator.
-    - plot_data: Plot the simulated data.
-    """
-
-    def __init__(self, processed_data_name: str, model: Model, domain: Domain, processor_params: dict, train_test_split: float = 0.8, noise_dist = 'no_noise', noise_level = None, noise_percentage = None, data_path = '/PhD_project/data/'):
-        super().__init__(processed_data_name, processor_params, train_test_split, data_path)
-        """
-        Initializes the SimDataProcess class.
-
-        Args:
-        - processed_data_name (str): The name of the simulated data.
+    Args:
+        - processed_data_name (str): The name of the simulated data. This will indicate the name of the folder where the data is saved within the data directory, and the name of the folder where the inference results will be saved in the results directory.
         - model (Model): The model used for data simulation.
         - domain (Domain): The domain used for data simulation.
-        - processor_params (dict): Additional parameters for the data simulator.
         - train_test_split (float, optional): The ratio of training data to test data. Defaults to 0.8.
         - noise_dist (str, optional): The distribution of noise. Defaults to 'no_noise'. Options are:
             - 'gaussian': Gaussian noise. Takes the noise_level as the standard deviation of the Gaussian distribution.
             - 'no_noise': No noise.
-        - noise_level (float, optional): The level of noise. Defaults to None. Can be used interchangeably with noise_percentage.
-        - noise_percentage (float, optional): The percentage of noise reletive to the predicted values of the model. Defaults to None. Can be used interchangeably with noise_level.
-        - data_path (str, optional): The path to save the simulated data. Defaults to '/PhD_project/data/'.
+            - Add more noise distributions as needed.
+        - noise_level (float, optional): The level of noise of the simulated data. Defaults to None. Can be used interchangeably with noise_percentage.
+        - noise_percentage (float, optional): The percentage of noise of the simulated data reletive to the predicted values of the model. Defaults to None. Can be used interchangeably with noise_level.
+        - data_path (str, optional): The path to save the simulated data. Defaults to '/data'.
+        - plot_data (bool, optional): Whether to plot the simulated data. Defaults to True.
+
+    Attributes:
+        - processed_data_name (str): The name of the simulated data. This indicates the name of the folder where the data is saved within the data directory, and the name of the folder where the inference results are saved in the results directory.
+        - model (Model): The model used for data simulation.
+        - domain (Domain): The domain used for data simulation.
+        - train_test_split (float): The ratio of training data to test data
+        - noise_dist (str): The distribution of noise. Defaults to 'no_noise'.
+        - noise_level (float): The level of noise. Can be used interchangeably with noise_percentage.
+        - noise_percentage (float): The percentage of noise reletive to the predicted values of the model. Can be used interchangeably with noise_level.
+        - simulated_data (pd.DataFrame): The simulated data.
+        - data_path (str): The root data path.
+        - plot_data (bool): Whether to plot the simulated
+
+    """
+
+    def __init__(self, processed_data_name: str, model: Model, domain: Domain, train_test_split: float = 0.8, noise_dist = 'no_noise', noise_level = None, noise_percentage = None, data_path = '/data', plot_data=True):
+        super().__init__(processed_data_name, None, train_test_split, data_path)
+        """
+        Initializes the SimDataProcess class.
+
+        Args:
+            - processed_data_name (str): The name of the simulated data. This will indicate the name of the folder where the data is saved within the data directory, and the name of the folder where the inference results will be saved in the results directory.
+            - model (Model): The model used for data simulation.
+            - domain (Domain): The domain used for data simulation.
+            - train_test_split (float, optional): The ratio of training data to test data. Defaults to 0.8.
+            - noise_dist (str, optional): The distribution of noise. Defaults to 'no_noise'. Options are:
+                - 'gaussian': Gaussian noise. Takes the noise_level as the standard deviation of the Gaussian distribution.
+                - 'no_noise': No noise.
+            - noise_level (float, optional): The level of noise. Defaults to None. Can be used interchangeably with noise_percentage.
+            - noise_percentage (float, optional): The percentage of noise reletive to the predicted values of the model. Defaults to None. Can be used interchangeably with noise_level.
+            - data_path (str, optional): The path to save the simulated data. Defaults to '/PhD_project/data/'.
+            - plot_data (bool, optional): Whether to plot the simulated data. Defaults to True.
 
         """
         
@@ -59,6 +69,7 @@ class SimDataProcessor(DataProcessor):
         self.noise_dist = noise_dist
         self.noise_level = noise_level
         self.noise_percentage = noise_percentage
+        self.plot_data = plot_data
 
         if self.noise_dist == 'no_noise':
             if self.noise_level is not None or self.noise_percentage is not None:
@@ -67,16 +78,22 @@ class SimDataProcessor(DataProcessor):
             if (self.noise_level is None and self.noise_percentage is None) or (self.noise_level is not None and self.noise_percentage is not None):
                 raise ValueError('SimDataProcess - either noise_level or noise_percentage must be specified, but not both, when noise_dist is not "no_noise"')
         
-    def get_construction(self):
+    def get_construction(self)->dict:
         """
-        Get the construction parameters for the data simulator.
+        Gets the construction parameters. The conctruction parameters includes all of the config information used to simulate the data. This is used to check if the simulated data already exists. It includes:
+            - processed_data_name: The name of the processed data.
+            - noise_dist: The distribution of noise.
+            - noise_level: The level of noise.
+            - noise_percentage: The percentage of noise.
+            - train_test_split: The ratio of training data to test data.
+            - model_params: The parameters for the model.
+            - domain_params: The parameters for the domain.
 
         Returns:
-            dict: The construction parameters.
+            - dict: The construction parameters.
         """
         construction = {
             'processed_data_name': self.processed_data_name,
-            'processor_params': self.processor_params,
             'noise_dist': self.noise_dist,
             'noise_level': self.noise_level,
             'noise_percentage': self.noise_percentage,
@@ -94,17 +111,17 @@ class SimDataProcessor(DataProcessor):
         Check if the simulated data already exists.
 
         Returns:
-            bool: True if the data exists, False otherwise.
+            - bool: True if the data exists, False otherwise.
         
         Raises:
-            FileNotFoundError: If the construction.json file is not found.
-            Exception: If the construction.json file does not match the simulator parameters.
+            - FileNotFoundError: If the construction.json file is not found.
+            - Exception: If the construction.json file does not match the simulator parameters.
         """
         if not os.path.exists(self.data_path + '/processed_sim_data/' + self.processed_data_name):
             return False
         else:
             try:
-                with open(self.data_path + 'processed_sim_data/' + self.processed_data_name + '/construction.json', 'r') as f:
+                with open(self.data_path + '/processed_sim_data/' + self.processed_data_name + '/construction.json', 'r') as f:
                     construction_data = json.load(f)
 
                 if construction_data == self.get_construction():
@@ -119,23 +136,21 @@ class SimDataProcessor(DataProcessor):
         Save the simulated data. Saves the data as a csv file and the construction parameters as a json file.
 
         Args:
-            simulated_data (pd.DataFrame): The simulated data.
+            - simulated_data (pd.DataFrame): The simulated data.
         """
         if not os.path.exists(self.data_path + '/processed_sim_data/' + self.processed_data_name):
             os.makedirs(self.data_path + '/processed_sim_data/' + self.processed_data_name)
         simulated_data.to_csv(self.data_path + '/processed_sim_data/' + self.processed_data_name + '/data.csv')
         with open(self.data_path + '/processed_sim_data/' + self.processed_data_name + '/construction.json', 'w') as f:
             json.dump(self.get_construction(), f, cls=NumpyEncoder, separators=(', ',': '), indent=4)
+        print('Data generated and saved to ' + self.data_path + '/processed_sim_data/' + self.processed_data_name)
 
-    def process_data(self, plot = True):
+    def process_data(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Simulate the data based on the given model and domain. If data has already been simulated, loads the data. Saves the simulated data as a csv file.
 
-        Args:
-        - plot (bool, optional): Whether to plot the simulated data. Defaults to True.
-
         Returns:
-        - tuple: A tuple containing the training data and test data.
+            - tuple: A tuple containing the training data and test data.
         """
         points = self.domain.create_domain()
         model_func = self.model.get_model()
@@ -159,10 +174,6 @@ class SimDataProcessor(DataProcessor):
                 C = mu
             else:
                 raise Exception('SimDataProcess - Noise distribution invalid!')
-            
-            if self.processor_params['log_output_data']:
-                C = np.log10(C)
-                mu = np.log10(mu)
 
             independent_vars = self.model.independent_variables
             data = pd.DataFrame({})
@@ -171,38 +182,35 @@ class SimDataProcessor(DataProcessor):
                     data[independent_vars[i]] = points
                 else:
                     data[independent_vars[i]] = points[:,i]
-            data[self.processor_params['output_header']] = C
-            data[self.processor_params['output_header'] + '_true'] = mu
+            data[self.model.dependent_variables[0]] = C
+            data[self.model.dependent_variables[0] + '_true'] = mu
             data.dropna(inplace=True)
             self.processed_data = data
             self._save_data(self.processed_data)
         else:
-            print('Data already simulated, loading data...')
             self.processed_data = pd.read_csv(self.data_path + '/processed_sim_data/' + self.processed_data_name + '/data.csv')
+            print('Data loaded from ' + self.data_path + '/processed_sim_data/' + self.processed_data_name)
 
         train_data, test_data = train_test_split(self.processed_data, test_size=1-self.train_test_split, random_state=42)
-        if plot:
-            self.plot_data()
+        if self.plot_data:
+            self.plot_sim_data()
 
         return train_data, test_data
     
-    def plot_data(self):
+    def plot_sim_data(self):
         """
-        Plot the simulated data.
+        This function plots the simulated data. The plot is saved as a png file in the processed_sim_data folder. The plot is only available for 1D and 3D data at present.
         """
         if not os.path.exists(self.data_path + '/processed_sim_data/' + self.processed_data_name):
             os.makedirs(self.data_path + '/processed_sim_data/' + self.processed_data_name)
         if not os.path.exists(self.data_path + '/processed_sim_data/' + self.processed_data_name + '/data_plot.png'):
-            if self.processor_params['log_output_data']:
-                title = 'Simulated log10(' + self.processor_params['output_header'] + ') data'
-            else:
-                title = 'Simulated '  + self.processor_params['output_header'] + ' data'
+            title = 'Simulated '  + self.model.dependent_variables[0] + ' data'
             if self.domain.n_dims == 1:
                 fig, ax = plt.subplots()
-                ax.scatter(self.processed_data[self.model.independent_variables[0]], self.processed_data[self.processor_params['output_header']], label='Simulated Data', s=10)
-                ax.plot(self.processed_data[self.model.independent_variables[0]], self.processed_data[self.processor_params['output_header'] + '_true'], label='Simulated Data No Noise', color='red')
+                ax.scatter(self.processed_data[self.model.independent_variables[0]], self.processed_data[self.model.dependent_variables[0]], label='Simulated Data', s=10)
+                ax.plot(self.processed_data[self.model.independent_variables[0]], self.processed_data[self.model.dependent_variables[0] + '_true'], label='Simulated Data No Noise', color='red')
                 ax.set_xlabel(self.model.independent_variables[0])
-                ax.set_ylabel(self.processor_params['output_header'])
+                ax.set_ylabel(self.model.dependent_variables[0])
                 ax.set_title(title)
                 ax.legend()
             elif self.domain.n_dims == 2:
@@ -215,10 +223,10 @@ class SimDataProcessor(DataProcessor):
                 sc = ax.scatter(self.processed_data[self.model.independent_variables[0]], 
                                 self.processed_data[self.model.independent_variables[1]], 
                                 self.processed_data[self.model.independent_variables[2]], 
-                                c=self.processed_data[self.processor_params['output_header']], 
+                                c=self.processed_data[self.model.dependent_variables[0]], 
                                 cmap='viridis', s=10,
-                                vmin = np.percentile(self.processed_data[self.processor_params['output_header']],5),
-                                vmax = np.percentile(self.processed_data[self.processor_params['output_header']],95))
+                                vmin = np.percentile(self.processed_data[self.model.dependent_variables[0]],5),
+                                vmax = np.percentile(self.processed_data[self.model.dependent_variables[0]],95))
                 ax.set_xlabel(self.model.independent_variables[0])
                 ax.set_ylabel(self.model.independent_variables[1])
                 ax.set_zlabel(self.model.independent_variables[2])
@@ -229,13 +237,6 @@ class SimDataProcessor(DataProcessor):
                 fig.colorbar(sc, cax=cbar_ax, orientation='horizontal')
                 fig.tight_layout()
 
-                # fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
-                # sc = ax.scatter(self.processed_data[self.model.independent_variables[0]], self.processed_data[self.model.independent_variables[1]], self.processed_data[self.model.independent_variables[2]], c=self.processed_data[self.processor_params['output_header']], cmap='viridis', s=10)
-                # ax.set_xlabel(self.model.independent_variables[0])
-                # ax.set_ylabel(self.model.independent_variables[1])
-                # ax.set_zlabel(self.model.independent_variables[2])
-                # ax.set_title(title)
-                # fig.colorbar(sc, ax=ax, label=self.processor_params['output_header'], orientation='horizontal', shrink=0.6, pad = 0.1)
             else:
                 raise ValueError('SimDataProcessor - Data dimensionality not supported')
             fig.savefig(self.data_path + '/processed_sim_data/' + self.processed_data_name + '/data_plot.png')

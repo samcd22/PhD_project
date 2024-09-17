@@ -8,7 +8,7 @@ from numpyencoder import NumpyEncoder
 import matplotlib.colors as colors
 
 
-from controllers.controller import Controller
+from app.controllers.controllers.controller import Controller
 from toolboxes.inference_toolbox.parameter import Parameter
 from app.toolboxes.inference_toolbox.model import Model
 from toolboxes.inference_toolbox.likelihood import Likelihood

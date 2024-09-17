@@ -9,22 +9,39 @@ from typing import Union, Optional, List
 
 class Parameter:
     """
-    A class representing an inferred parameter of the model by the sampler.
+    A class representing an inferred parameter of the model by the sampler. The Parameter class is used to define the prior distribution of the parameter, which is used to estimate the posterior distribution during the inference process. The Sampler class requires a series of Parameter objects to generate the sampled posterior.
+
+    Args:
+        - name (str or list): The name(s) of the parameter. If the parameter is multivariate, the name should be a list of names.
+        - prior_select (str, optional): The type of prior distribution to use. Defaults to "gaussian". Options are:
+            - "gaussian": Gaussian distribution 
+                - Can handle single and multivariate cases.
+                - Can handle single and multimodal cases.
+                - Requires 'mu' and 'sigma' hyperparameters.
+            - "gamma": Gamma distribution 
+                - Can only handle single variate cases.
+                - Can only handle single mode cases
+                - Requires either 'mu' and 'sigma' or 'alpha' and 'beta' hyperparameters.
+            - "uniform": Uniform distribution.
+                - Can only handle single variate cases.
+                - Can only handle single mode cases
+                - Requires 'low' and 'high' hyperparameters.
+            - "log_norm": Log-normal distribution.
+                - Can handle single and multivariate cases.
+                - Can handle single and multimodal cases.
+                - Requires either 'mu' and 'sigma' or 'loc' and 'scale' hyperparameters.
+        - order (int, optional): The order of the parameter. This is used to specify the order of magnitude of the parameter. The input hyperparameter values are generally set between 0.1 and 10, then specify the order of magnitude using "order". The hyperparameters are multiplied by 10^a, where a is the order. Defaults to 0.
+        - multi_mode (bool, optional): Indicates whether the parameter is multimodal or not. Defaults to False.
 
     Attributes:
-    - prior_params (pd.Series): A series to store the prior hyperparameters.
-    - name (str or list): The name or list of names of the parameter/joint parameters.
-    - prior_select (str): The type of prior distribution to use.
-    - multivar (bool): Indicates whether the parameter is multivariate or not.
-    - multi_mode (bool): Indicates whether the parameter is multimodal or not.
-    - joined_name (str): The combined name of the parameter/joint parameters.
-    - order (int): The order of magnitude of the parameter - input hyperparameter values generally between 0.1 and 10, then specify the order of magnitude using "order".
-    - n_dims (int): The number of dimensions of the parameter.
-    
-    Methods:
-    - add_prior_param: Saves a named prior hyperparameter to the Parameter class before generating the parameter's prior distribution.
-    - get_prior_function: Generates the selected prior distribution using the prior hyperparameters.
-    - sample_param: Generates a sample for this parameter.
+        - prior_params (pd.Series): A series to store the prior hyperparameters.
+        - name (str or list): The name or list of names of the parameter/joint parameters.
+        - prior_select (str): The type of prior distribution to use.
+        - multivar (bool): Indicates whether the parameter is multivariate or not.
+        - multi_mode (bool): Indicates whether the parameter is multimodal or not.
+        - joined_name (str): The combined name of the parameter/joint parameters.
+        - order (int): The order of magnitude of the parameter - input hyperparameter values generally between 0.1 and 10, then specify the order of magnitude using "order".
+        - n_dims (int): The number of dimensions of the parameter.
     """
     def __init__(self, name: Union[str, List[str]], prior_select: str = "gaussian", order: int = 0, multi_mode: Optional[bool] = False):
         """
@@ -49,7 +66,6 @@ class Parameter:
                 - Can handle single and multivariate cases.
                 - Can handle single and multimodal cases.
                 - Requires either 'mu' and 'sigma' or 'loc' and 'scale' hyperparameters.
-
         - order (int, optional): The order of the parameter. Defaults to 0.
         - multi_mode (bool, optional): Indicates whether the parameter is multimodal or not. Defaults to False.
         """
@@ -78,12 +94,14 @@ class Parameter:
             self.n_dims = 1        
         self.order = order
 
-    def get_construction(self):
+    def get_construction(self) -> dict:
         """
-        Get the construction parameters of the parameter.
-
-        Returns:
-        - dict: The construction parameters.
+        Get the construction parameters of the parameter. The conctruction parameters includes all of the config information used to construct the parameter object. It includes:
+            - name: The name of the parameter.
+            - prior_select: The selected prior distribution.
+            - prior_params: The prior hyperparameters.
+            - order: The order of magnitude of the parameter.
+            - multi_mode: Indicates whether the parameter is multimodal or not.
         """
         construction = {
             'name': self.name,
@@ -99,11 +117,9 @@ class Parameter:
         Utility function for converting mean and stdev to alpha in a Gamma distribution.
 
         Args:
-        - mu (float or array-like): The mean value(s).
-        - sigma (float or array-like): The standard deviation value(s).
+            - mu (float or array-like): The mean value(s).
+            - sigma (float or array-like): The standard deviation value(s).
 
-        Returns:
-        - float or array-like: The alpha value(s).
         """
         if sigma == 0:
             raise ValueError("'Parameter - 'sigma' cannot be zero.")
@@ -115,11 +131,9 @@ class Parameter:
         Utility function for converting mean and stdev to beta in a Gamma distribution.
 
         Args:
-        - mu (float or array-like): The mean value(s).
-        - sigma (float or array-like): The standard deviation value(s).
+            - mu (float or array-like): The mean value(s).
+            - sigma (float or array-like): The standard deviation value(s).
 
-        Returns:
-        - float or array-like: The beta value(s).
         """
         if sigma == 0:
             raise ValueError("'Parameter - 'sigma' cannot be zero.")
@@ -131,11 +145,9 @@ class Parameter:
         Utility function for converting mean and stdev to location in a Log Normal distribution.
 
         Args:
-        - mu (float or array-like): The mean value(s).
-        - sigma (float or array-like): The standard deviation value(s).
+            - mu (float or array-like): The mean value(s).
+            - sigma (float or array-like): The standard deviation value(s).
 
-        Returns:
-        - float or array-like: The loc value(s).
         """
 
         if np.isscalar(mu):
@@ -161,11 +173,9 @@ class Parameter:
         Utility function for converting mean and stdev to scale in a Log Normal distribution.
 
         Args:
-        - mu (float or array-like): The mean value(s).
-        - sigma (float or array-like): The standard deviation value(s).
+            - mu (float or array-like): The mean value(s).
+            - sigma (float or array-like): The standard deviation value(s).
 
-        Returns:
-        - float or array-like: The scale value(s).
         """
         if np.isscalar(mu):
             return np.sqrt(np.log(1 + sigma**2 / mu**2))
@@ -183,10 +193,8 @@ class Parameter:
         Utility function for converting peak to location in a Log Normal distribution.
 
         Args:
-        - peak (float or array-like): The peak value(s).
-
-        Returns:
-        - float or array-like: The loc value(s).
+            - peak (float or array-like): The peak value(s).
+            - scale (float or array-like): The scale value(s).
         """
         if np.isscalar(peak):
             return np.log(peak) + scale
@@ -209,11 +217,9 @@ class Parameter:
         Saves a named prior hyperparameter to the Parameter class before generating the parameter's prior distribution.
 
         Args:
-        - name (str): The name of the prior hyperparameter.
-        - val (float, int or np.ndarray): The value of the prior hyperparameter.
+            - name (str): The name of the prior hyperparameter.
+            - val (float, int or np.ndarray): The value of the prior hyperparameter.
 
-        Returns:
-        - Parameter: The Parameter instance.
         """
 
         if isinstance(val, list):
@@ -491,12 +497,12 @@ class Parameter:
             else:
                 raise ValueError("Parameter - class must contain the hyperparameters 'mu' and 'sigma' or 'loc' and 'scale' or 'peak' and 'scale'")
                           
-    def get_prior_function(self) -> distributions.Distribution:
+    def get_prior_function(self) -> callable:
         """
-        Generates the selected prior distribution using the prior hyperparameters.
+        Generates the selected prior distribution using the prior hyperparameters. The prior distribution is used alongside the Likelihood function to estimate the posterior distribution of the parameter during the inference process.
 
         Returns:
-        - numpyro.distributions.Distribution: The prior distribution.
+            - callable: The prior distribution function. This function is a callable Numpyro distribution object.
         """
 
         def gaussian_prior(prior_params):
@@ -634,10 +640,10 @@ class Parameter:
 
     def sample_param(self) -> list[float]|float:
         """
-        Generates a sample for this parameter.
+        Generates a sample for this parameter. The sample is generated from the prior distribution of the parameter. This function is used by the Sampler class to generate samples for the parameter during the inference process.
 
         Returns:
-        - float or list[float]: The sampled parameter value.
+            - float or list[float]: The sampled parameter value.
         """
         if self.prior_func == None:
             self.prior_func = self.get_prior_function()

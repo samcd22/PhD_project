@@ -8,7 +8,7 @@ from numpyencoder import NumpyEncoder
 from matplotlib import pyplot as plt
 import shutil
 
-from controllers.controller import Controller
+from app.controllers.controllers.controller import Controller
 from toolboxes.inference_toolbox.parameter import Parameter
 from app.toolboxes.inference_toolbox.model import Model
 from toolboxes.inference_toolbox.likelihood import Likelihood

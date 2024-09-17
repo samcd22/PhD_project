@@ -13,46 +13,43 @@ import warnings
 warnings.filterwarnings("ignore")
 import statsmodels.api as sm
 
-from toolboxes.inference_toolbox.sampler import Sampler
-from toolboxes.plotting_toolbox.domain import Domain
-from toolboxes.data_processing_toolbox.sim_data_processor import SimDataProcessor
+from inference_toolbox.sampler import Sampler
+from plotting_toolbox.domain import Domain
+from data_processing.sim_data_processor import SimDataProcessor
 
 class Visualiser:
     """
     Visualiser class - Used for processing and visualising the results from the sampler
 
-    Attributes:
-    - n_samples (int): Number of samples
-    - n_chains (int): Number of chains
-    - samples (pd.DataFrame): Samples from the sampler
-    - chain_samples (pd.DataFrame): Samples from each chain
-    - fields (list): Fields of the sampler
-    - data_processor (SimDataProcessor or RawDataProcessor): Data processor object
-    - training_data (pd.DataFrame): Training data
-    - testing_data (pd.DataFrame): Testing data
-    - model_func (function): Model function
-    - dependent_variables (list): Dependent variables of the model
-    - independent_variables (list): Independent variables of the model
-    - inference_params (list): Inference parameters
-    - likelihood_func (function): Likelihood function
-    - results_path (str): Path to save results
-    - instance (int): Instance number
-    - params_min (pd.Series): Minimum parameter values from the sampled results
-    - params_lower (pd.Series): Lower bound parameter values from the sampled results
-    - params_median (pd.Series): Median parameter values from the sampled results
-    - params_upper (pd.Series): Upper bound parameter values from the sampled results
-    - params_max (pd.Series): Maximum parameter values from the sampled results
-    - RMSE (float): Root Mean Squared Error
-    - AIC (float): Akaike Information Criterion
-    - BIC (float): Bayesian Information Criterion
-    - autocorrs (dict): Autocorrelations
 
-    Methods:
-    - get_traceplots: Checks whether traceplots exist, if not, generates and saves them
-    - show_predictions: Outputs the plots for visualising the modelled system
-    - get_autocorrs: Generates the autocorrelation plots
-    - get_summary: Generates a summary of the results
-    - plot_prior: Plots the prior distribution for the inputted parameter
+    Args:
+        - sampler (Sampler): The sampler object
+
+    Attributes:
+        - n_samples (int): Number of samples
+        - n_chains (int): Number of chains
+        - samples (pd.DataFrame): Samples from the sampler
+        - chain_samples (pd.DataFrame): Samples from each chain
+        - fields (list): Fields of the sampler
+        - data_processor (SimDataProcessor or RawDataProcessor): Data processor object
+        - training_data (pd.DataFrame): Training data
+        - testing_data (pd.DataFrame): Testing data
+        - model_func (function): Model function
+        - dependent_variables (list): Dependent variables of the model
+        - independent_variables (list): Independent variables of the model
+        - inference_params (list): Inference parameters
+        - likelihood_func (function): Likelihood function
+        - results_path (str): Path to save results
+        - instance (int): Instance number
+        - params_min (pd.Series): Minimum parameter values from the sampled results
+        - params_lower (pd.Series): Lower bound parameter values from the sampled results
+        - params_median (pd.Series): Median parameter values from the sampled results
+        - params_upper (pd.Series): Upper bound parameter values from the sampled results
+        - params_max (pd.Series): Maximum parameter values from the sampled results
+        - RMSE (float): Root Mean Squared Error
+        - AIC (float): Akaike Information Criterion
+        - BIC (float): Bayesian Information Criterion
+        - autocorrs (dict): Autocorrelations
 
     """
 
@@ -61,10 +58,8 @@ class Visualiser:
         Initialises the Visualiser class saving all relevant variables and performing some initialising tasks
 
         Args:
-            sampler (Sampler): The sampler object
+            - sampler (Sampler): The sampler object
 
-        Raises:
-            Exception: If the sampler has not been run
         """
         if not sampler.sampled:
             raise Exception('Visualiser - sampler has not been run!')
@@ -133,9 +128,9 @@ class Visualiser:
         Generates a traceplot based on inputted samples
 
         Args:
-            x (np.ndarray): Input samples
-            xnames (list): Names of the variables
-            title (str): Title of the traceplot
+            - x (np.ndarray): Input samples
+            - xnames (list): Names of the variables
+            - title (str): Title of the traceplot
 
         Returns:
             matplotlib.figure.Figure: The generated traceplot figure
@@ -191,12 +186,12 @@ class Visualiser:
         Outputs the plots for visualising the modelled system based on the concluded lower, median and upper bound parameters and an inputted domain
 
         Args:
-            domain (Domain): The domain object
-            plot_name (str): Name of the plot for saving purposes
-            plot_type (str, optional): Type of plot. Defaults to '3D'. Options are:
+            - domain (Domain): The domain object
+            - plot_name (str): Name of the plot for saving purposes
+            - plot_type (str, optional): Type of plot. Defaults to '3D'. Options are: 
                 - '3D': 3D plot
                 - '2D_slice': 2D slice plot
-            title (str, optional): Overall title of the plot. Defaults to None.
+            - title (str, optional): Overall title of the plot. Defaults to None.
 
         """
         if plot_type == '3D':
@@ -277,9 +272,9 @@ class Visualiser:
         Plotting function for 1D plots
 
         Args:
-            results (pd.DataFrame): Results dataframe
-            name (str): Name of the plot for saving purposes
-            title (str, optional): Title of the plot. Defaults to None.
+            - results (pd.DataFrame): Results dataframe
+            - name (str): Name of the plot for saving purposes
+            - title (str, optional): Title of the plot. Defaults to None.
         """
         results[self.independent_variables[0]]
         lower_res = results.lower_res
@@ -376,10 +371,10 @@ class Visualiser:
         Plotting function for 3D plots
 
         Args:
-            results (pd.DataFrame): Results dataframe
-            name (str): Name of the plot for saving purposes
-            q (int, optional): Number of bins i.e. number of figures generated. Defaults to 10.
-            title (str, optional): Title of the plot. Defaults to None.
+            - results (pd.DataFrame): Results dataframe
+            - name (str): Name of the plot for saving purposes
+            - q (int, optional): Number of bins i.e. number of figures generated. Defaults to 10.
+            - title (str, optional): Title of the plot. Defaults to None.
         """
         X = results[self.independent_variables[0]]
         Y = results[self.independent_variables[1]]
@@ -562,8 +557,6 @@ class Visualiser:
         The accuracy is calculated as the percentage error between the mean value of the parameter
         in the samples and the corresponding fixed model parameter value.
 
-        Returns:
-            str: A string representation of the accuracy of each parameter.
         """
         param_accuracy_string_array = []
         for param in self.samples.columns:
@@ -608,11 +601,11 @@ class Visualiser:
         Calculate the aggregated samples for each column in the given DataFrame.
 
         Parameters:
-        samples (pd.DataFrame): The DataFrame containing the samples.
-        q_val (float): The quantile value used to calculate the aggregated sample.
+            - samples (pd.DataFrame): The DataFrame containing the samples.
+            - q_val (float): The quantile value used to calculate the aggregated sample.
 
         Returns:
-        pd.Series: A Series containing the aggregated samples for each column.
+            - pd.Series: A Series containing the aggregated samples for each column.
         """
         ags = pd.Series({}, dtype='float64')
         for col in samples.columns:
@@ -626,14 +619,9 @@ class Visualiser:
         Gathers all of the figures under the inputted name, creates an animation of them and saves that animation
 
         Args:
-            name (str): The name of the animation.
-            frame_dur (int, optional): The duration of each frame in milliseconds. Defaults to 500.
+            - name (str): The name of the animation.
+            - frame_dur (int, optional): The duration of each frame in milliseconds. Defaults to 500.
 
-        Raises:
-            Exception: If the images for animation do not exist.
-
-        Returns:
-            None
         """
         folder_name = 'instance_' + str(self.instance) + '/' + name + '/figures'
         gif_name = name + '.gif'
@@ -657,10 +645,10 @@ class Visualiser:
         Plots the prior distribution for a given parameter.
 
         Args:
-            param_name (str): The name of the parameter.
-            param_range (list): The range of the parameter values.
-            references (dict, optional): A dictionary of reference values for the parameter. Defaults to None.
-            show_estimate (bool, optional): Whether to show the estimated median value. Defaults to False.
+            - param_name (str): The name of the parameter.
+            - param_range (list): The range of the parameter values.
+            - references (dict, optional): A dictionary of reference values for the parameter. Defaults to None.
+            - show_estimate (bool, optional): Whether to show the estimated median value. Defaults to False.
         """
         if param_name not in self.inference_params:
             raise Exception('Visualiser - parameter not listed as an inference parameter!')
@@ -676,12 +664,11 @@ class Visualiser:
         Plot the two priors for a given parameter.
 
         Args:
-            param_name (str): The name of the parameter.
-            param_range (list): A list of two lists, each containing two floats or integers, representing the range of the parameter.
-            references (dict, optional): A dictionary containing references for the parameter. 
-                It should have keys 'labels' and 'vals', where 'labels' is a list of strings and 'vals' is a list of lists, 
-                each containing two floats or integers. Defaults to None.
-            show_estimate (bool, optional): Whether to show the estimated median value. Defaults to False.
+            - param_name (str): The name of the parameter.
+            - param_range (list): A list of two lists, each containing two floats or integers, representing the range of the parameter.
+            - references (dict, optional): A dictionary containing references for the parameter. 
+                - It should have keys 'labels' and 'vals', where 'labels' is a list of strings and 'vals' is a list of lists, each containing two floats or integers. Defaults to None.
+            - show_estimate (bool, optional): Whether to show the estimated median value. Defaults to False.
 
         """
         plt.figure(figsize=(8, 8))
@@ -768,9 +755,9 @@ class Visualiser:
         Plot the prior distribution for a given parameter.
 
         Args:
-            param_name (str): The name of the parameter.
-            param_range (list): A list with two floats or integers indicating the maximum and minimum values to plot the prior between.
-            references (dict, optional): A dictionary containing reference values for the parameter. The dictionary must have keys 'labels' and 'vals', which are lists of labels and values respectively. Defaults to None.
+            - param_name (str): The name of the parameter.
+            - param_range (list): A list with two floats or integers indicating the maximum and minimum values to plot the prior between.
+            - references (dict, optional): A dictionary containing reference values for the parameter. The dictionary must have keys 'labels' and 'vals', which are lists of labels and values respectively. Defaults to None.
         """
         if not isinstance(param_range, list) or len(param_range) != 2 or not all(isinstance(val, (float, int)) for val in param_range):
             raise Exception('Visualiser - Invalid param_range. It should be a list with two floats or integers indicating the maximum and minimum values to plot the prior between.')
@@ -852,10 +839,10 @@ class Visualiser:
         Generates plots for a 2D slice of the 3D modelled system based on the concluded lower, median and upper bound parameters and an inputted domain
 
         Args:
-            results (dict): The results data containing the independent variables and their corresponding values.
-            name (str): The name of the plot.
-            slice_name (str, optional): The name of the slice variable. Defaults to None.
-            title (str, optional): The title of the plot. Defaults to None.
+            - results (dict): The results data containing the independent variables and their corresponding values.
+            - name (str): The name of the plot.
+            - slice_name (str, optional): The name of the slice variable. Defaults to None.
+            - title (str, optional): The title of the plot. Defaults to None.
 
         """
         full_path = self.results_path + '/instance_' + str(self.instance) + '/' + name + '_2D_' + slice_name + '.png'
@@ -967,7 +954,7 @@ class Visualiser:
 
     def get_autocorrelations(self):
         """
-        Generate and save autocorrelation plots for each parameter in the MCMC samples.
+        Generates and saves autocorrelation plots for each parameter of the MCMC samples.
         """
         autocorr_folder = self.results_path + '/instance_' + str(self.instance) + '/autocorrelations'
         if not os.path.exists(autocorr_folder):
@@ -1005,12 +992,11 @@ class Visualiser:
         """
         Calculate autocorrelation values for the samples.
 
-        Parameters:
-            D (int, optional): The number of samples to consider for autocorrelation calculation. 
-                               If not provided, it defaults to the total number of samples.
+        Args:
+            - D (int, optional): The number of samples to consider for autocorrelation calculation. If not provided, it defaults to the total number of samples.
 
         Returns:
-            dict: A dictionary containing autocorrelation values for each chain and overall.
+            - dict: A dictionary containing autocorrelation values for each chain and overall.
 
         """
         autocorrs = {}
@@ -1042,7 +1028,7 @@ class Visualiser:
 
         return autocorrs
 
-    def get_summary(self):
+    def get_summary(self) -> dict:
         """
         Generates and saves the summary of the inference results.
 
@@ -1107,6 +1093,15 @@ class Visualiser:
         return summary
 
     def plot_posterior(self, param_name: str, param_range: list, references: dict = None):
+        """
+        Plots the posterior distribution for a given parameter.
+
+        Args:
+            - param_name (str): The name of the parameter.
+            - param_range (list): A list with two floats or integers indicating the maximum and minimum values to plot the prior between.
+            - references (dict, optional): A dictionary containing reference values for the parameter. The dictionary must have keys 'labels' and 'vals', which are lists of labels and values respectively. Defaults to None.
+        """
+
         if param_name not in self.inference_params:
             raise Exception('Visualiser - parameter not listed as an inference parameter!')
         if self.inference_params[param_name].n_dims == 1:

@@ -9,49 +9,60 @@ from jaxlib.xla_extension import ArrayImpl
 from jax import random
 import jax
 
-from toolboxes.inference_toolbox.model import Model
-from toolboxes.inference_toolbox.likelihood import Likelihood
-from toolboxes.data_processing_toolbox.data_processor import DataProcessor
+from inference_toolbox.model import Model
+from inference_toolbox.likelihood import Likelihood
+from data_processing.data_processor import DataProcessor
 
 
 class Sampler:
     """
-    A class for performing sampling using the NUTS algorithm.
+    A class for performing sampling using the NUTS algorithm. The Sampler class is used to generate samples from the posterior distribution of the inference parameters.
+
+    Args:
+        - inference_params (pd.Series): A pandas Series containing the inference parameters. Each element is a parameter object
+        - model (Model): The model object.
+        - likelihood (Likelihood): The likelihood object.
+        - data_processor (RawDataProcessor, SimDataProcessor): The data processor object.
+        - n_samples (int, optional): The number of samples to draw. Defaults to 10000.
+        - p_warmup (float, optional): The proportion of warmup samples. Defaults to 0.5. So if p_warmup is 0.5 then 50% more samples will be drawn and thrown out before the actual sampling process begins.
+        - n_chains (int, optional): The number of chains to run in parallel. Defaults to 1. If set to greater than 1, the sampler will be run multiple times beginning in different locations in the parameter space.
+        - thinning_rate (int, optional): The thinning rate for the samples. Defaults to 1. If thinning_rate is 1, all samples are saved. If thinning_rate is 2, every second sample is saved, and so on.
+        - root_results_path (str, optional): The root path to save the results. Defaults to '/results/inference_results'.
+        - controller (str, optional): The controller type. Must be one of 'sandbox', 'generator', or 'optimisor'. Defaults to 'sandbox'.
+        - generator_name (str, optional): The name of the generator. Required if controller is 'generator'. Defaults to None.
+        - optimiser_name (str, optional): The name of the optimiser. Required if controller is 'optimisor'. Defaults to None.
+
 
     Attributes:
-    - inference_params (pd.Series): A pandas Series containing the inference parameters.
-    - n_samples (int): The number of samples to draw.
-    - n_chains (int): The number of chains to run in parallel.
-    - p_warmup (float): The proportion of warmup samples.
-    - n_warmup (int): The number of warmup samples.
-    - thinning_rate (int): The thinning rate for the samples.
-    - data_processor: The data processor object.
-    - model: The model object.
-    - likelihood: The likelihood object.
-    - training_data: The training data.
-    - testing_data: The testing data.
-    - data_construction: The construction of the data processor.
-    - model_func: The model function.
-    - independent_variables: The independent variables of the model.
-    - dependent_variables: The dependent variables of the model.
-    - all_model_param_names: All parameter names of the model.
-    - fixed_model_params: The fixed model parameters.
-    - likelihood_func: The likelihood function.
-    - fixed_likelihood_params: The fixed likelihood parameters.
-    - results_path (str): The path to save the results.
-    - root_results_path (str): The root path to save the results.
-    - sampler_construction: The construction of the sampler.
-    - data_exists (bool): Flag indicating if the data exists.
-    - instance (int): The instance number.
-    - sampled (bool): Flag indicating if the sampler has been sampled.
-    - samples (pd.DataFrame): The samples.
-    - chain_samples (pd.DataFrame): The chain samples.
-    - fields (dict): The fields dictionary.
+        - inference_params (pd.Series): A pandas Series containing the inference parameters.
+        - n_samples (int): The number of samples to draw.
+        - n_chains (int): The number of chains to run in parallel.
+        - p_warmup (float): The proportion of warmup samples.
+        - n_warmup (int): The number of warmup samples.
+        - thinning_rate (int): The thinning rate for the samples.
+        - data_processor (RawDataProcessor, SimDataProcessor): The data processor object.
+        - model (Model): The model object.
+        - likelihood (Likelihood): The likelihood object.
+        - training_data (pd.DataFrame): The training data.
+        - testing_data (pd.DataFrame): The testing data.
+        - data_construction (dict): The construction of the data processor.
+        - model_func (callable): The model function.
+        - independent_variables (list): The independent variable names of the model.
+        - dependent_variables (list): The dependent variable names of the model.
+        - all_model_param_names (list): All parameter names of the model.
+        - fixed_model_params (pd.Series): The fixed model parameters.
+        - likelihood_func (callable): The likelihood function.
+        - fixed_likelihood_params (pd.Series): The fixed likelihood parameters.
+        - results_path (str): The path to save the results.
+        - root_results_path (str): The root path to save the results.
+        - sampler_construction (dict): The construction of the sampler.
+        - data_exists (bool): Flag indicating if the data exists.
+        - instance (int): The instance number.
+        - sampled (bool): Flag indicating if the sampler has been sampled.
+        - samples (pd.DataFrame): The samples.
+        - chain_samples (pd.DataFrame): The chain samples.
+        - fields (dict): The fields dictionary.
 
-    Methods:
-    - get_construction: Get the construction of the sampler.
-    - sample_one: Sample one set of parameters.
-    - sample_all: Sample all sets of parameters.
     """
 
     def __init__(self, inference_params: pd.Series, 
@@ -62,7 +73,7 @@ class Sampler:
                  p_warmup:float=0.5, 
                  n_chains:int=1, 
                  thinning_rate:int=1, 
-                 root_results_path:str='/PhD_project/results/inference_results', 
+                 root_results_path:str='/results/inference_results', 
                  controller:str='sandbox', 
                  generator_name:str=None, 
                  optimiser_name:str=None):
@@ -70,18 +81,18 @@ class Sampler:
         Initializes the Sampler class.
 
         Args:
-        - inference_params (pd.Series): A pandas Series containing the inference parameters. Each element is a parameter object
-        - model: The model object.
-        - likelihood: The likelihood object.
-        - data_processor: The data processor object.
-        - n_samples (int, optional): The number of samples to draw. Defaults to 10000.
-        - p_warmup (float, optional): The proportion of warmup samples. Defaults to 0.5.
-        - n_chains (int, optional): The number of chains to run in parallel. Defaults to 1.
-        - thinning_rate (int, optional): The thinning rate for the samples. Defaults to 1.
-        - root_results_path (str, optional): The root path to save the results. Defaults to '/PhD_project/results/inference_results'.
-        - controller (str, optional): The controller type. Must be one of 'sandbox', 'generator', or 'optimisor'. Defaults to 'sandbox'.
-        - generator_name (str, optional): The name of the generator. Required if controller is 'generator'. Defaults to None.
-        - optimiser_name (str, optional): The name of the optimiser. Required if controller is 'optimisor'. Defaults to None.
+            - inference_params (pd.Series): A pandas Series containing the inference parameters. Each element is a parameter object
+            - model: The model object.
+            - likelihood: The likelihood object.
+            - data_processor: The data processor object.
+            - n_samples (int, optional): The number of samples to draw. Defaults to 10000.
+            - p_warmup (float, optional): The proportion of warmup samples. Defaults to 0.5.
+            - n_chains (int, optional): The number of chains to run in parallel. Defaults to 1.
+            - thinning_rate (int, optional): The thinning rate for the samples. Defaults to 1.
+            - root_results_path (str, optional): The root path to save the results. Defaults to '/results/inference_results'.
+            - controller (str, optional): The controller type. Must be one of 'sandbox', 'generator', or 'optimisor'. Defaults to 'sandbox'.
+            - generator_name (str, optional): The name of the generator. Required if controller is 'generator'. Defaults to None.
+            - optimiser_name (str, optional): The name of the optimiser. Required if controller is 'optimisor'. Defaults to None.
         """
         
         if not isinstance(inference_params, pd.Series):
@@ -160,8 +171,6 @@ class Sampler:
         """
         Get the construction of the sampler.
 
-        Returns:
-            dict: The construction of the sampler.
         """
         construction = {
             'inference_params': [param.get_construction() for param in self.inference_params],
@@ -180,9 +189,9 @@ class Sampler:
         Save the samples, chain samples, and fields to disk.
 
         Args:
-            samples (pd.DataFrame): The samples.
-            chain_samples (pd.DataFrame): The chain samples.
-            fields (dict): The fields dictionary.
+            - samples (pd.DataFrame): The samples.
+            - chain_samples (pd.DataFrame): The chain samples.
+            - fields (dict): The fields dictionary.
         """
         instance_folder = os.path.join(self.results_path, f'instance_{self.instance}')
         os.makedirs(instance_folder, exist_ok=True)
@@ -196,14 +205,12 @@ class Sampler:
         with open(os.path.join(instance_folder, 'sampler_construction.json'), "w") as fp:
             json.dump(self.sampler_construction,fp, cls=NumpyEncoder, separators=(', ',': '), indent=4)
 
+        print('Samples saved to ' + instance_folder)
+
     def _load_samples(self):
         """
         Load the samples, chain samples, and fields from disk.
 
-        Returns:
-            pd.DataFrame: The samples.
-            pd.DataFrame: The chain samples.
-            dict: The fields dictionary.
         """
         instance_folder = os.path.join(self.results_path, f'instance_{self.instance}')
         try:
@@ -224,6 +231,8 @@ class Sampler:
             samples.drop(columns=['Unnamed: 0'], inplace=True)
         if 'Unnamed: 0' in chain_samples.columns:
             chain_samples.drop(columns=['Unnamed: 0'], inplace=True)
+
+        print('Samples loaded from ' + instance_folder)
         
         return samples, chain_samples, fields
 
@@ -232,12 +241,8 @@ class Sampler:
         Check the validity of the data.
 
         Args:
-            data: The data to check.
+            - data: The data to check.
 
-        Raises:
-            Exception: If the data contains missing values.
-            Exception: If the data does not contain all independent variables of the model.
-            Exception: If the data does not contain all dependent variables of the model.
         """
         if data.isnull().values.any():
             raise Exception('Sampler - Data contains missing values!')
@@ -251,8 +256,6 @@ class Sampler:
         """
         Sample one set of parameters.
 
-        Returns:
-            numpyro.sample: The observed samples.
         """
         current_params_sample = {}
         for param_ind in self.inference_params.index:
@@ -270,7 +273,7 @@ class Sampler:
             self.likelihood_func(mu, current_params_sample)
         except:
             print(self.training_data[['x','y','z']].values[jnp.isinf(mu)])
-            print('Error in likelihood function')
+            print('Sampler - Error in likelihood function')
 
         mu = numpyro.deterministic('mu', mu)
         with numpyro.plate('data', len(self.training_data[self.dependent_variables[0]])):
@@ -281,23 +284,23 @@ class Sampler:
         Use logarithms to handle large exponents safely
 
         Returns:
-        - float: The result of the exponentiation.
+            - float: The result of the exponentiation.
 
         """
         res = jnp.exp(jnp.log(base) + exponent * jnp.log(10))
         return res
 
-    def sample_all(self, rng_key=random.PRNGKey(2120)):
+    def sample_all(self, rng_key=random.PRNGKey(2120)) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
         """
         Sample all sets of parameters.
 
         Args:
-        - rng_key: The random number generator key.
+            - rng_key: The random number generator key.
 
         Returns:
-        - pd.DataFrame: The samples.
-        - pd.DataFrame: The chain samples.
-        - dict: The fields dictionary.
+            - pd.DataFrame: The samples.
+            - pd.DataFrame: The chain samples.
+            - dict: The fields dictionary.
         """
         if not self.data_exists:
             kernel = numpyro.infer.NUTS(self.sample_one)
@@ -311,7 +314,6 @@ class Sampler:
             self._save_samples(samples, chain_samples, fields)
             self.samples, self.chain_samples, self.fields = samples, chain_samples, fields, 
         else:
-            print("Samples already exists, loading data...")
             self.samples, self.chain_samples, self.fields = self._load_samples()
         self.sampled = True
         return self.samples, self.chain_samples, self.fields
@@ -321,10 +323,8 @@ class Sampler:
         Format the samples.
 
         Args:
-        - samples (dict): The unformatted samples.
+            - samples (dict): The unformatted samples.
         
-        Returns:
-        - pd.DataFrame: The formatted samples and chain samples.
         """
 
         chain_new_samples = pd.DataFrame({}, dtype='float64')
@@ -377,10 +377,8 @@ class Sampler:
         Format the current parameter samples.
 
         Args:
-            current_params_sample: The current parameter samples.
+            - current_params_sample: The current parameter samples.
 
-        Returns:
-            dict: The formatted current parameter samples.
         """
         formatted_current_params_sample = {}
         for param_ind in self.inference_params.index:
@@ -423,10 +421,10 @@ class Sampler:
         Utility function which recursively converts NumPy arrays to lists within a dictionary.
 
         Args:
-        - obj (dict or list or np.ndarray): The input object to convert.
+            - obj (dict or list or np.ndarray): The input object to convert.
 
         Returns:
-        - dict or list or list: The converted object with NumPy arrays replaced by lists.
+            - dict or list or list: The converted object with NumPy arrays replaced by lists.
         """
         if isinstance(obj, dict):
             # If the object is a dictionary, convert arrays within its values

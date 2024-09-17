@@ -8,21 +8,29 @@ import matplotlib.gridspec as gridspec
 
 class BoxGridder:
     """
-    Class to create a 3D grid of boxes and average the data points within each box
+    Class to create a 3D grid of boxes and average the data points within each box. The class takes three dimensional spatial data and averages the data points within each box of a specific 3D grid. The centroid of each grid square is set as the location of each averaged value. The class can then visualize the grid of averaged data and generate histograms for a random sample of grid squares.
+    
+    Args:
+        - data: DataFrame containing the 3D data points
+        - grid_size: List containing the size of the grid in each dimension
+        - output_path: String, path to the data directory
+        - independent_variables: List of strings, names of the independent variables
+        - dependent_variable: String, name of the dependent variable
+        - input_data_logged: Boolean, indicates if the input data is logged
+        - output_data_logged: Boolean, indicates if the results should be logged
+        - averages_df: DataFrame containing the already averaged data
 
-    Parameters:
-    - data: DataFrame containing the 3D data points
-    - grid_size: List containing the size of the grid in each dimension
-    - output_path: String, path to the data directory
-    - independent_variables: List of strings, names of the independent variables
-    - dependent_variable: String, name of the dependent variable
-    - input_data_logged: Boolean, indicates if the input data is logged
-    - output_data_logged: Boolean, indicates if the results should be logged
-    - averages_df: DataFrame containing the already averaged data
-
-    Methods:
-    - visualise_average_data: Visualize the 3D grid of the averaged data
-    - get_sample_histograms: Generate histograms for a random sample of grid squares
+    Attributes:
+        - data: DataFrame containing the 3D data points
+        - grid_size: List containing the size of the grid in each dimension
+        - output_path: String, path to the data directory
+        - independent_variables: List of strings, names of the independent variables
+        - dependent_variable: String, name of the dependent variable
+        - input_data_logged: Boolean, indicates if the input data is logged
+        - output_data_logged: Boolean, indicates if the results should be logged
+        - averages_df: DataFrame containing the averaged data
+        - samples: List of tuples, containing the samples within each box
+    
     """
     
     def __init__(self, data: pd.DataFrame=None, grid_size: List[float]=None, 
@@ -35,14 +43,14 @@ class BoxGridder:
         Initialize the BoxGridder object and  generates the averaged data if not already inputted.
 
         Args:
-        - data: DataFrame containing the 3D data points
-        - grid_size: Tuple containing the size of the grid in each dimension
-        - output_path: String, path to the data directory
-        - independent_variables: List of strings, names of the independent variables
-        - dependent_variable: String, name of the dependent variable
-        - input_data_logged: Boolean, indicates if the input data is logged
-        - output_data_logged: Boolean, indicates if the results should be logged
-        - averages_df: DataFrame containing the averaged data
+            - data: DataFrame containing the 3D data points
+            - grid_size: Tuple containing the size of the grid in each dimension
+            - output_path: String, path to the data directory
+            - independent_variables: List of strings, names of the independent variables
+            - dependent_variable: String, name of the dependent variable
+            - input_data_logged: Boolean, indicates if the input data is logged
+            - output_data_logged: Boolean, indicates if the results should be logged
+            - averages_df: DataFrame containing the averaged data
         """
 
         self.data = data
@@ -69,11 +77,11 @@ class BoxGridder:
         Round down to the next base number.
 
         Args:
-        - x: Float, number to be rounded
-        - base: Float, base number
+            - x: Float, number to be rounded
+            - base: Float, base number
 
         Returns:
-        - Float, rounded number
+            - Float, rounded number
         """
         return base * np.floor(x/base)
     
@@ -82,11 +90,11 @@ class BoxGridder:
         Check which boundary points in the grid the point of interest lies between.
 
         Args:
-        - haystack: Numpy array, grid points
-        - needle: Float, point of interest
+            - haystack: Numpy array, grid points
+            - needle: Float, point of interest
 
         Returns:
-        - Tuple of floats, lower and upper bounds
+            - Tuple of floats, lower and upper bounds
         """
         idx = bisect.bisect(haystack, needle)
         if 0 < idx < len(haystack):
@@ -100,7 +108,7 @@ class BoxGridder:
         Calculate the averages of the data points within each box.
 
         Returns:
-        - DataFrame, averaged data
+            - DataFrame: averaged data
         """
         if self.data is None:
             raise Exception('RawDataProcessor - Data not provided')
@@ -175,11 +183,10 @@ class BoxGridder:
     
     def visualise_average_data(self, type: str = 'values') -> None:
         """
-        Visualize the 3D grid of the averaged data.
+        Visualize the 3D grid of the averaged data. Can either visualize the average values or the number of data points within each grid square. The plot is saved in the output directory.
 
         Args:
-        - averages_df: DataFrame containing the averaged data
-        - type: String, either 'value' or 'counts' depending on what you want to visualize
+            - type: String, either 'value' or 'counts' depending on what you want to visualize
         """
         file_name = self.output_path + '/' + type.lower() + '_grid_plot.png'
         if not os.path.exists(file_name):
@@ -215,11 +222,10 @@ class BoxGridder:
     
     def get_sample_histograms(self, n_hists: int = 5) -> None:
         """
-        Generate histograms for a random sample of grid squares.
+        Generate histograms for a random sample of grid squares. The number of histograms to generate is specified by the n_hists parameter. The histograms are saved in the output directory.
 
         Args:
-        - averages_df: DataFrame containing the averaged data
-        - n_hists: Integer, number of histograms to generate
+            - n_hists: Integer, number of histograms to generate
         """
 
         samples = self.averages_df.samples.sample(n_hists, random_state=1)

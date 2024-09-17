@@ -11,21 +11,21 @@ ModelInput = Union[str, int, float]
 
 class Model:
     """
-    A class representing the Model used for predicting a system's behaviour. The parameters of this model are optimised using Bayesian Inference
+    A class representing the Model used for predicting a system's behaviour. The parameters of this model are optimised using Bayesian Inference. The Sampler class requires a Model object to generate the sampled posterior.
+
+    Args:
+        - model_select (str): The selected model. Default options are:
+            - 'line': y = m * x + c.
+            - 'curve': y = m * x^2 + c.
+            - Add more models using the add_model function.
 
     Attributes:
-    - fixed_model_params (pd.Series): A pandas Series object to store model parameters.
-    - model_select (str): The selected model.
-    - model_func_string (str): The model function string.
-    - independent_variables (list): A list of independent variables.
-    - dependent_variables (list): A list of dependent variables.
-    - all_param_names (list): A list of all parameter names.
-
-    Methods:
-    - __init__(self, model_select: str): Initializes the Model class.
-    - add_model_param(self, name: str, val: ModelInput) -> 'Model': Adds a named parameter to the Model class.
-    - get_model(self) ->: callable Generates the selected model function using the model parameters.
-    - gen_construction(self) -> dict: Generates the construction parameters for the model.
+        - fixed_model_params (pd.Series): A pandas Series object to store model parameters.
+        - model_select (str): The selected model. This is the key used to select the model from the models.json file.
+        - model_func_string (str): The model function string.
+        - independent_variables (list): A list of independent variable names.
+        - dependent_variables (list): A list of dependent variable names.
+        - all_param_names (list): A list of all parameter names.
     """
 
     def __init__(self, model_select: str):
@@ -33,7 +33,10 @@ class Model:
         Initializes the Model class.
 
         Args:
-        - model_select (str): The selected model. Options are:
+            - model_select (str): The selected model. Options are:
+                - 'line': y = m * x + c.
+                - 'curve': y = m * x^2 + c.
+                - Add more models using the add_model function.
         """
         self.fixed_model_params = pd.Series({}, dtype='float64')
         self.model_select = model_select
@@ -90,24 +93,23 @@ class Model:
 
     def add_fixed_model_param(self, name: str, val) -> 'Model':
         """
-        Adds a named parameter to the Model class.
+        Adds a named parameter to the Model class. This parameter is fixed and not optimised during the inference process.
 
         Args:
-        - name (str): The name of the parameter.
-        - val: The value of the parameter.
+            - name (str): The name of the parameter.
+            - val: The value of the parameter.
 
-        Returns:
-        - self: The Model object.
         """
         self.fixed_model_params[name] = val
         return self
 
-    def get_model(self):
+    def get_model(self) -> callable:
         """
-        Generates the selected model function using the model parameters.
+        Generates the selected model function using the model parameters. The model function is used to predict the system's behaviour.
 
         Returns:
-        - _model_func: The model function.
+            - callable: The model function. This function takes the list of infered model parameters and a value list of independent variables as inputs and returns the predicted dependent variable values.
+        
         """
         
         inference_param_vars = [self.variables[param] for param in self.all_param_names if param not in self.fixed_model_params]
@@ -122,12 +124,15 @@ class Model:
         
         return _model_func
     
-    def get_construction(self):
+    def get_construction(self) -> dict:
         """
-        Generates the construction parameters for the model.
-
-        Returns:
-        - dict: The construction parameters.
+        Gets the construction parameters. The conctruction parameters includes all of the config information used to construct the model object. It includes:
+            - model_select: The selected model.
+            - fixed_model_params: The fixed model parameters.
+            - independent_variables: A list of independent variable names.
+            - dependent_variables: A list of dependent variable names.
+            - all_param_names: A list of all parameter names.
+            - model_func_string: The model function string.
         """
         construction = {
             'model_select': self.model_select,
@@ -141,41 +146,36 @@ class Model:
 
 def add_model(model_name: str, model_str: str, independent_variables: List[str], dependent_variables: List[str], all_param_names: List[str]):
     """
-    Adds a model to the model.json.
+    Adds a model to the model.json. The model string should be a mathematical expression that can be evaluated using SymPy. The model string should contain the independent variables, dependent variables, and all parameter names. A list of how mathematical expressions in the model string should be formatted is provided below.
 
     Args:
-    - model_name (str): The name of the model.
-    - model_str (str): The model string.
-    - independent_variables (list): A list of independent variables.
-    - dependent_variables (list): A list of dependent variables.
-    - all_param_names (list): A list of all parameter names.
-
-    Raises:
-    - Exception: If the model string contains any mathematical words.
-    - Exception: If the model already exists in the models.json file but the model string does not match.
-    - Exception: If the model already exists in the models.json file.
+        - model_name (str): The name of the model. This name should be unique.
+        - model_str (str): The model string. This should be a mathematical expression that can be evaluated using SymPy.
+        - independent_variables (list): A list of independent variable names.
+        - dependent_variables (list): A list of dependent variable names.
+        - all_param_names (list): A list of all parameter names.
 
     Mathematical expressions:
-    - pi: The mathematical constant pi.
-    - exp: The exponential function.
-    - log: The natural logarithm function.
-    - log10: The logarithm function (base 10).
-    - sqrt: The square root function. 
-    - sin: The sine function.
-    - cos: The cosine function.
-    - tan: The tangent function.
-    - arcsin: The inverse sine function.
-    - arccos: The inverse cosine function.
-    - arctan: The inverse tangent function.
-    - sinh: The hyperbolic sine function.
-    - cosh: The hyperbolic cosine function.
-    - tanh: The hyperbolic tangent function.
-    - arcsinh: The inverse hyperbolic sine function.
-    - arccosh: The inverse hyperbolic cosine function.
-    - arctanh: The inverse hyperbolic tangent function.
-    - abs: The absolute value function.
-    - ceil: The ceiling function.
-    - floor: The floor function.
+        - pi: The mathematical constant pi.
+        - exp: The exponential function.
+        - log: The natural logarithm function.
+        - log10: The logarithm function (base 10).
+        - sqrt: The square root function. 
+        - sin: The sine function.
+        - cos: The cosine function.
+        - tan: The tangent function.
+        - arcsin: The inverse sine function.
+        - arccos: The inverse cosine function.
+        - arctan: The inverse tangent function.
+        - sinh: The hyperbolic sine function.
+        - cosh: The hyperbolic cosine function.
+        - tanh: The hyperbolic tangent function.
+        - arcsinh: The inverse hyperbolic sine function.
+        - arccosh: The inverse hyperbolic cosine function.
+        - arctanh: The inverse hyperbolic tangent function.
+        - abs: The absolute value function.
+        - ceil: The ceiling function.
+        - floor: The floor function.
 
     """
     mathematical_words = ['pi', 'exp', 'log', 'log10', 'sqrt', 'sin', 'cos', 
@@ -212,10 +212,10 @@ def add_model(model_name: str, model_str: str, independent_variables: List[str],
 
 def delete_model(model_name: str):
     """
-    Deletes a model from model.json.
+    Deletes a model from model.json using the model name.
 
     Args:
-    - model_name (str): The name of the model.
+        - model_name (str): The name of the model. This is the key used to select the model from the models.json file.
 
     """
     models_file = os.path.join(os.path.dirname(__file__), "models.json")
