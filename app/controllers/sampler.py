@@ -169,8 +169,15 @@ class Sampler:
 
     def get_construction(self):
         """
-        Get the construction of the sampler.
-
+        Get the construction of the sampler. The conctruction parameters includes all of the config information used to construct the sampler object. It includes:
+            - inference_params: The inference parameters.
+            - model: The construction of the model object.
+            - likelihood: The construction of the likelihood object.
+            - data_processor: The construction of the data processor object.
+            - n_samples: The number of samples to draw.
+            - n_chains: The number of chains to run in parallel.
+            - thinning_rate: The thinning rate for the samples.
+            - p_warmup: The proportion of warmup samples.
         """
         construction = {
             'inference_params': [param.get_construction() for param in self.inference_params],
@@ -254,7 +261,7 @@ class Sampler:
 
     def sample_one(self):
         """
-        Sample one set of parameters.
+        Sample one set of parameters. This function is used by the MCMC sampler to generate samples from the posterior distribution. The sampler itterated through this function to generate the samples.
 
         """
         current_params_sample = {}
@@ -292,7 +299,7 @@ class Sampler:
 
     def sample_all(self, rng_key=random.PRNGKey(2120)) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
         """
-        Sample all sets of parameters.
+        Sample all sets of parameters. This function is used to generate all samples from the posterior distribution.
 
         Args:
             - rng_key: The random number generator key.

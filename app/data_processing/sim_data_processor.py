@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from sklearn.model_selection import train_test_split
 import matplotlib.gridspec as gridspec
 
-from plotting_toolbox.domain import Domain
+from visualisation_toolbox.domain import Domain
 from inference_toolbox.model import Model
 from data_processing.data_processor import DataProcessor
 

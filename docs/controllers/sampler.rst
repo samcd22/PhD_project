@@ -1,7 +1,7 @@
 Sampler
 =======
 
-.. automodule:: inference_toolbox.sampler
+.. automodule:: controllers.sampler
    :members:
    :undoc-members:
    :show-inheritance:

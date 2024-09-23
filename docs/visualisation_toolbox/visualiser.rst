@@ -1,7 +1,7 @@
 Visualiser
 ==========
 
-.. automodule:: inference_toolbox.visualiser
+.. automodule:: visualisation_toolbox.visualiser
    :members:
    :undoc-members:
    :show-inheritance:

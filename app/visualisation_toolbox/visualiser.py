@@ -13,14 +13,13 @@ import warnings
 warnings.filterwarnings("ignore")
 import statsmodels.api as sm
 
-from inference_toolbox.sampler import Sampler
-from plotting_toolbox.domain import Domain
+from controllers.sampler import Sampler
+from visualisation_toolbox.domain import Domain
 from data_processing.sim_data_processor import SimDataProcessor
 
 class Visualiser:
     """
-    Visualiser class - Used for processing and visualising the results from the sampler
-
+    Visualiser class - Used for processing and visualising the results from the sampler. The class contains methods for generating traceplots of the samples, visualising the modelled system and summarising the results and success of the sampler.
 
     Args:
         - sampler (Sampler): The sampler object
@@ -37,7 +36,7 @@ class Visualiser:
         - model_func (function): Model function
         - dependent_variables (list): Dependent variables of the model
         - independent_variables (list): Independent variables of the model
-        - inference_params (list): Inference parameters
+        - inference_params (pd.Series): Inference parameters. This is a series containing the Parameter objects
         - likelihood_func (function): Likelihood function
         - results_path (str): Path to save results
         - instance (int): Instance number
@@ -49,7 +48,7 @@ class Visualiser:
         - RMSE (float): Root Mean Squared Error
         - AIC (float): Akaike Information Criterion
         - BIC (float): Bayesian Information Criterion
-        - autocorrs (dict): Autocorrelations
+        - autocorrs (dict): A dictionary containing the autocorrelation values for each parameter
 
     """
 
@@ -103,7 +102,7 @@ class Visualiser:
 
     def get_traceplots(self):
         """
-        Generates and saves the traceplots from the sampled results
+        Generates and saves the traceplots from the sampled results. If there are multiple chains of samples then multiple traceplots are generated and saved. One file is saved per chain, including the traceplot for each inferred parameter.
         """
         traceplot_folder = self.results_path + '/instance_' + str(self.instance) + '/traceplots'
         if not os.path.exists(traceplot_folder):
@@ -183,21 +182,27 @@ class Visualiser:
 
     def show_predictions(self, domain: Domain, plot_name: str, plot_type: str = '3D', title: str = None):
         """
-        Outputs the plots for visualising the modelled system based on the concluded lower, median and upper bound parameters and an inputted domain
+        Outputs the plots for visualising the modelled system based on the concluded lower, median and upper bound parameters and an inputted domain. Plots are saved and include a summary of the parameter values and the sampling success.
 
         Args:
-            - domain (Domain): The domain object
+            - domain (Domain): The domain object. This object contains information about where the model is to be evaluated.
             - plot_name (str): Name of the plot for saving purposes
             - plot_type (str, optional): Type of plot. Defaults to '3D'. Options are: 
+                - '1D': 1D plot
+                - '2D': 2D plot - not yet implemented
                 - '3D': 3D plot
+                - '4D': 4D plot - not yet implemented
+                - '1D_slice': 1D slice plot - not yet implemented
                 - '2D_slice': 2D slice plot
+                - '3D_slice': 3D slice plot - not yet implemented
+
             - title (str, optional): Overall title of the plot. Defaults to None.
 
         """
         if plot_type == '3D':
             if domain.n_dims != 3:
                 raise Exception('Visualiser - domain does not have the correct number of spatial dimensions!')
-            
+
             points = domain.create_domain()
 
             results_df = pd.DataFrame({})
@@ -264,6 +269,18 @@ class Visualiser:
             results_df['upper_res'] = upper_res
 
             self._oneD_plots(results_df, plot_name, title=title)
+        elif plot_type == '2D':
+            raise Exception('Visualiser - 2D plot type not implemented!')
+        
+        elif plot_type == '1D_slice':
+            raise Exception('Visualiser - 1D slice plot type not implemented!')
+        
+        elif plot_type == '4D':
+            raise Exception('Visualiser - 4D plot type not implemented!')
+        
+        elif plot_type == '3D_slice':
+            raise Exception('Visualiser - 3D slice plot type not implemented!')
+        
         else:
             raise Exception('Visualiser - plot type not recognised!')
         
@@ -642,13 +659,13 @@ class Visualiser:
 
     def plot_prior(self, param_name: str, param_range: list, references: dict = None, show_estimate: bool = False):
         """
-        Plots the prior distribution for a given parameter.
+        Plots the prior distribution for a given parameter. Either a 1D or 2D plot is generated based on the number of dimensions of the parameter. The plot is saved in the results directory.
 
         Args:
-            - param_name (str): The name of the parameter.
-            - param_range (list): The range of the parameter values.
-            - references (dict, optional): A dictionary of reference values for the parameter. Defaults to None.
-            - show_estimate (bool, optional): Whether to show the estimated median value. Defaults to False.
+            - param_name (str): The name of the parameter. If the parameter is a 2D parameter, the name should be the name of the parameter is the one given as the key in the inference_params series.
+            - param_range (list): The range of the parameter values for the plot. Indicates the maximum and minimum values of the parameter to plot the prior between. The range should be a list containing two floats or integers in the 1D case and a list of of two lists, each containing two floats or integers in the 2D case.
+            - references (dict, optional): A dictionary containing reference values for the parameter. The dictionary must have keys 'labels' and 'vals', which are lists of labels and values respectively. Defaults to None.
+            - show_estimate (bool, optional): Whether to show the estimated median value from the sampled posterior. Defaults to False.
         """
         if param_name not in self.inference_params:
             raise Exception('Visualiser - parameter not listed as an inference parameter!')
@@ -954,7 +971,7 @@ class Visualiser:
 
     def get_autocorrelations(self):
         """
-        Generates and saves autocorrelation plots for each parameter of the MCMC samples.
+        Generates and saves autocorrelation plots for each parameter of the MCMC samples. A plot is generated for each parameter within each chain.
         """
         autocorr_folder = self.results_path + '/instance_' + str(self.instance) + '/autocorrelations'
         if not os.path.exists(autocorr_folder):
@@ -1030,8 +1047,12 @@ class Visualiser:
 
     def get_summary(self) -> dict:
         """
-        Generates and saves the summary of the inference results.
-
+        Generates and saves the summary of the inference results. This is a JSON file which includes:
+            - RMSE, AIC and BIC values
+            - The lower, median and upper values for each parameter in each chain
+            - The autocorrelation values for each parameter in each chain
+            - The lower, median and upper values for each parameter overall
+            - The autocorrelation values for each parameter overall
         Returns:
             dict: A dictionary containing the summary of the inference results.
         """
@@ -1094,11 +1115,11 @@ class Visualiser:
 
     def plot_posterior(self, param_name: str, param_range: list, references: dict = None):
         """
-        Plots the posterior distribution for a given parameter.
+        Plots the posterior distribution for a given parameter. Either a 1D or 2D plot is generated based on the number of dimensions of the parameter. The plot is saved in the results directory.
 
         Args:
-            - param_name (str): The name of the parameter.
-            - param_range (list): A list with two floats or integers indicating the maximum and minimum values to plot the prior between.
+            - param_name (str): The name of the parameter. If the parameter is a 2D parameter, the name should be the name of the parameter is the one given as the key in the inference_params series.
+            - param_range (list): The range of the parameter values for the plot. Indicates the maximum and minimum values of the parameter to plot the sampled posterior between. The range should be a list containing two floats or integers in the 1D case and a list of of two lists, each containing two floats or integers in the 2D case.
             - references (dict, optional): A dictionary containing reference values for the parameter. The dictionary must have keys 'labels' and 'vals', which are lists of labels and values respectively. Defaults to None.
         """
 
@@ -1258,4 +1279,4 @@ class Visualiser:
             os.makedirs(folder_name)
 
         plt.savefig(full_path)
-        plt.close()        
+        plt.close()

@@ -1,7 +1,7 @@
 Domain
 =============
 
-.. automodule:: plotting_toolbox.domain
+.. automodule:: visualisation_toolbox.domain
    :members:
    :undoc-members:
    :show-inheritance:

@@ -5,7 +5,7 @@ import os
 import json
 from numpyencoder import NumpyEncoder
 
-from controllers.controller import Controller
+from controllers.controllers.controller import Controller
 from toolboxes.inference_toolbox.parameter import Parameter
 from toolboxes.inference_toolbox.model import Model
 from toolboxes.inference_toolbox.likelihood import Likelihood

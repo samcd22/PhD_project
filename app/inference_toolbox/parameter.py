@@ -29,7 +29,15 @@ class Parameter:
             - "log_norm": Log-normal distribution.
                 - Can handle single and multivariate cases.
                 - Can handle single and multimodal cases.
-                - Requires either 'mu' and 'sigma' or 'loc' and 'scale' hyperparameters.
+                - Requires either 'mu' and 'sigma', 'loc' and 'scale', or 'peak' and 'scale' hyperparameters.
+            - "exponential": Exponential distribution.
+                - Can only handle single variate cases.
+                - Can only handle single and multimodal cases.
+                - Requires 'rate' hyperparameter.
+            - "beta": Beta distribution.
+                - Can only handle single variate cases.
+                - Can only handle single and multimodal cases.
+                - Requires 'alpha' and 'beta' hyperparameters.
         - order (int, optional): The order of the parameter. This is used to specify the order of magnitude of the parameter. The input hyperparameter values are generally set between 0.1 and 10, then specify the order of magnitude using "order". The hyperparameters are multiplied by 10^a, where a is the order. Defaults to 0.
         - multi_mode (bool, optional): Indicates whether the parameter is multimodal or not. Defaults to False.
 
@@ -497,6 +505,44 @@ class Parameter:
             else:
                 raise ValueError("Parameter - class must contain the hyperparameters 'mu' and 'sigma' or 'loc' and 'scale' or 'peak' and 'scale'")
                           
+        elif 'exponential_check' in checks:
+            if 'rate' not in prior_params:
+                raise ValueError("Parameter - class must contain the hyperparameter 'rate'")
+            if set(prior_params.keys()) - {'rate'}:
+                raise ValueError("Parameter - class must only contain the hyperparameter 'rate'")
+        
+            if self.multi_mode:
+                try:
+                    rate = np.array(prior_params['rate'])
+                    if not np.isscalar(rate).all():
+                        raise ValueError("Parameter - 'rate' must contain only scalar values")
+                except:
+                    raise ValueError("Parameter - 'rate' must be an array-like object")
+            else:
+                if not np.isscalar(prior_params['rate']):
+                    raise ValueError("Parameter - 'rate' must be a scalar value")
+                
+        elif 'beta_check' in checks:
+            if 'alpha' not in prior_params or 'beta' not in prior_params:
+                raise ValueError("Parameter - class must contain the hyperparameters 'alpha' and 'beta'")
+            if set(prior_params.keys()) - {'alpha', 'beta'}:
+                raise ValueError("Parameter - class must only contain the hyperparameters 'alpha' and 'beta'")
+            
+            if self.multi_mode:
+                try:
+                    alpha = np.array(prior_params['alpha'])
+                    if not np.isscalar(alpha).all():
+                        raise ValueError("Parameter - 'alpha' must contain only scalar values")
+                except:
+                    raise ValueError("Parameter - 'alpha' must be an array-like object")
+                try:
+                    beta = np.array(prior_params['beta'])
+                    if not np.isscalar(beta).all():
+                        raise ValueError("Parameter - 'beta' must contain only scalar values")
+                except:
+                    raise ValueError("Parameter - 'beta' must be an array-like object")
+                
+        
     def get_prior_function(self) -> callable:
         """
         Generates the selected prior distribution using the prior hyperparameters. The prior distribution is used alongside the Likelihood function to estimate the posterior distribution of the parameter during the inference process.
@@ -524,6 +570,30 @@ class Parameter:
                     return distributions.MultivariateNormal(prior_params.mu, prior_params['sigma']**2)
                 else:
                     return distributions.Normal(prior_params.mu, prior_params['sigma']**2)
+
+        def exponential_prior(prior_params):
+            self._hyperparam_checks(prior_params, ['exponential_check'])
+            if self.multi_mode:
+                dists = []
+                mixture_size = np.shape(prior_params['rate'])[0]
+                mixing_dist = distributions.Categorical(probs=jnp.ones(mixture_size) / mixture_size)
+                for i in range(np.shape(prior_params['rate'])[0]):
+                    dists.append(distributions.Exponential(prior_params['rate'][i]))
+                return distributions.MixtureGeneral(mixing_dist, dists)
+            else:
+                return distributions.Exponential(prior_params['rate'])
+            
+        def beta_prior(prior_params):
+            self._hyperparam_checks(prior_params, ['beta_check'])
+            if self.multi_mode:
+                dists = []
+                mixture_size = np.shape(prior_params.alpha)[0]
+                mixing_dist = distributions.Categorical(probs=jnp.ones(mixture_size) / mixture_size)
+                for i in range(np.shape(prior_params.alpha)[0]):
+                    dists.append(distributions.Beta(prior_params.alpha[i], prior_params.beta[i]))
+                return distributions.MixtureGeneral(mixing_dist, dists)
+            else:
+                return distributions.Beta(prior_params.alpha, prior_params.beta)
 
         def gamma_prior(prior_params):
             self._hyperparam_checks(prior_params, ['gamma_check'])
@@ -634,7 +704,11 @@ class Parameter:
             return uniform_prior(self.prior_params)
         
         elif self.prior_select == 'log_norm':  
-            return log_norm_prior(self.prior_params)        
+            return log_norm_prior(self.prior_params)       
+        elif self.prior_select == 'exponential':
+            return exponential_prior(self.prior_params) 
+        elif self.prior_select == 'beta':
+            return beta_prior(self.prior_params)
         else:
             raise ValueError("Invalid prior distribution selected!")
 

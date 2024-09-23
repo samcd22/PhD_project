@@ -17,6 +17,8 @@ class Model:
         - model_select (str): The selected model. Default options are:
             - 'line': y = m * x + c.
             - 'curve': y = m * x^2 + c.
+            - exponential: y = a * exp(b * x).
+            - logarithmic: y = a * log(b * x).
             - Add more models using the add_model function.
 
     Attributes:
@@ -36,6 +38,8 @@ class Model:
             - model_select (str): The selected model. Options are:
                 - 'line': y = m * x + c.
                 - 'curve': y = m * x^2 + c.
+                - exponential: y = a * exp(b * x).
+                - logarithmic: y = a * log(b * x).
                 - Add more models using the add_model function.
         """
         self.fixed_model_params = pd.Series({}, dtype='float64')

@@ -10,6 +10,11 @@ Add your content using ``reStructuredText`` syntax. See the
 `reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
 documentation for details.
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Controllers:
+
+   controllers/sampler
 
 .. toctree::
    :maxdepth: 2
@@ -18,14 +23,13 @@ documentation for details.
    inference_toolbox/likelihood
    inference_toolbox/model
    inference_toolbox/parameter
-   inference_toolbox/sampler
-   inference_toolbox/visualiser
 
 .. toctree::
    :maxdepth: 2
-   :caption: Plotting Toolbox:
+   :caption: Visualisation Toolbox:
 
-   plotting_toolbox/domain
+   visualisation_toolbox/domain
+   visualisation_toolbox/visualiser
 
 .. toctree::
    :maxdepth: 2
