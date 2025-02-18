@@ -1,17 +1,4 @@
 {
-    "line": {
-        "model": "m*x+c", 
-        "independent_variables": [
-            "x"
-        ], 
-        "dependent_variables": [
-            "y"
-        ], 
-        "all_param_names": [
-            "m", 
-            "c"
-        ]
-    }, 
     "curve": {
         "model": "m*x^2+c", 
         "independent_variables": [
@@ -37,7 +24,7 @@
             "a", 
             "b"
         ]
-    },
+    }, 
     "logarithmic": {
         "model": "a*log(x)+b", 
         "independent_variables": [
@@ -50,7 +37,7 @@
             "a", 
             "b"
         ]
-    },
+    }, 
     "gpm_norm": {
         "model": "Q/(2*pi*I_y*I_z*x^2)*exp(-y^2/(2*I_y^2*x^2))*(exp(-(z-H)^2/(2*I_z^2*x^2))+exp(-(z+H)^2/(2*I_z^2*x^2)))", 
         "independent_variables": [
@@ -117,6 +104,150 @@
         "all_param_names": [
             "a", 
             "n"
+        ]
+    }, 
+    "test": {
+        "model": "a*x", 
+        "independent_variables": [
+            "x"
+        ], 
+        "dependent_variables": [
+            "y"
+        ], 
+        "all_param_names": [
+            "a"
+        ]
+    }, 
+    "test2": {
+        "model": "a*x^3 + b*x^2", 
+        "independent_variables": [
+            "x"
+        ], 
+        "dependent_variables": [
+            "y"
+        ], 
+        "all_param_names": [
+            "a", 
+            "b"
+        ]
+    }, 
+    "alt_gpm_norm": {
+        "model": "Q/(2*pi*R_y*R_z*x^(b_y+b_z))*exp(-y^2/(2*R_y^2*x^(2*b_y)))*(exp(-(z-H)^2/(2*R_z^2*x^(2*b_z)))+exp(-(z+H)^2/(2*R_z^2*x^(2*b_z))))", 
+        "independent_variables": [
+            "x", 
+            "y", 
+            "z"
+        ], 
+        "dependent_variables": [
+            "Concentration"
+        ], 
+        "all_param_names": [
+            "Q", 
+            "R_y", 
+            "R_z", 
+            "b_y", 
+            "b_z", 
+            "H"
+        ]
+    }, 
+    "log_alt_gpm_norm": {
+        "model": "log10(Q/(2*pi*R_y*R_z*x^(b_y+b_z))*exp(-y^2/(2*R_y^2*x^(2*b_y)))*(exp(-(z-H)^2/(2*R_z^2*x^(2*b_z)))+exp(-(z+H)^2/(2*R_z^2*x^(2*b_z)))))", 
+        "independent_variables": [
+            "x", 
+            "y", 
+            "z"
+        ], 
+        "dependent_variables": [
+            "Concentration"
+        ], 
+        "all_param_names": [
+            "Q", 
+            "R_y", 
+            "R_z", 
+            "b_y", 
+            "b_z", 
+            "H"
+        ]
+    }, 
+    "log_full_briggs_gpm_norm": {
+        "model": "log10(Q/(2*pi*a_y*a_z*x^2*(1+c_y*x)^d_y*(1+c_z*x)^d_z)*exp(-y^2/(2*a_y^2*x^2*(1+c_y*x)^(2*d_y)))*(exp(-(z-H)^2/(2*a_z^2*x^2*(1+c_z*x)^(2*d_z)))+exp(-(z+H)^2/(2*a_z^2*x^2*(1+c_z*x)^(2*d_z)))))", 
+        "independent_variables": [
+            "x", 
+            "y", 
+            "z"
+        ], 
+        "dependent_variables": [
+            "Concentration"
+        ], 
+        "all_param_names": [
+            "H", 
+            "Q", 
+            "a_y", 
+            "c_y", 
+            "d_y", 
+            "a_z", 
+            "c_z", 
+            "d_z"
+        ]
+    }, 
+    "line": {
+        "model": "a*x + b", 
+        "independent_variables": [
+            "x"
+        ], 
+        "dependent_variables": [
+            "y"
+        ], 
+        "all_param_names": [
+            "a", 
+            "b"
+        ]
+    }, 
+    "nat_log_gpm_norm": {
+        "model": "log(Q/(2*pi*I_y*I_z*x^2)*exp(-y^2/(2*I_y^2*x^2))*(exp(-(z-H)^2/(2*I_z^2*x^2))+exp(-(z+H)^2/(2*I_z^2*x^2))))", 
+        "independent_variables": [
+            "x", 
+            "y", 
+            "z"
+        ], 
+        "dependent_variables": [
+            "Concentration"
+        ], 
+        "all_param_names": [
+            "H", 
+            "I_y", 
+            "I_z", 
+            "Q"
+        ]
+    }, 
+    "parabaloid": {
+        "model": "a*x^2 + b*y^2", 
+        "independent_variables": [
+            "x", 
+            "y"
+        ], 
+        "dependent_variables": [
+            "C"
+        ], 
+        "all_param_names": [
+            "a", 
+            "b"
+        ]
+    }, 
+    "parabaloid_3D": {
+        "model": "a*x^2 + b*y^2 + d*z^2", 
+        "independent_variables": [
+            "x", 
+            "y", 
+            "z"
+        ], 
+        "dependent_variables": [
+            "C"
+        ], 
+        "all_param_names": [
+            "a", 
+            "b", 
+            "d"
         ]
     }
 }

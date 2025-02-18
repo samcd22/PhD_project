@@ -24,7 +24,7 @@ class BoxGridder:
         - dependent_variable: String, the dependent variable name.
         - input_data_logarithmised: Boolean, indicating logarithmised data.
         - output_data_logarithmised: Boolean, flag output logarithmisation.
-        - averages_df: DataFrame containing the already averaged data.
+        - processed_data: DataFrame containing the already averaged data.
 
     Attributes:
         - data: DataFrame containing the 3D spatial data.
@@ -34,7 +34,7 @@ class BoxGridder:
         - dependent_variable: String, the dependent variable name.
         - input_data_logarithmised: Boolean, indicating logarithmised data.
         - output_data_logarithmised: Boolean, flag output logarithmisation.
-        - averages_df: DataFrame containing the averaged data.
+        - processed_data: DataFrame containing the averaged data.
         - samples: List of tuples, containing the samples within each box.
     """
 
@@ -46,7 +46,7 @@ class BoxGridder:
                  dependent_variable: str = 'Concentration',
                  input_data_logarithmised: bool = False,
                  output_data_logarithmised: bool = False,
-                 averages_df=None) -> None:
+                 processed_data=None) -> None:
 
         """
         Initialise a BoxGridder object.
@@ -60,7 +60,7 @@ class BoxGridder:
             - dependent_variable: String, the dependent variable name.
             - input_data_logarithmised: Boolean, indicating logarithmised data.
             - output_data_logarithmised: Boolean, flag output logarithmisation.
-            - averages_df: DataFrame containing the averaged data.
+            - processed_data: DataFrame containing the averaged data.
         """
 
         self.data = data
@@ -71,16 +71,16 @@ class BoxGridder:
         self.input_data_logarithmised = input_data_logarithmised
         self.output_data_logarithmised = output_data_logarithmised
 
-        output_path_csv = output_path + '/data.csv'
+        output_path_csv = output_path + '/data_plus.csv'
         if os.path.exists(output_path_csv):
-            self.averages_df = pd.read_csv(output_path_csv)
+            self.processed_data = pd.read_csv(output_path_csv)
         else:
             os.makedirs(output_path, exist_ok=True)
-            if averages_df is not None:
-                self.averages_df = averages_df
+            if processed_data is not None:
+                self.processed_data = processed_data
             else:
-                self.averages_df = self._get_averages()
-                self.averages_df.to_csv(output_path_csv, index=False)
+                self.processed_data = self._get_averages()
+                self.processed_data.to_csv(output_path_csv, index=False)
 
     def _flexible_floor(self, x: float, base: float) -> float:
         """
@@ -228,16 +228,16 @@ class BoxGridder:
             if self.output_data_logarithmised:
                 averages_data = np.log10(averages_data)
 
-            averages_df = pd.DataFrame({
+            processed_data = pd.DataFrame({
                 self.independent_variables[0]: centroid_x,
                 self.independent_variables[1]: centroid_y,
                 self.independent_variables[2]: centroid_z,
                 self.dependent_variable: averages_data,
                 'counts': counts_data, 'samples': samples_data})
-            averages_df = averages_df.dropna()
-        return averages_df
+            processed_data = processed_data.dropna()
+        return processed_data
 
-    def visualise_average_data(self, type: str = 'values') -> None:
+    def visualise_counts(self) -> None:
         """
         Visualise a 3D grid of averaged data.
         Visualises either averages, or data points count, in each box.
@@ -247,33 +247,20 @@ class BoxGridder:
             - type: String, either 'value' or 'counts' depending on the desired
                        visualisation.
         """
-        file_name = self.output_path + '/' + type.lower() + '_grid_plot.png'
+        file_name = self.output_path + '/counts_grid_plot.png'
         if not os.path.exists(file_name):
-            if type == 'values':
-                title = self.dependent_variable + ' across all experiments'
-                if self.output_data_logarithmised:
-                    title = 'Average log ' + title
-                else:
-                    title = 'Average ' + title
 
-                colour_output = self.averages_df[self.dependent_variable]
-
-            elif type == 'counts':
-                colour_output = self.averages_df['counts']
-                title = 'Number of data points within each grid square'
-
-            else:
-                raise Exception('Type not found')
-
+            colour_output = self.processed_data['counts']
+            title = 'Number of data points within each grid square'
             fig = plt.figure(figsize=(10, 10))
 
             # Create grid for plot and colour bar.
             gs = gridspec.GridSpec(2, 1, height_ratios=[5, 0.2])
 
             ax = fig.add_subplot(gs[0], projection='3d')
-            p = ax.scatter(self.averages_df[self.independent_variables[0]],
-                           self.averages_df[self.independent_variables[1]],
-                           self.averages_df[self.independent_variables[2]],
+            p = ax.scatter(self.processed_data[self.independent_variables[0]],
+                           self.processed_data[self.independent_variables[1]],
+                           self.processed_data[self.independent_variables[2]],
                            c=colour_output, s=15, cmap='viridis',
                            vmin=np.percentile(colour_output, 5),
                            vmax=np.percentile(colour_output, 95), alpha=1)
@@ -297,7 +284,7 @@ class BoxGridder:
             - n_hists: Integer, number of histograms to generate.
         """
 
-        samples = self.averages_df.samples.sample(n_hists, random_state=1)
+        samples = self.processed_data.samples.sample(n_hists, random_state=1)
 
         samples_dir = self.output_path + '/sample_grid_squares'
         if not os.path.exists(samples_dir):
@@ -309,9 +296,9 @@ class BoxGridder:
                 # Convert the string elements to floats and create a new tuple.
                 sample = [float(element) for element in string_elements]
             plot_path = samples_dir + '/sample_grid_square_' + str(i) + '.png'
-            x = self.averages_df[self.independent_variables[0]][i]
-            y = self.averages_df[self.independent_variables[1]][i]
-            z = self.averages_df[self.independent_variables[2]][i]
+            x = self.processed_data[self.independent_variables[0]][i]
+            y = self.processed_data[self.independent_variables[1]][i]
+            z = self.processed_data[self.independent_variables[2]][i]
             title = str([x, y, z])
 
             if self.output_data_logarithmised:

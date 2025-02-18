@@ -84,7 +84,7 @@ class Parameter:
             raise TypeError("prior_select must be a string")
         if not isinstance(order, (int, float)):
             raise TypeError("order must be an integer")
-        if prior_select not in ["gaussian", "gamma", "uniform", "log_norm", "multi_mode_gaussian", "multi_mode_log_norm"]:
+        if prior_select not in ["gaussian", "gamma", "uniform", "log_norm", "exponential", "beta"]:
             raise ValueError("Invalid prior distribution selected!")
         
         self.prior_params = pd.Series({}, dtype='float64')
@@ -562,14 +562,14 @@ class Parameter:
                         multinorm = distributions.MultivariateNormal(prior_params.mu[i], prior_params['sigma'][i]**2)
                         dists.append(multinorm)
                     else:
-                        multinorm = distributions.Normal(prior_params.mu[i], prior_params['sigma'][i]**2)
+                        multinorm = distributions.Normal(prior_params.mu[i], prior_params['sigma'][i])
                         dists.append(multinorm)
                 return distributions.MixtureGeneral(mixing_dist, dists)
             else:
                 if self.multivar:
                     return distributions.MultivariateNormal(prior_params.mu, prior_params['sigma']**2)
                 else:
-                    return distributions.Normal(prior_params.mu, prior_params['sigma']**2)
+                    return distributions.Normal(prior_params.mu, prior_params['sigma'])
 
         def exponential_prior(prior_params):
             self._hyperparam_checks(prior_params, ['exponential_check'])
@@ -673,19 +673,32 @@ class Parameter:
                     mixing_dist = distributions.Categorical(probs=jnp.ones(mixture_size) / mixture_size)
                     for i in range(mixture_size):
                         loc = self._peak_to_loc(prior_params['peak'][i], prior_params['overall_scale'])
-                        multinorm = distributions.MultivariateNormal(loc, prior_params['overall_scale']*np.eye(len(loc)))
-                        dist = distributions.TransformedDistribution(multinorm, distributions.transforms.ExpTransform())
-                        max_vals.append(np.exp(dist.log_prob(prior_params['peak'][i])))
+                        if self.multivar:
+                            multinorm = distributions.MultivariateNormal(loc, prior_params['overall_scale']*np.eye(len(loc)))
+                            dist = distributions.TransformedDistribution(multinorm, distributions.transforms.ExpTransform())
+                            max_vals.append(np.exp(dist.log_prob(prior_params['peak'][i])))
+                        else:
+                            multinorm = distributions.Normal(loc, prior_params['overall_scale'])
+                            dist = distributions.TransformedDistribution(multinorm, distributions.transforms.ExpTransform())
+                            max_vals.append(np.exp(dist.log_prob(prior_params['peak'][i])))
                     target_max_pdf = min(max_vals)  # Use the maximum pdf value among all distributions as the target
                     for i in range(mixture_size):
                         mode_peak = prior_params['peak'][i]
-                        adjusted_scale = root_scalar(lambda scale: scale + np.log(2*np.pi*mode_peak[0]*mode_peak[1]*scale*target_max_pdf), x0=prior_params['overall_scale']).root
+                        if self.multivar:
+                            adjusted_scale = root_scalar(lambda scale: scale + np.log(2*np.pi*mode_peak[0]*mode_peak[1]*scale*target_max_pdf), x0=prior_params['overall_scale']).root
+                        else:
+                            adjusted_scale = root_scalar(lambda scale: scale + np.log(2*np.pi*mode_peak**2*scale*target_max_pdf), x0=prior_params['overall_scale']).root
                         if np.isnan(adjusted_scale):
                             raise ValueError("Parameter - unable to find a valid scale for the distribution")
                         loc = self._peak_to_loc(prior_params['peak'][i], adjusted_scale)
-                        multinorm = distributions.MultivariateNormal(loc, adjusted_scale*np.eye(len(loc)))
-                        transformed_dist = distributions.TransformedDistribution(multinorm, distributions.transforms.ExpTransform())
-                        dists.append(transformed_dist)
+                        if self.multivar:
+                            multinorm = distributions.MultivariateNormal(loc, adjusted_scale*np.eye(len(loc)))
+                            transformed_dist = distributions.TransformedDistribution(multinorm, distributions.transforms.ExpTransform())
+                            dists.append(transformed_dist)
+                        else:
+                            multinorm = distributions.Normal(loc, adjusted_scale)
+                            transformed_dist = distributions.TransformedDistribution(multinorm, distributions.transforms.ExpTransform())
+                            dists.append(transformed_dist)
                     return distributions.MixtureGeneral(mixing_dist, dists)
                 else:
                     raise ValueError("Parameter - using 'peak' and 'overall_scale' requires 'multi_mode' to be 'True'")
@@ -712,14 +725,26 @@ class Parameter:
         else:
             raise ValueError("Invalid prior distribution selected!")
 
-    def sample_param(self) -> list[float]|float:
+    def sample_param(self, n_samples = None) -> list[float]|float:
         """
         Generates a sample for this parameter. The sample is generated from the prior distribution of the parameter. This function is used by the Sampler class to generate samples for the parameter during the inference process.
+
+        Args:
+            - n_samples (int): The number of samples to generate. If None, only one sample is generated.
 
         Returns:
             - float or list[float]: The sampled parameter value.
         """
-        if self.prior_func == None:
-            self.prior_func = self.get_prior_function()
-        sample_val = numpyro.sample(self.joined_name, self.prior_func)
+        if n_samples == None:
+            if self.prior_func == None:
+                self.prior_func = self.get_prior_function()
+            try:
+                sample_val = numpyro.sample(self.joined_name, self.prior_func)
+            except:
+                raise ValueError("Parameter - Unable to sample from the prior distribution. Try specifying the number of samples.")
+        else:
+            if self.prior_func == None:
+                self.prior_func = self.get_prior_function()
+            rng_key = random.PRNGKey(0)
+            sample_val = numpyro.sample(self.joined_name, self.prior_func, sample_shape=(n_samples,), rng_key=rng_key)
         return sample_val

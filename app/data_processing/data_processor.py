@@ -1,8 +1,9 @@
+import os
+
 class DataProcessor:
     """
     A class to define the data processor.
-    This is a base class that is inherited by the specific data processors:
-        RawDataProcessor and SimDataProcessor.
+    This is a base class that is inherited by the specific data processors: RawDataProcessor and SimDataProcessor.
 
     Args:
         - process_data_name (str): The name of the processed data.
@@ -36,11 +37,11 @@ class DataProcessor:
         self.processed_data_name = processed_data_name
         self.processor_params = processor_params
         self.train_test_split = train_test_split
-        self.data_path = data_path
+        self.data_path = os.getcwd() + data_path
         self.processed_data = None
 
         if (not isinstance(self.train_test_split, float) or
-                self.train_test_split <= 0 or self.train_test_split >= 1):
+                self.train_test_split < 0 or self.train_test_split > 1):
             raise ValueError('DataProcessors - train_test_split must be a float between 0 and 1')
 
     def process_data(self):

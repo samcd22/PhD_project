@@ -26,7 +26,17 @@ extensions = [
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
+latex_engine = 'pdflatex'
 
+latex_elements = {
+    'papersize': 'a4paper',  # Use A4 or 'letterpaper'
+    'pointsize': '10pt',  # Font size
+    'preamble': r'''
+    \usepackage{amsmath}
+    \usepackage{amsfonts}
+    ''',  # Add custom LaTeX packages or configurations
+    'figure_align': 'H',  # Alignment of figures
+}
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

@@ -95,6 +95,8 @@ class Sampler:
             - optimiser_name (str, optional): The name of the optimiser. Required if controller is 'optimisor'. Defaults to None.
         """
         
+        root_results_path = os.getcwd() + root_results_path
+
         if not isinstance(inference_params, pd.Series):
             raise TypeError("Sampler - inference_params must be a pandas Series")
         if not isinstance(model, Model):
@@ -268,9 +270,19 @@ class Sampler:
         for param_ind in self.inference_params.index:
             sample = self.inference_params[param_ind].sample_param()
             if jnp.isscalar(sample):
-                current_params_sample[param_ind] = jax.lax.cond(sample > 0, lambda sample: self._safe_exponentiation(sample, self.inference_params[param_ind].order), lambda sample: sample, sample)
+                current_params_sample[param_ind] = jax.lax.cond(
+                    sample > 0,
+                    lambda sample: self._safe_exponentiation(sample.astype(jnp.float32), self.inference_params[param_ind].order),
+                    lambda sample: sample.astype(jnp.float32),  # Ensure the scalar stays as float32 in both branches
+                    sample
+                )            
             else:
-                current_params_sample[param_ind] = jax.lax.cond(jnp.all(sample > jnp.zeros(sample.shape)), lambda sample: self._safe_exponentiation(sample, self.inference_params[param_ind].order), lambda sample: sample, sample)
+                current_params_sample[param_ind] = jax.lax.cond(
+                    jnp.all(sample > jnp.zeros(sample.shape, dtype=jnp.float32)),  # Ensure `sample` is float32
+                    lambda sample: self._safe_exponentiation(sample.astype(jnp.float32), self.inference_params[param_ind].order),  # Ensure this returns float32
+                    lambda sample: sample.astype(jnp.float32),  # Ensure the false branch returns float32
+                    sample
+                )        
         current_params_sample = self._format_params(current_params_sample)
 
         mu = self.model_func(current_params_sample, self.training_data)
@@ -279,7 +291,6 @@ class Sampler:
         try:
             self.likelihood_func(mu, current_params_sample)
         except:
-            print(self.training_data[['x','y','z']].values[jnp.isinf(mu)])
             print('Sampler - Error in likelihood function')
 
         mu = numpyro.deterministic('mu', mu)
@@ -297,7 +308,7 @@ class Sampler:
         res = jnp.exp(jnp.log(base) + exponent * jnp.log(10))
         return res
 
-    def sample_all(self, rng_key=random.PRNGKey(2120)) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+    def sample_all(self, rng_key=random.PRNGKey(0)) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
         """
         Sample all sets of parameters. This function is used to generate all samples from the posterior distribution.
 

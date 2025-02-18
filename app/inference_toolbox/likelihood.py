@@ -1,6 +1,8 @@
 import pandas as pd
 import numpyro
 from typing import Union
+import jax.numpy as jnp
+from inference_toolbox.tr_norm import TruncatedNormal
 
 LikelihoodInput = Union[str, int, float]
 
@@ -76,7 +78,7 @@ class Likelihood:
             """
             if 'sigma' not in self.fixed_likelihood_params:
                 raise ValueError('Likelihood - fixed sigma parameter not set!')
-            return numpyro.distributions.Normal(mu, self.fixed_likelihood_params.sigma**2)
+            return numpyro.distributions.Normal(mu, self.fixed_likelihood_params.sigma)
 
         def _gaussian_likelihood_percentage_error(mu: float, params: dict) -> numpyro.distributions.Normal:
             """
@@ -87,7 +89,15 @@ class Likelihood:
                 params (dict): Dictionary of parameters.
 
             """
-            return numpyro.distributions.Normal(mu, (mu * params['error'])**2)
+
+            try :
+                return numpyro.distributions.Normal(mu, jnp.abs(mu) * params['error'])
+            except:
+                print('Error in Gaussian likelihood function')
+                print('mu:', mu)
+                print('params:', params)
+
+            return numpyro.distributions.Normal(mu, jnp.abs(mu) * params['error'])
 
         def _gaussian_likelihood(mu: float, params: dict) -> numpyro.distributions.Normal:
             """
@@ -98,7 +108,116 @@ class Likelihood:
                 params (dict): Dictionary of parameters.
 
             """
-            return numpyro.distributions.Normal(mu, params['sigma']**2)
+            return numpyro.distributions.Normal(mu, params['sigma'])
+        
+        def _gamma_likelihood(mu: float, params: dict) -> numpyro.distributions.Gamma:
+            """
+            Gamma likelihood function.
+
+            Args:
+                mu (float): Mean value.
+                params (dict): Dictionary of parameters.
+
+            """  
+            alpha, beta = mean_to_alpha_beta(mu, params['sigma'])
+            return numpyro.distributions.Gamma(alpha, beta)
+        
+        def _gamma_likelihood_fixed_sigma(mu: float, params: dict) -> numpyro.distributions.Gamma:
+            """
+            Gamma likelihood function without estimating sigma.
+
+            Args:
+                mu (float): Mean value.
+                params (dict): Dictionary of parameters.
+
+            """    
+            if 'sigma' not in self.fixed_likelihood_params:
+                raise ValueError('Likelihood - fixed sigma parameter not set!')
+            alpha, beta = mean_to_alpha_beta(mu, self.fixed_likelihood_params.sigma)
+            return numpyro.distributions.Gamma(alpha, beta)
+
+        def _gamma_likelihood_percentage_error(mu: float, params: dict) -> numpyro.distributions.Gamma:
+            """
+            Gamma likelihood function using percentage error.
+
+            Args:
+                mu (float): Mean value.
+                params (dict): Dictionary of parameters.
+
+            """    
+            alpha, beta = mean_to_alpha_beta(mu, mu * params['error'])
+            return numpyro.distributions.Gamma(alpha, beta)
+        
+        def _truncate_normal_likelihood_fixed_sigma(mu: float, params: dict) -> TruncatedNormal:
+            """
+            Truncated normal likelihood function.
+
+            Args:
+                mu (float): Mean value.
+                params (dict): Dictionary of parameters.
+
+            """    
+            return TruncatedNormal(mu, self.fixed_likelihood_params.sigma)
+        
+        def _truncate_normal_likelihood(mu: float, params: dict) -> TruncatedNormal:
+            """
+            Truncated normal likelihood function without estimating sigma.
+
+            Args:
+                mu (float): Mean value.
+                params (dict): Dictionary of parameters.
+
+            """    
+            return TruncatedNormal(mu, params['sigma'])
+        
+        def _truncate_normal_likelihood_percentage_error(mu: float, params: dict) -> TruncatedNormal:
+            """
+            Truncated normal likelihood function using percentage error.
+
+            Args:
+                mu (float): Mean value.
+                params (dict): Dictionary of parameters.
+
+            """    
+            return TruncatedNormal(mu, mu * params['error'])
+        
+        def uniform_likelihood(mu: float, params: dict) -> numpyro.distributions.Uniform:
+            """
+            Uniform likelihood function.
+
+            Args:
+                mu (float): Mean value.
+                params (dict): Dictionary of parameters.
+
+            """
+            return numpyro.distributions.Uniform(mu - params['sigma']*jnp.sqrt(12)/2, mu + params['sigma']*jnp.sqrt(12)/2)
+
+        def uniform_likelihood_fixed_sigma(mu: float, params: dict) -> numpyro.distributions.Uniform:
+            """
+            Uniform likelihood function without estimating sigma.
+
+            Args:
+                mu (float): Mean value.
+                params (dict): Dictionary of parameters.
+
+            """
+            return numpyro.distributions.Uniform(mu - self.fixed_likelihood_params.sigma*jnp.sqrt(12)/2, mu + self.fixed_likelihood_params.sigma*jnp.sqrt(12)/2)
+        
+        def uniform_likelihood_percentage_error(mu: float, params: dict) -> numpyro.distributions.Uniform:
+            """
+            Uniform likelihood function using percentage error.
+
+            Args:
+                mu (float): Mean value.
+                params (dict): Dictionary of parameters.
+
+            """              
+            return numpyro.distributions.Uniform(mu - mu*params['error']*jnp.sqrt(12)/2, mu + mu*params['error']*jnp.sqrt(12)/2)
+
+        def mean_to_alpha_beta(mean, sigma):
+            alpha = mean ** 2 / sigma**2
+            beta = mean / sigma**2
+            return alpha, beta
 
         if self.likelihood_select == 'gaussian_fixed_sigma':
             return _gaussian_likelihood_fixed_sigma
@@ -106,6 +225,24 @@ class Likelihood:
             return _gaussian_likelihood_percentage_error
         elif self.likelihood_select == 'gaussian':
             return _gaussian_likelihood
+        elif self.likelihood_select == 'gamma_fixed_sigma':
+            return _gamma_likelihood_fixed_sigma
+        elif self.likelihood_select == 'gamma':
+            return _gamma_likelihood
+        elif self.likelihood_select == 'gamma_percentage_error':
+            return _gamma_likelihood_percentage_error
+        elif self.likelihood_select == 'truncated_normal_fixed_sigma':
+            return _truncate_normal_likelihood_fixed_sigma
+        elif self.likelihood_select == 'truncated_normal':
+            return _truncate_normal_likelihood
+        elif self.likelihood_select == 'truncated_normal_percentage_error':
+            return _truncate_normal_likelihood_percentage_error
+        elif self.likelihood_select == 'uniform_fixed_sigma':
+            return uniform_likelihood_fixed_sigma
+        elif self.likelihood_select == 'uniform':
+            return uniform_likelihood
+        elif self.likelihood_select == 'uniform_percentage_error':
+            return uniform_likelihood_percentage_error
         else:
             raise ValueError('Invalid likelihood function selected!')
 

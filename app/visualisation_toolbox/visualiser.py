@@ -12,10 +12,17 @@ np.seterr(divide='ignore', invalid='ignore')
 import warnings
 warnings.filterwarnings("ignore")
 import statsmodels.api as sm
+from bs4 import BeautifulSoup
+import base64
+from sympy.printing.latex import latex
+from sympy import Eq, symbols
+import jax.numpy as jnp
+import io
 
 from controllers.sampler import Sampler
 from visualisation_toolbox.domain import Domain
 from data_processing.sim_data_processor import SimDataProcessor
+from data_processing.raw_data_processor import RawDataProcessor
 
 class Visualiser:
     """
@@ -75,6 +82,7 @@ class Visualiser:
         self.testing_data = sampler.testing_data
         
         self.model_func = sampler.model_func
+        self.model_sum_expr = sampler.model.sum_expr
         self.dependent_variables = sampler.dependent_variables
         self.independent_variables = sampler.independent_variables
         self.inference_params = sampler.inference_params
@@ -92,13 +100,19 @@ class Visualiser:
 
         test_predictions = self.model_func(self.params_median, self.testing_data)
         test_measured = self.testing_data[self.dependent_variables[0]]
-        log_likelihood = self.likelihood_func(test_predictions, self.params_median).log_prob(test_measured).sum()
+        a = self.likelihood_func(test_predictions, self.params_median)
+
+        log_likelihood = self.likelihood_func(test_predictions, self.params_median).log_prob(jnp.array(test_measured)).sum()
         
         self.RMSE = np.sqrt(np.mean((test_predictions-test_measured)**2))
         self.AIC = 2*self.params_median.size - log_likelihood
         self.BIC = self.params_median.size*np.log(self.testing_data.shape[0]) - 2*log_likelihood
 
         self.autocorrs = self._calculate_autocorrs()
+
+        self.construction = sampler.get_construction()
+
+        self.prediction_plots = []
 
     def get_traceplots(self):
         """
@@ -120,7 +134,6 @@ class Visualiser:
             if not os.path.exists(full_path):
                 tp = self._traceplots(samples.values, xnames=self.samples.columns, title=title)
                 tp.savefig(full_path)
-
 
     def _traceplots(self, x, xnames=None, title=None):
         """
@@ -179,394 +192,485 @@ class Visualiser:
         plt.close()
         return fig
 
-
-    def show_predictions(self, domain: Domain, plot_name: str, plot_type: str = '3D', title: str = None):
+    def show_predictions(self, domain: Domain, plot_name: str, plot_type: str = '3D', title: str = None, cross_section_params = None):
         """
         Outputs the plots for visualising the modelled system based on the concluded lower, median and upper bound parameters and an inputted domain. Plots are saved and include a summary of the parameter values and the sampling success.
 
         Args:
-            - domain (Domain): The domain object. This object contains information about where the model is to be evaluated.
+            - domain (Domain): Domain object, must be built
             - plot_name (str): Name of the plot for saving purposes
             - plot_type (str, optional): Type of plot. Defaults to '3D'. Options are: 
                 - '1D': 1D plot
-                - '2D': 2D plot - not yet implemented
+                - '2D': 2D plot
                 - '3D': 3D plot
-                - '4D': 4D plot - not yet implemented
-                - '1D_slice': 1D slice plot - not yet implemented
-                - '2D_slice': 2D slice plot
-                - '3D_slice': 3D slice plot - not yet implemented
+                - '2D_cross_sections': 2D cross sections plot
 
             - title (str, optional): Overall title of the plot. Defaults to None.
+            - cross_section_params (dict, optional): Dictionary containing the cross section parameters. Defaults to None.
 
         """
+
+        if domain.points is None:
+            raise Exception('Visualiser - domain has not been built, run domain.build_domain() outside of the visualiser!')
+        
+        domain_points = domain.points
+
+        if not all(self.independent_variables == domain_points.columns):
+            raise Exception('Visualiser - domain columns do not match the independent variables!')
+
         if plot_type == '3D':
-            if domain.n_dims != 3:
-                raise Exception('Visualiser - domain does not have the correct number of spatial dimensions!')
-
-            points = domain.create_domain()
-
-            results_df = pd.DataFrame({})
-            for i, var in enumerate(self.independent_variables):
-                results_df[var] = points[:,i].flatten()
-
-            lower_res = self.model_func(self.params_lower, results_df)
-            mean_res = self.model_func(self.params_median, results_df)
-            upper_res = self.model_func(self.params_upper, results_df)
-
-            results_df['lower_res'] = lower_res
-            results_df['mean_res'] = mean_res
-            results_df['upper_res'] = upper_res
-            
-            self._threeD_plots(results_df, plot_name, title=title)
-
-        elif plot_type == '2D_slice':
-            if domain.n_dims != 3:
-                raise Exception('Visualiser - domain does not have the correct number of spatial dimensions!')
-            count = 0
-            for slice_name in [indep_var + '_slice' for indep_var in self.independent_variables]:
-                if slice_name in domain.domain_params:
-                    count+=1
-                    points = domain.create_domain_slice(slice_name)
-
-                    results_df = pd.DataFrame({})
-                    for i, var in enumerate(self.independent_variables):
-                        results_df[var] = points[:,i].flatten()
-
-                    lower_res = self.model_func(self.params_lower, results_df)
-                    mean_res = self.model_func(self.params_median, results_df)
-                    upper_res = self.model_func(self.params_upper, results_df)
-
-                    results_df['lower_res'] = lower_res
-                    results_df['mean_res'] = mean_res
-                    results_df['upper_res'] = upper_res
-
-                    self._twoD_slice_plots(results_df, plot_name,  slice_name = slice_name, title=title)
-
-            if count == 0:
-                raise Exception('No slice parameter inputted')
-            
-        elif plot_type == '1D':
-            if domain.n_dims != 1:
-                raise Exception('Visualiser - domain does not have the correct number of spatial dimensions!')
-            points = domain.create_domain()
-
-            results_df = pd.DataFrame({})
-            for i, var in enumerate(self.independent_variables):
-                if points.ndim == 1:
-                    if len(self.independent_variables) == 1:
-                        results_df[var] = points
-                    else:
-                        raise Exception('Visualiser - domain does not have the correct number of spatial dimensions!')
-                else:
-                    results_df[var] = points[:,i].flatten()
-
-            lower_res = self.model_func(self.params_lower, results_df)
-            mean_res = self.model_func(self.params_median, results_df)
-            upper_res = self.model_func(self.params_upper, results_df)
-
-            results_df['lower_res'] = lower_res
-            results_df['mean_res'] = mean_res
-            results_df['upper_res'] = upper_res
-
-            self._oneD_plots(results_df, plot_name, title=title)
+            self._show_3D_predictions(domain_points, plot_name, title)
         elif plot_type == '2D':
-            raise Exception('Visualiser - 2D plot type not implemented!')
-        
-        elif plot_type == '1D_slice':
-            raise Exception('Visualiser - 1D slice plot type not implemented!')
-        
-        elif plot_type == '4D':
-            raise Exception('Visualiser - 4D plot type not implemented!')
-        
-        elif plot_type == '3D_slice':
-            raise Exception('Visualiser - 3D slice plot type not implemented!')
-        
-        else:
-            raise Exception('Visualiser - plot type not recognised!')
-        
-    def _oneD_plots(self, results, name, title=None):
+            self._show_2D_predictions(domain_points, plot_name, title)
+        elif plot_type == '1D':
+            self._show_1D_predictions(domain_points, plot_name, title)
+        elif plot_type == '2D_cross_sections':
+            self._show_2D_cross_sections_predictions(domain, plot_name, title, cross_section_params)
+        elif plot_type == '3D_fixed':
+            self._show_3D_fixed_predictions(domain_points, plot_name, title)
+    
+    def _construct_figure(self, project_3D = False):
         """
-        Plotting function for 1D plots
-
-        Args:
-            - results (pd.DataFrame): Results dataframe
-            - name (str): Name of the plot for saving purposes
-            - title (str, optional): Title of the plot. Defaults to None.
+        Constructs the figure for the visualisation
         """
-        results[self.independent_variables[0]]
-        lower_res = results.lower_res
-        mean_res = results.mean_res
-        upper_res = results.upper_res
+        fin_alpha = len(self.params_median)*0.75
 
-        full_path = self.results_path + '/instance_' + str(self.instance) + '/' + name + '_1D_scatter.png'
+        y = 12
+        r = 0.8
+        alpha = (1-r)*y
+
+        delta_alpha = fin_alpha - alpha
+
+        y_prime = y + delta_alpha
+        r_prime = r*y/y_prime
+
+        r_prime_frac = Fraction(r_prime)
+
+        fig = plt.figure(constrained_layout = True, figsize = (24,y_prime))
+        spec = GridSpec(2, 6, figure = fig, height_ratios= [r_prime_frac.numerator, r_prime_frac.denominator - r_prime_frac.numerator])
+        axes = [None]*5
+        
+        projection = None
+        if project_3D:
+            projection = '3d'
+        
+        axes[0] = fig.add_subplot(spec[0,:2], projection = projection)
+        axes[1] = fig.add_subplot(spec[0,2:4], projection = projection)
+        axes[2] = fig.add_subplot(spec[0,4:], projection = projection)
+        axes[3] = fig.add_subplot(spec[1,:3])
+        axes[4] = fig.add_subplot(spec[1,3:])
+
+        return fig, axes
+
+    def _fill_figure_metadata(self, fig, axes, title):
+        RMSE_formatter = "{:.2e}" 
+        AIC_formatter = "{:.2e}"
+        BIC_formatter = "{:.2e}"
+
+        if self.RMSE < 0:
+            raise Exception('Visualiser - RMSE is negative!')
+        if  np.floor(np.log10(self.RMSE)) < 2 and np.floor(np.log10(self.RMSE)) > -2: RMSE_formatter = "{:.2f}"
+        if  np.floor(np.log10(np.abs(self.AIC))) < 2 and np.floor(np.log10(np.abs(self.AIC))) > -2: AIC_formatter = "{:.2f}"
+        if  np.floor(np.log10(np.abs(self.BIC))) < 2 and np.floor(np.log10(np.abs(self.BIC))) > -2: BIC_formatter = "{:.2f}"
+        RMSE_string = 'RMSE = ' + RMSE_formatter.format(self.RMSE)
+        AIC_string = 'AIC = ' + AIC_formatter.format(self.AIC)
+        BIC_string = 'BIC = ' + BIC_formatter.format(self.BIC)
+
+        # Creates an axis to display the parameter values
+        param_string = self._get_param_string()
+        axes[3].text(0.5,0.5,param_string, fontsize = 30, va = "center", ha = 'center')
+        axes[3].set_xticks([])
+        axes[3].set_yticks([])
+
+        param_accuracy_string = self._get_param_accuracy_string()
+
+        # Creates an axis to display the sampling information
+        axes[4].text(0.5,0.5, RMSE_string + ',   ' + AIC_string + ',   ' + BIC_string + '\n' + param_accuracy_string, fontsize = 30, va = "center", ha = 'center')
+        axes[4].set_xticks([])
+        axes[4].set_yticks([])
+
+        return fig, axes
+
+    def _show_1D_predictions(self, domain_points, plot_name, title):
+
+        dir_name = self.results_path + '/instance_' + str(self.instance) + '/' + plot_name
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
+
+        full_path = dir_name + '/predictions.png'
         if not os.path.exists(full_path):
-            fin_alpha = len(self.params_median)*0.75
 
-            y = 12
-            r = 0.8
-            alpha = (1-r)*y
+            lower_pred = self.model_func(self.params_lower, domain_points)
+            median_pred = self.model_func(self.params_median, domain_points)
+            upper_pred = self.model_func(self.params_upper, domain_points)
 
-            delta_alpha = fin_alpha - alpha
+            results_df = domain_points.copy()
+            results_df['lower_res'] = lower_pred
+            results_df['mean_res'] = median_pred
+            results_df['upper_res'] = upper_pred
+            
+            fig, axes = self._construct_figure()
 
-            y_prime = y + delta_alpha
-            r_prime = r*y/y_prime
-
-            r_prime_frac = Fraction(r_prime)
-
-            fig = plt.figure(constrained_layout = True, figsize = (24,y_prime))
-            spec = GridSpec(2, 6, figure = fig, height_ratios= [r_prime_frac.numerator, r_prime_frac.denominator - r_prime_frac.numerator])
-
-            ax1 = fig.add_subplot(spec[0,:2])
-            ax2 = fig.add_subplot(spec[0,2:4])
-            ax3 = fig.add_subplot(spec[0,4:])
-            ax4 = fig.add_subplot(spec[1,:3])
-            ax5 = fig.add_subplot(spec[1,3:])
-                
             # Defines the lower bound subplot
-            ax1.plot(results[self.independent_variables[0]], lower_res, label='Predicted ' + self.dependent_variables[0])
-            ax1.set_title('Generated by the lower bound parameters', fontsize = 20)
-            ax1.set_xlabel(self.independent_variables[0])
-            ax1.set_ylabel(self.dependent_variables[0])
+            axes[0].plot(results_df[self.independent_variables[0]], lower_pred, label='Predicted ' + self.dependent_variables[0])
+            axes[0].set_title('Generated by the lower bound parameters', fontsize = 20)
+            axes[0].set_xlabel(self.independent_variables[0])
+            axes[0].set_ylabel(self.dependent_variables[0])
 
             # Defines the median subplot
-            ax2.plot(results[self.independent_variables[0]], mean_res, label='Predicted ' + self.dependent_variables[0])
-            ax2.set_title('Generated by the median parameters', fontsize = 20)
-            ax2.set_xlabel(self.independent_variables[0])
-            ax2.set_ylabel(self.dependent_variables[0])
+            axes[1].plot(results_df[self.independent_variables[0]], median_pred, label='Predicted ' + self.dependent_variables[0])
+            axes[1].set_title('Generated by the median parameters', fontsize = 20)
+            axes[1].set_xlabel(self.independent_variables[0])
+            axes[1].set_ylabel(self.dependent_variables[0])
+            # Fill the area between the lower and upper bound predictions
+            axes[1].fill_between(results_df[self.independent_variables[0]], lower_pred, upper_pred, color='gray', alpha=0.3, label='Prediction Interval')
 
             # Defines the upper subplot
-            ax3.plot(results[self.independent_variables[0]], upper_res, label='Predicted ' + self.dependent_variables[0])
-            ax3.set_title('Generated by the upper bound parameters', fontsize = 20)
-            ax3.set_xlabel(self.independent_variables[0])
-            ax3.set_ylabel(self.dependent_variables[0])
+            axes[2].plot(results_df[self.independent_variables[0]], upper_pred, label='Predicted ' + self.dependent_variables[0])
+            axes[2].set_title('Generated by the upper bound parameters', fontsize = 20)
+            axes[2].set_xlabel(self.independent_variables[0])
+            axes[2].set_ylabel(self.dependent_variables[0])
 
-            ax1.scatter(self.testing_data[self.independent_variables[0]],self.testing_data[self.dependent_variables[0]], s = 20, c = 'r', label='Measured ' + self.dependent_variables[0] + ' test values')
-            ax2.scatter(self.testing_data[self.independent_variables[0]],self.testing_data[self.dependent_variables[0]], s = 20, c = 'r', label='Measured ' + self.dependent_variables[0] + ' test values')
-            ax3.scatter(self.testing_data[self.independent_variables[0]],self.testing_data[self.dependent_variables[0]], s = 20, c = 'r', label='Measured ' + self.dependent_variables[0] + ' test values')
+            axes[0].scatter(self.testing_data[self.independent_variables[0]],self.testing_data[self.dependent_variables[0]], s = 20, c = 'r', label='Measured ' + self.dependent_variables[0] + ' test values')
+            axes[1].scatter(self.testing_data[self.independent_variables[0]],self.testing_data[self.dependent_variables[0]], s = 20, c = 'r', label='Measured ' + self.dependent_variables[0] + ' test values')
+            axes[2].scatter(self.testing_data[self.independent_variables[0]],self.testing_data[self.dependent_variables[0]], s = 20, c = 'r', label='Measured ' + self.dependent_variables[0] + ' test values')
             
-            ax1.legend()
-            ax2.legend()
-            ax3.legend()
+            axes[0].legend()
+            axes[1].legend()
+            axes[2].legend()
 
-            RMSE_formatter = "{:.2e}" 
-            AIC_formatter = "{:.2e}"
-            BIC_formatter = "{:.2e}"
-
-            if self.RMSE < 0:
-                raise Exception('Visualiser - RMSE is negative!')
-            if  np.floor(np.log10(self.RMSE)) < 2 and np.floor(np.log10(self.RMSE)) > -2: RMSE_formatter = "{:.2f}"
-            if  np.floor(np.log10(np.abs(self.AIC))) < 2 and np.floor(np.log10(np.abs(self.AIC))) > -2: AIC_formatter = "{:.2f}"
-            if  np.floor(np.log10(np.abs(self.BIC))) < 2 and np.floor(np.log10(np.abs(self.BIC))) > -2: BIC_formatter = "{:.2f}"
-            RMSE_string = 'RMSE = ' + RMSE_formatter.format(self.RMSE)
-            AIC_string = 'AIC = ' + AIC_formatter.format(self.AIC)
-            BIC_string = 'BIC = ' + BIC_formatter.format(self.BIC)
-
-            # Creates an axis to display the parameter values
-            param_string = self._get_param_string()
-            ax4.text(0.5,0.5,param_string, fontsize = 30, va = "center", ha = 'center')
-            ax4.set_xticks([])
-            ax4.set_yticks([])
-
-            param_accuracy_string = self._get_param_accuracy_string()
-
-            # Creates an axis to display the sampling information
-            ax5.text(0.5,0.5, RMSE_string + ',   ' + AIC_string + ',   ' + BIC_string + '\n' + param_accuracy_string, fontsize = 30, va = "center", ha = 'center')
-            ax5.set_xticks([])
-            ax5.set_yticks([])
-
-            # Defines the overall title, including the range of values for each plot
             fig.suptitle(title, fontsize = 40)
 
-            # Saves the figures if required
-            if not os.path.exists(full_path):
-                fig.savefig(full_path)
+            fig, axes = self._fill_figure_metadata(fig, axes, title)
+
+            fig.savefig(full_path)
             plt.close()
-                              
 
-    def _threeD_plots(self, results, name, q=10, title=None):
-        """
-        Plotting function for 3D plots
+    def _show_2D_predictions(self, domain_points, plot_name, title):
+        dir_name = self.results_path + '/instance_' + str(self.instance) + '/' + plot_name
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
 
-        Args:
-            - results (pd.DataFrame): Results dataframe
-            - name (str): Name of the plot for saving purposes
-            - q (int, optional): Number of bins i.e. number of figures generated. Defaults to 10.
-            - title (str, optional): Title of the plot. Defaults to None.
-        """
-        X = results[self.independent_variables[0]]
-        Y = results[self.independent_variables[1]]
-        Z = results[self.independent_variables[2]]
-        lower_res = results.lower_res
-        mean_res = results.mean_res
-        upper_res = results.upper_res
+        full_path = dir_name + '/predictions.png'
+        if not os.path.exists(full_path):
 
-        lower_bin_nums = pd.qcut(lower_res,q, labels = False, duplicates='drop')
+            lower_pred = self.model_func(self.params_lower, domain_points)
+            median_pred = self.model_func(self.params_median, domain_points)
+            upper_pred = self.model_func(self.params_upper, domain_points)
 
-        mean_bin_nums = pd.qcut(mean_res,q, labels = False, duplicates='drop')
-        mean_bin_labs = np.array(pd.qcut(mean_res,q, duplicates='drop').unique())
+            results_df = domain_points.copy()
+            results_df['lower_res'] = lower_pred
+            results_df['mean_res'] = median_pred
+            results_df['upper_res'] = upper_pred
+            
+            fig, axes = self._construct_figure()
 
-        upper_bin_nums = pd.qcut(upper_res,q, labels = False, duplicates='drop')
+            # Define min and max values for colorbar
+            min_val = np.percentile([lower_pred, median_pred, upper_pred], 10)
+            max_val = np.percentile([lower_pred, median_pred, upper_pred], 90)
 
-        lower_conc_and_bins = pd.DataFrame([X, Y, Z, lower_res, lower_bin_nums]).T
-        lower_conc_and_bins.columns=[self.independent_variables[0],self.independent_variables[1], self.independent_variables[2], 'val', 'bin']
+            X = results_df[self.independent_variables[0]]
+            Y = results_df[self.independent_variables[1]]
 
-        mean_conc_and_bins = pd.DataFrame([X, Y, Z, mean_res, mean_bin_nums]).T
-        mean_conc_and_bins.columns=[self.independent_variables[0],self.independent_variables[1], self.independent_variables[2], 'val', 'bin']
+            # Defines the lower bound subplot
+            plot_1 = axes[0].tricontourf(X, Y, lower_pred, vmin=min_val, vmax=max_val, levels=100, cmap = 'jet', alpha = 0.7)
+            axes[0].set_title('Generated by the lower bound parameters', fontsize=20)
+            axes[0].set_xlabel(self.independent_variables[0])
+            axes[0].set_ylabel(self.independent_variables[1])
+            axes[0].set_xlim(np.min(X), np.max(X))
+            axes[0].set_ylim(np.min(Y), np.max(Y))
 
-        upper_conc_and_bins = pd.DataFrame([X, Y, Z, upper_res, upper_bin_nums]).T
-        upper_conc_and_bins.columns=[self.independent_variables[0],self.independent_variables[1], self.independent_variables[2], 'val', 'bin']
+            # Defines the mean subplot
+            axes[1].tricontourf(X, Y, median_pred, vmin=min_val, vmax=max_val, levels=100, cmap = 'jet', alpha = 0.7)
+            axes[1].set_title('Generated by the mean parameters', fontsize=20)
+            axes[1].set_xlabel(self.independent_variables[0])
+            axes[1].set_ylabel(self.independent_variables[1])
+            axes[1].set_xlim(np.min(X), np.max(X))
+            axes[1].set_ylim(np.min(Y), np.max(Y))
 
-        # Define min and max values for colorbar
-        min_val = np.percentile([lower_res, mean_res, upper_res],10)
-        max_val = np.percentile([lower_res, mean_res, upper_res],90)
+            # Defines the upper bound subplot
+            axes[2].tricontourf(X, Y, upper_pred, vmin=min_val, vmax=max_val, levels=100, cmap = 'jet', alpha = 0.7)
+            axes[2].set_title('Generated by the upper bound parameters', fontsize=20)
+            axes[2].set_xlabel(self.independent_variables[0])
+            axes[2].set_ylabel(self.independent_variables[1])
+            axes[2].set_xlim(np.min(X), np.max(X))
+            axes[2].set_ylim(np.min(Y), np.max(Y))
 
-        # Calculates the percentage differances and RMSE if the test points are set to be included
-        lower_test_pred = self.model_func(self.params_lower, self.testing_data)
-        lower_test_measured = self.testing_data[self.dependent_variables[0]]
-        lower_percentage_difference = 2*np.abs(lower_test_measured-lower_test_pred)/(lower_test_measured + lower_test_pred) * 100
+            lower_test_error = np.abs(self.testing_data[self.dependent_variables[0]]-self.model_func(self.params_lower, self.testing_data))
+            median_test_error = np.abs(self.testing_data[self.dependent_variables[0]]-self.model_func(self.params_median, self.testing_data))
+            upper_test_error = np.abs(self.testing_data[self.dependent_variables[0]]-self.model_func(self.params_upper, self.testing_data))
 
-        mean_test_pred = self.model_func(self.params_median, self.testing_data)
-        mean_test_measured = self.testing_data[self.dependent_variables[0]]
-        mean_percentage_difference = 2*np.abs(mean_test_measured-mean_test_pred)/(mean_test_measured + mean_test_pred) * 100
+            # Generates the test point data on each graph
+            plot_2 = axes[0].scatter(self.testing_data[self.independent_variables[0]],self.testing_data[self.independent_variables[1]], s = 20, c = lower_test_error, label='Measured ' + self.dependent_variables[0] + ' test values', cmap = 'binary', edgecolors='k')
+            axes[1].scatter(self.testing_data[self.independent_variables[0]],self.testing_data[self.independent_variables[1]], s = 20, c = median_test_error, label='Measured ' + self.dependent_variables[0] + ' test values', cmap = 'binary', edgecolors='k')
+            axes[2].scatter(self.testing_data[self.independent_variables[0]],self.testing_data[self.independent_variables[1]], s = 20, c = upper_test_error, label='Measured ' + self.dependent_variables[0] + ' test values', cmap = 'binary', edgecolors='k')
 
-        upper_test_pred = self.model_func(self.params_upper, self.testing_data)
-        upper_test_measured = self.testing_data[self.dependent_variables[0]]
-        upper_percentage_difference = 2*np.abs(upper_test_measured-upper_test_pred)/(upper_test_measured + upper_test_pred) * 100
+            # Defines the two colorbars
+            cbar1 = plt.colorbar(plot_1, ax=axes[3], location='top', shrink=2)
+            cbar1.ax.set_title('Predicted ' + self.dependent_variables[0], fontsize=10)
+            cbar2 = plt.colorbar(plot_2, ax=axes[4], location='top', shrink=2)
+            cbar2.ax.set_title('Error in Predictions (Modeled - Measured)', fontsize=10)
 
-        # Creates a directory for the instance if the save parameter is selected
-        if not os.path.exists(self.results_path + '/instance_' + str(self.instance) + '/' + str(name) + '_3D_scatter/figures'):
-            os.makedirs(self.results_path + '/instance_' + str(self.instance) + '/' + str(name) + '_3D_scatter/figures')
-        
-        # Loops through each bin number and generates a figure with the bin data 
-        for bin_num in np.sort(np.unique(mean_bin_nums)):
-            fig_name = 'fig_' + str(bin_num + 1) + '_of_' + str(np.max(mean_bin_nums + 1)) + '.png'
-            full_path = self.results_path + '/instance_' + str(self.instance) + '/' + name + '_3D_scatter' + '/figures/' + fig_name
-            if not os.path.exists(full_path):
+            fig.suptitle(title, fontsize = 40)
+
+            fig, axes = self._fill_figure_metadata(fig, axes, title)
+
+            fig.savefig(full_path)
+            plt.close()
+
+    def _show_3D_predictions(self, domain_points, plot_name, title):
+        dir_name = self.results_path + '/instance_' + str(self.instance) + '/' + plot_name
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
+
+        full_path = dir_name + '/predictions.gif'
+        if not os.path.exists(full_path):
+
+            lower_pred = self.model_func(self.params_lower, domain_points)
+            median_pred = self.model_func(self.params_median, domain_points)
+            upper_pred = self.model_func(self.params_upper, domain_points)
+
+            results_df = domain_points.copy()
+            results_df['lower_res'] = lower_pred
+            results_df['mean_res'] = median_pred
+            results_df['upper_res'] = upper_pred
+
+            X = results_df[self.independent_variables[0]]
+            Y = results_df[self.independent_variables[1]]
+            Z = results_df[self.independent_variables[2]]
+
+            lower_bin_nums = pd.qcut(lower_pred, 10, labels=False, duplicates='drop')
+            mean_bin_nums = pd.qcut(median_pred, 10, labels=False, duplicates='drop')
+            upper_bin_nums = pd.qcut(upper_pred, 10, labels=False, duplicates='drop')
+
+            lower_conc_and_bins = pd.DataFrame(
+                np.column_stack((X, Y, Z, lower_pred, lower_bin_nums)),
+                columns=[self.independent_variables[0], self.independent_variables[1], self.independent_variables[2], 'val', 'bin']
+            )
+
+            mean_conc_and_bins = pd.DataFrame(
+                np.column_stack((X, Y, Z, median_pred, mean_bin_nums)),
+                columns=[self.independent_variables[0], self.independent_variables[1], self.independent_variables[2], 'val', 'bin']
+            )
+
+            upper_conc_and_bins = pd.DataFrame(
+                np.column_stack((X, Y, Z, upper_pred, upper_bin_nums)),
+                columns=[self.independent_variables[0], self.independent_variables[1], self.independent_variables[2], 'val', 'bin']
+            )
+
+            min_val = np.percentile([lower_pred, median_pred, upper_pred], 10)
+            max_val = np.percentile([lower_pred, median_pred, upper_pred], 90)
+
+            lower_test_error = np.abs(self.testing_data[self.dependent_variables[0]]-self.model_func(self.params_lower, self.testing_data))
+            median_test_error = np.abs(self.testing_data[self.dependent_variables[0]]-self.model_func(self.params_median, self.testing_data))
+            upper_test_error = np.abs(self.testing_data[self.dependent_variables[0]]-self.model_func(self.params_upper, self.testing_data))
+
+            images = []
+            for bin_num in np.sort(np.unique(mean_bin_nums)):
+                fig, axes = self._construct_figure(project_3D = True)
+
                 lower_bin_data = lower_conc_and_bins[lower_conc_and_bins['bin'] >= bin_num]
                 mean_bin_data = mean_conc_and_bins[mean_conc_and_bins['bin'] >= bin_num]
                 upper_bin_data = upper_conc_and_bins[upper_conc_and_bins['bin'] >= bin_num]
 
-                fin_alpha = len(self.params_median)*0.75
-
-                y = 12
-                r = 0.8
-                alpha = (1-r)*y
-
-                delta_alpha = fin_alpha - alpha
-
-                y_prime = y + delta_alpha
-                r_prime = r*y/y_prime
-
-                r_prime_frac = Fraction(r_prime)
-
-                fig = plt.figure(constrained_layout = True, figsize = (24,y_prime))
-                spec = GridSpec(2, 6, figure = fig, height_ratios= [r_prime_frac.numerator, r_prime_frac.denominator - r_prime_frac.numerator])
-
-                ax1 = fig.add_subplot(spec[0,:2], projection='3d')
-                ax2 = fig.add_subplot(spec[0,2:4], projection='3d')
-                ax3 = fig.add_subplot(spec[0,4:], projection='3d')
-                ax4 = fig.add_subplot(spec[1,:3])
-                ax5 = fig.add_subplot(spec[1,3:])
-                
                 # Defines the lower bound subplot
-                plot_1 = ax1.scatter(lower_bin_data[self.independent_variables[0]], lower_bin_data[self.independent_variables[1]], lower_bin_data[self.independent_variables[2]], c = lower_bin_data.val, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
-                ax1.set_title('Generated by the lower bound parameters', fontsize = 20)
-                ax1.set_xlabel(self.independent_variables[0])
-                ax1.set_ylabel(self.independent_variables[1])
-                ax1.set_zlabel(self.independent_variables[2])
-                ax1.set_xlim(np.min(X), np.max(X))
-                ax1.set_ylim(np.min(Y), np.max(Y))
-                ax1.set_zlim(np.min(Z), np.max(Z))
+                plot_1 = axes[0].scatter(lower_bin_data[self.independent_variables[0]], lower_bin_data[self.independent_variables[1]], lower_bin_data[self.independent_variables[2]], c = lower_bin_data.val, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.7, s=1)
+                axes[0].set_title('Generated by the lower bound parameters', fontsize = 20)
+                axes[0].set_xlabel(self.independent_variables[0])
+                axes[0].set_ylabel(self.independent_variables[1])
+                axes[0].set_zlabel(self.independent_variables[2])
+                axes[0].set_xlim(np.min(X), np.max(X))
+                axes[0].set_ylim(np.min(Y), np.max(Y))
+                axes[0].set_zlim(np.min(Z), np.max(Z))
 
                 # Defines the mean subplot
-                ax2.scatter(mean_bin_data[self.independent_variables[0]], mean_bin_data[self.independent_variables[1]], mean_bin_data[self.independent_variables[2]], c = mean_bin_data.val, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
-                ax2.set_title('Generated by the mean parameters', fontsize = 20)
-                ax2.set_xlabel(self.independent_variables[0])
-                ax2.set_ylabel(self.independent_variables[1])
-                ax2.set_zlabel(self.independent_variables[2])
-                ax2.set_xlim(np.min(X), np.max(X))
-                ax2.set_ylim(np.min(Y), np.max(Y))
-                ax2.set_zlim(np.min(Z), np.max(Z))
+                axes[1].scatter(mean_bin_data[self.independent_variables[0]], mean_bin_data[self.independent_variables[1]], mean_bin_data[self.independent_variables[2]], c = mean_bin_data.val, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.7, s=1)
+                axes[1].set_title('Generated by the mean parameters', fontsize = 20)
+                axes[1].set_xlabel(self.independent_variables[0])
+                axes[1].set_ylabel(self.independent_variables[1])
+                axes[1].set_zlabel(self.independent_variables[2])
+                axes[1].set_xlim(np.min(X), np.max(X))
+                axes[1].set_ylim(np.min(Y), np.max(Y))
+                axes[1].set_zlim(np.min(Z), np.max(Z))
 
                 # Defines the upper bound subplot
-                ax3.scatter(upper_bin_data[self.independent_variables[0]], upper_bin_data[self.independent_variables[1]], upper_bin_data[self.independent_variables[2]], c = upper_bin_data.val, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.3, s=1)
-                ax3.set_title('Generated by the upper bound parameters', fontsize = 20)
-                ax3.set_xlabel(self.independent_variables[0])
-                ax3.set_ylabel(self.independent_variables[1])
-                ax3.set_zlabel(self.independent_variables[2])
-                ax3.set_xlim(np.min(X), np.max(X))
-                ax3.set_ylim(np.min(Y), np.max(Y))
-                ax3.set_zlim(np.min(Z), np.max(Z))
+                axes[2].scatter(upper_bin_data[self.independent_variables[0]], upper_bin_data[self.independent_variables[1]], upper_bin_data[self.independent_variables[2]], c = upper_bin_data.val, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.7, s=1)
+                axes[2].set_title('Generated by the upper bound parameters', fontsize = 20)
+                axes[2].set_xlabel(self.independent_variables[0])
+                axes[2].set_ylabel(self.independent_variables[1])
+                axes[2].set_zlabel(self.independent_variables[2])
+                axes[2].set_xlim(np.min(X), np.max(X))
+                axes[2].set_ylim(np.min(Y), np.max(Y))
+                axes[2].set_zlim(np.min(Z), np.max(Z))
 
-                # Generates the test point data on each graph
-                pd_min = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
-                pd_max = np.min([lower_percentage_difference, mean_percentage_difference, upper_percentage_difference])
+                plot_2 = axes[0].scatter(self.testing_data[self.independent_variables[0]], self.testing_data[self.independent_variables[1]], self.testing_data[self.independent_variables[2]], s = 20, c = lower_test_error, label='Measured ' + self.dependent_variables[0] + ' test values', cmap = 'binary', edgecolors='k')
+                axes[1].scatter(self.testing_data[self.independent_variables[0]], self.testing_data[self.independent_variables[1]], self.testing_data[self.independent_variables[2]], s = 20, c = median_test_error, label='Measured ' + self.dependent_variables[0] + ' test values', cmap = 'binary', edgecolors='k')
+                axes[2].scatter(self.testing_data[self.independent_variables[0]], self.testing_data[self.independent_variables[1]], self.testing_data[self.independent_variables[2]], s = 20, c = upper_test_error, label='Measured ' + self.dependent_variables[0] + ' test values', cmap = 'binary', edgecolors='k')
 
-                all_test_data = self.testing_data
-                all_test_data['lower_p_diff'] = lower_percentage_difference
-                all_test_data['mean_p_diff'] = mean_percentage_difference
-                all_test_data['upper_p_diff'] = upper_percentage_difference
+                cbar1 = plt.colorbar(plot_1, ax=axes[3], location='top', shrink=2)
+                cbar1.ax.set_title('Predicted ' + self.dependent_variables[0], fontsize=10)
+                cbar2 = plt.colorbar(plot_2, ax=axes[4], location='top', shrink=2)
+                cbar2.ax.set_title('Error in Predictions (Modeled - Measured)', fontsize=10)
 
-                all_test_data = all_test_data[all_test_data[self.independent_variables[0]]<np.max(X)]
-                all_test_data = all_test_data[all_test_data[self.independent_variables[0]]>np.min(X)]
-                all_test_data = all_test_data[all_test_data[self.independent_variables[1]]<np.max(Y)]
-                all_test_data = all_test_data[all_test_data[self.independent_variables[1]]>np.min(Y)]
-                all_test_data = all_test_data[all_test_data[self.independent_variables[2]]>np.min(Z)]
-                all_test_data = all_test_data[all_test_data[self.independent_variables[2]]<np.max(Z)]
+                fig.suptitle(title, fontsize = 40)
 
-                plot_2 = ax1.scatter(all_test_data[self.independent_variables[0]],all_test_data[self.independent_variables[1]],all_test_data[self.independent_variables[2]], s = 20, c = all_test_data['lower_p_diff'], cmap='jet', vmin = pd_min, vmax = pd_max)
-                ax2.scatter(all_test_data[self.independent_variables[0]],all_test_data[self.independent_variables[1]],all_test_data[self.independent_variables[2]], s = 20, c = all_test_data['mean_p_diff'], cmap='jet', vmin = pd_min, vmax = pd_max)
-                ax3.scatter(all_test_data[self.independent_variables[0]],all_test_data[self.independent_variables[1]],all_test_data[self.independent_variables[2]], s = 20, c = all_test_data['upper_p_diff'], cmap='jet', vmin = pd_min, vmax = pd_max)
-                RMSE_formatter = "{:.2e}" 
-                AIC_formatter = "{:.2e}"
-                BIC_formatter = "{:.2e}"
+                fig, axes = self._fill_figure_metadata(fig, axes, title)
 
-                if self.RMSE < 0:
-                    raise Exception('Visualiser - RMSE is negative!')
-                if  np.floor(np.log10(self.RMSE)) < 2 and np.floor(np.log10(self.RMSE)) > -2: RMSE_formatter = "{:.2f}"
-                if  np.floor(np.log10(np.abs(self.AIC))) < 2 and np.floor(np.log10(np.abs(self.AIC))) > -2: AIC_formatter = "{:.2f}"
-                if  np.floor(np.log10(np.abs(self.BIC))) < 2 and np.floor(np.log10(np.abs(self.BIC))) > -2: BIC_formatter = "{:.2f}"
-                RMSE_string = 'RMSE = ' + RMSE_formatter.format(self.RMSE)
-                AIC_string = 'AIC = ' + AIC_formatter.format(self.AIC)
-                BIC_string = 'BIC = ' + BIC_formatter.format(self.BIC)
+                images.append(fig)
 
-                # Creates an axis to display the parameter values
-                param_string = self._get_param_string()
-                ax4.text(0.5,0.5,param_string, fontsize = 30, va = "center", ha = 'center')
-                ax4.set_xticks([])
-                ax4.set_yticks([])
-
-                param_accuracy_string = self._get_param_accuracy_string()
-
-                # Creates an axis to display the sampling information
-                ax5.text(0.5,0.5, RMSE_string + ',   ' + AIC_string + ',   ' + BIC_string + '\n' + param_accuracy_string, fontsize = 30, va = "center", ha = 'center')
-                ax5.set_xticks([])
-                ax5.set_yticks([])
-
-                # Defines the two colorbars
-                cbar1 = plt.colorbar(plot_1, ax = ax4, location = 'top', shrink = 2)
-                cbar2 = plt.colorbar(plot_2, ax = ax5, location = 'top', shrink = 2)
-
-                cbar1.ax.set_title('Predicted Concentration', fontsize = 20)
-                cbar2.ax.set_title('Percentage Difference in Test Data', fontsize = 20)
-
-
-                # Defines the overall title, including the range of values for each plot
-                if mean_bin_labs[bin_num].left < 0:
-                    left_bound = 0
-                else:
-                    left_bound = mean_bin_labs[bin_num].left
-                fig.suptitle(title + '\nValues for mean plot greater than ' + "{:.2f}".format(left_bound) + '\n', fontsize = 32)
-
-                # Saves the figures if required
-                fig_name = 'fig_' + str(bin_num + 1) + '_of_' + str(np.max(mean_bin_nums + 1)) + '.png'
-                full_path = self.results_path + '/instance_' + str(self.instance) + '/' + name + '_3D_scatter' + '/figures/' + fig_name
-                if not os.path.exists(full_path):
-                    fig.savefig(full_path)
                 plt.close()
-        
-        self._animate(name = name + '_3D_scatter')
+            self._animate_figures(images, full_path)
+            plt.close()
 
+    def _show_3D_fixed_predictions(self, domain_points, plot_name, title):
+        dir_name = self.results_path + '/instance_' + str(self.instance) + '/' + plot_name
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
+
+        full_path = dir_name + '/fixed_predictions.png'
+        if not os.path.exists(full_path):
+
+            lower_pred = self.model_func(self.params_lower, domain_points)
+            median_pred = self.model_func(self.params_median, domain_points)
+            upper_pred = self.model_func(self.params_upper, domain_points)
+
+            results_df = domain_points.copy()
+            results_df['lower_res'] = lower_pred
+            results_df['mean_res'] = median_pred
+            results_df['upper_res'] = upper_pred
+
+            X = results_df[self.independent_variables[0]]
+            Y = results_df[self.independent_variables[1]]
+            Z = results_df[self.independent_variables[2]]
+
+            min_val = np.percentile([lower_pred, median_pred, upper_pred], 10)
+            max_val = np.percentile([lower_pred, median_pred, upper_pred], 90)
+
+            lower_test_error = np.abs(self.testing_data[self.dependent_variables[0]]-self.model_func(self.params_lower, self.testing_data))
+            median_test_error = np.abs(self.testing_data[self.dependent_variables[0]]-self.model_func(self.params_median, self.testing_data))
+            upper_test_error = np.abs(self.testing_data[self.dependent_variables[0]]-self.model_func(self.params_upper, self.testing_data))
+
+            fig, axes = self._construct_figure(project_3D = True)
+
+            plot_1 = axes[0].scatter(X, Y, Z, c = lower_pred, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.7, s=1)
+            axes[0].set_title('Generated by the lower bound parameters', fontsize = 20)
+            axes[0].set_xlabel(self.independent_variables[0])
+            axes[0].set_ylabel(self.independent_variables[1])
+            axes[0].set_zlabel(self.independent_variables[2])
+            axes[0].set_xlim(np.min(X), np.max(X))
+            axes[0].set_ylim(np.min(Y), np.max(Y))
+            axes[0].set_zlim(np.min(Z), np.max(Z))
+            
+            axes[1].scatter(X, Y, Z, c = median_pred, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.7, s=1)
+            axes[1].set_title('Generated by the mean parameters', fontsize = 20)
+            axes[1].set_xlabel(self.independent_variables[0])
+            axes[1].set_ylabel(self.independent_variables[1])
+            axes[1].set_zlabel(self.independent_variables[2])
+            axes[1].set_xlim(np.min(X), np.max(X))
+            axes[1].set_ylim(np.min(Y), np.max(Y))
+            axes[1].set_zlim(np.min(Z), np.max(Z))
+            
+            axes[2].scatter(X, Y, Z, c = upper_pred, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.7, s=1)
+            axes[2].set_title('Generated by the upper bound parameters', fontsize = 20)
+            axes[2].set_xlabel(self.independent_variables[0])
+            axes[2].set_ylabel(self.independent_variables[1])
+            axes[2].set_zlabel(self.independent_variables[2])
+            axes[2].set_xlim(np.min(X), np.max(X))
+            axes[2].set_ylim(np.min(Y), np.max(Y))
+            axes[2].set_zlim(np.min(Z), np.max(Z))
+            
+            plot_4 = axes[0].scatter(self.testing_data[self.independent_variables[0]], self.testing_data[self.independent_variables[1]], self.testing_data[self.independent_variables[2]], s = 20, c = lower_test_error, label='Measured ' + self.dependent_variables[0] + ' test values', cmap = 'binary', edgecolors='k')
+            axes[1].scatter(self.testing_data[self.independent_variables[0]], self.testing_data[self.independent_variables[1]], self.testing_data[self.independent_variables[2]], s = 20, c = median_test_error, label='Measured ' + self.dependent_variables[0] + ' test values', cmap = 'binary', edgecolors='k')
+            axes[2].scatter(self.testing_data[self.independent_variables[0]], self.testing_data[self.independent_variables[1]], self.testing_data[self.independent_variables[2]], s = 20, c = upper_test_error, label='Measured ' + self.dependent_variables[0] + ' test values', cmap = 'binary', edgecolors='k')
+            
+            cbar1 = plt.colorbar(plot_1, ax=axes[3], location='top', shrink=2)
+            cbar1.ax.set_title('Predicted ' + self.dependent_variables[0], fontsize=10)
+            cbar2 = plt.colorbar(plot_4, ax=axes[4], location='top', shrink=2)
+            cbar2.ax.set_title('Error in Predictions (Modeled - Measured)', fontsize=10)
+            
+            fig.suptitle(title, fontsize = 40)
+
+            fig, axes = self._fill_figure_metadata(fig, axes, title)
+            
+            fig.savefig(full_path)
+
+    def _animate_figures(self, images, filename):
+        frames = []
+            
+        for fig in images[::-1]:
+            buf = io.BytesIO()  # Create an in-memory buffer
+            fig.savefig(buf, format="png")  # Save figure to buffer
+            buf.seek(0)  # Reset buffer position
+            img = imageio.imread(buf)  # Read as an image
+            frames.append(img)  # Store the image
+
+        # Save as GIF or MP4
+        imageio.mimsave(filename, frames, fps=1)  # Use '.mp4' for video
+
+        print(f"Animation saved as {filename}")
+
+    def _show_2D_cross_sections_predictions(self, domain, plot_name, title, cross_section_params):
+        cross_sections = domain.cross_sections
+        dir_name = self.results_path + '/instance_' + str(self.instance) + '/' + plot_name
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
+        
+        for i, cross_section in enumerate(cross_sections):
+            full_path = dir_name + '/cross_section_' + str(i+1) + '.png'
+            all_points = cross_section['points']
+            projected_points = cross_section['projected_points']
+            if not os.path.exists(full_path):
+                lower_pred = self.model_func(self.params_lower, all_points)
+                median_pred = self.model_func(self.params_median, all_points)
+                upper_pred = self.model_func(self.params_upper, all_points)
+                
+                u_name = projected_points.columns[0]
+                v_name = projected_points.columns[1]
+
+                results_df = projected_points.copy()
+                results_df['lower_res'] = lower_pred
+                results_df['mean_res'] = median_pred
+                results_df['upper_res'] = upper_pred
+
+                X = results_df[u_name]
+                Y = results_df[v_name]
+
+                min_val = np.percentile([lower_pred, median_pred, upper_pred], 10)
+                max_val = np.percentile([lower_pred, median_pred, upper_pred], 90)
+
+                fig, axes = self._construct_figure()
+
+                plot_1 = axes[0].tricontourf(X, Y, lower_pred, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.7, s=1)
+                axes[0].set_title('Generated by the lower bound parameters', fontsize = 20)
+                axes[0].set_xlabel(u_name)
+                axes[0].set_ylabel(v_name)
+                axes[0].set_xlim(np.min(X), np.max(X))
+                axes[0].set_ylim(np.min(Y), np.max(Y))
+
+                axes[1].tricontourf(X, Y, median_pred, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.7, s=1)
+                axes[1].set_title('Generated by the mean parameters', fontsize = 20)
+                axes[1].set_xlabel(u_name)
+                axes[1].set_ylabel(v_name)
+                axes[1].set_xlim(np.min(X), np.max(X))
+                axes[1].set_ylim(np.min(Y), np.max(Y))
+
+                axes[2].tricontourf(X, Y, upper_pred, cmap='jet', vmin = min_val, vmax = max_val, alpha = 0.7, s=1)
+                axes[2].set_title('Generated by the upper bound parameters', fontsize = 20)
+                axes[2].set_xlabel(u_name)
+                axes[2].set_ylabel(v_name)
+                axes[2].set_xlim(np.min(X), np.max(X))
+                axes[2].set_ylim(np.min(Y), np.max(Y))
+                
+                cbar1 = plt.colorbar(plot_1, ax=axes[3], location='top', shrink=2)
+                cbar1.ax.set_title('Predicted ' + self.dependent_variables[0], fontsize=10)
+                
+                fig.suptitle(f'{title}\nCross Section {i+1}', fontsize = 40)
+                
+                fig, axes = self._fill_figure_metadata(fig, axes, title)
+
+                fig.savefig(full_path)
+                plt.close()
+                
     def _get_param_accuracy_string(self):
         """
         Returns a string representation of the accuracy of each parameter in the samples.
@@ -640,9 +744,9 @@ class Visualiser:
             - frame_dur (int, optional): The duration of each frame in milliseconds. Defaults to 500.
 
         """
-        folder_name = 'instance_' + str(self.instance) + '/' + name + '/figures'
+        folder_name = 'instance_' + str(self.instance) + '/predictions/' + name + '/figures'
         gif_name = name + '.gif'
-        gif_path = self.results_path + '/' + 'instance_' + str(self.instance) + '/' + name + '/' + gif_name
+        gif_path = self.results_path + '/' + 'instance_' + str(self.instance) + '/predictions/' + name + '/' + gif_name
 
         if not os.path.exists(self.results_path + '/' + folder_name):
             raise Exception('Visualiser - Images for animation do not exist')
@@ -851,124 +955,6 @@ class Visualiser:
         plt.savefig(full_path)
         plt.close()
 
-    def _twoD_slice_plots(self, results, name, slice_name=None, title=None):
-        """
-        Generates plots for a 2D slice of the 3D modelled system based on the concluded lower, median and upper bound parameters and an inputted domain
-
-        Args:
-            - results (dict): The results data containing the independent variables and their corresponding values.
-            - name (str): The name of the plot.
-            - slice_name (str, optional): The name of the slice variable. Defaults to None.
-            - title (str, optional): The title of the plot. Defaults to None.
-
-        """
-        full_path = self.results_path + '/instance_' + str(self.instance) + '/' + name + '_2D_' + slice_name + '.png'
-        if not os.path.exists(full_path):
-            slice_var = slice_name.split('_')[0]
-            if slice_var in self.independent_variables:
-                other_vars = [var for var in self.independent_variables if var != slice_var]
-
-                X = results[other_vars[0]]
-                Y = results[other_vars[1]]
-                final_title = title + '\nslice at ' + slice_var + ' = ' + str(results[slice_var][0])
-                xlab = other_vars[0]
-                ylab = other_vars[1]
-            else:
-                raise Exception('Visualiser - Invalid slice inputted!')
-
-            lower_res = results.lower_res
-            mean_res = results.mean_res
-            upper_res = results.upper_res
-
-            # Define min and max values for colorbar
-            min_val = np.percentile([lower_res, mean_res, upper_res], 10)
-            max_val = np.percentile([lower_res, mean_res, upper_res], 90)
-
-            fin_alpha = len(self.params_median) * 0.75
-
-            y = 12
-            r = 0.8
-            alpha = (1 - r) * y
-
-            delta_alpha = fin_alpha - alpha
-
-            y_prime = y + delta_alpha
-            r_prime = r * y / y_prime
-
-            r_prime_frac = Fraction(r_prime)
-
-            fig = plt.figure(constrained_layout=True, figsize=(24, y_prime))
-            spec = GridSpec(2, 6, figure=fig, height_ratios=[r_prime_frac.numerator, r_prime_frac.denominator - r_prime_frac.numerator])
-
-            ax1 = fig.add_subplot(spec[0, :2])
-            ax2 = fig.add_subplot(spec[0, 2:4])
-            ax3 = fig.add_subplot(spec[0, 4:])
-            ax4 = fig.add_subplot(spec[1, :3])
-            ax5 = fig.add_subplot(spec[1, 3:])
-
-            # Defines the lower bound subplot
-            plot_1 = ax1.tricontourf(X, Y, lower_res, vmin=min_val, vmax=max_val, levels=100)
-            ax1.set_title('Generated by the lower bound parameters', fontsize=20)
-            ax1.set_xlabel(xlab)
-            ax1.set_ylabel(ylab)
-            ax1.set_xlim(np.min(X), np.max(X))
-            ax1.set_ylim(np.min(Y), np.max(Y))
-
-            # Defines the mean subplot
-            ax2.tricontourf(X, Y, mean_res, vmin=min_val, vmax=max_val, levels=100)
-            ax2.set_title('Generated by the mean parameters', fontsize=20)
-            ax2.set_xlabel(xlab)
-            ax2.set_ylabel(ylab)
-            ax2.set_xlim(np.min(X), np.max(X))
-            ax2.set_ylim(np.min(Y), np.max(Y))
-
-            # Defines the upper bound subplot
-            ax3.tricontourf(X, Y, upper_res, vmin=min_val, vmax=max_val, levels=100)
-            ax3.set_title('Generated by the upper bound parameters', fontsize=20)
-            ax3.set_xlabel(xlab)
-            ax3.set_ylabel(ylab)
-            ax3.set_xlim(np.min(X), np.max(X))
-            ax3.set_ylim(np.min(Y), np.max(Y))
-
-            # Generates the test point data on each graph
-            RMSE_formatter = "{:.2e}" 
-            AIC_formatter = "{:.2e}"
-            BIC_formatter = "{:.2e}"
-
-            if self.RMSE < 0:
-                raise Exception('Visualiser - RMSE is negative!')
-            if  np.floor(np.log10(self.RMSE)) < 2 and np.floor(np.log10(self.RMSE)) > -2: RMSE_formatter = "{:.2f}"
-            if  np.floor(np.log10(np.abs(self.AIC))) < 2 and np.floor(np.log10(np.abs(self.AIC))) > -2: AIC_formatter = "{:.2f}"
-            if  np.floor(np.log10(np.abs(self.BIC))) < 2 and np.floor(np.log10(np.abs(self.BIC))) > -2: BIC_formatter = "{:.2f}"
-            RMSE_string = 'RMSE = ' + RMSE_formatter.format(self.RMSE)
-            AIC_string = 'AIC = ' + AIC_formatter.format(self.AIC)
-            BIC_string = 'BIC = ' + BIC_formatter.format(self.BIC)
-
-
-            # Creates an axis to display the parameter values
-            param_string = self._get_param_string()
-            ax4.text(0.5, 0.5, param_string, fontsize=30, va="center", ha='center')
-            ax4.set_xticks([])
-            ax4.set_yticks([])
-
-            param_accuracy_string = self._get_param_accuracy_string()
-
-            # Creates an axis to display the sampling information
-            ax5.text(0.5, 0.5, RMSE_string + ',   ' + AIC_string + ',   ' + BIC_string + '\n' + param_accuracy_string, fontsize=30, va="center", ha='center')
-            ax5.set_xticks([])
-            ax5.set_yticks([])
-
-            # Defines the two colorbars
-            cbar1 = plt.colorbar(plot_1, ax=ax4, location='top', shrink=2)
-
-            cbar1.ax.set_title('Predicted ' + self.dependent_variables[0], fontsize=10)
-
-            # Defines the overall title, including the range of values for each plot
-            fig.suptitle(final_title, fontsize=32)
-
-            # Saves the figures if required
-            plt.close()
-
     def get_autocorrelations(self):
         """
         Generates and saves autocorrelation plots for each parameter of the MCMC samples. A plot is generated for each parameter within each chain.
@@ -1107,9 +1093,26 @@ class Visualiser:
                     actual = self.data_processor.model.fixed_model_params[param]
                     summary['overall'][param]['param_accuracy'] = np.abs(np.abs(proposed - actual) / (self.params_max[param] - self.params_min[param]) * 100)
 
+            def convert_to_serializable(obj):
+                if isinstance(obj, dict):
+                    return {k: convert_to_serializable(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_to_serializable(v) for v in obj]
+                elif isinstance(obj, (np.ndarray, np.generic)):  # Handles numpy arrays and scalars
+                    return obj.tolist() if isinstance(obj, np.ndarray) else float(obj)
+                elif isinstance(obj, (float, int, str)):  # Already serializable types
+                    return obj
+                elif hasattr(obj, "tolist"):  # For objects like ArrayImpl
+                    return obj.tolist()
+                elif hasattr(obj, "item"):  # For numpy scalars
+                    return obj.item()
+                else:
+                    return obj  # Default case, leave it as-is
 
+            # Convert your summary dictionary
+            summary_serializable = convert_to_serializable(summary)
             with open(self.results_path + '/instance_' + str(self.instance) + '/summary.json', "w") as fp:
-                json.dump(summary, fp, cls=NumpyEncoder, separators=(', ', ': '), indent=4)
+                json.dump(summary_serializable, fp, cls=NumpyEncoder, separators=(', ', ': '), indent=4)
 
         return summary
 
@@ -1280,3 +1283,407 @@ class Visualiser:
 
         plt.savefig(full_path)
         plt.close()
+
+    def generate_report(self, title, include = 'all'):
+        HTML_string = '''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <script type="text/javascript" async
+            src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+            </script>
+        </head>
+        <body>
+        '''
+        HTML_string_section = []
+        HTML_string_section.append(f"<h1>{title}</h1>")
+        HTML_string_section.append(self._generate_input_summary())
+
+        if include == 'all':
+            HTML_string_section.append(self._data_visualisation_report_section())
+            HTML_string_section.append(self._traceplots_report_section())
+            HTML_string_section.append(self._priors_report_section())
+            HTML_string_section.append(self._posteriors_report_section())
+            HTML_string_section.append(self._autocorrelations_report_section())
+            HTML_string_section.append(self._predictions_report_section())
+            HTML_string_section.append(self._summary_report_section())
+        elif isinstance(include, list):
+            for item in include:
+                if item == 'data':
+                    HTML_string_section.append(self._data_visualisation_report_section())
+                if item == 'prior':
+                    HTML_string_section.append(self._priors_report_section())
+                elif item == 'posterior':
+                    HTML_string_section.append(self._posteriors_report_section())
+                elif item == 'autocorrelation':
+                    HTML_string_section.append(self._autocorrelations_report_section())
+                elif item == 'summary':
+                    HTML_string_section.append(self._summary_report_section())
+                elif item == 'traceplots':
+                    HTML_string_section.append(self._traceplots_report_section())
+                elif item == 'predictions':
+                    HTML_string_section.append(self._predictions_report_section())
+                else:
+                    raise ValueError("Visualiser - Invalid report item. Expected 'prior', 'posterior', 'autocorrelation', 'summary' or 'all'.")
+        else:
+            raise ValueError("Visualiser - Invalid report item. Expected a list or 'all'.")
+    
+        HTML_string += "\n<hr>\n".join(HTML_string_section)
+        HTML_string += '</body></html>'
+        report_path = self.results_path + '/instance_' + str(self.instance) + '/report.html'
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write(HTML_string)
+
+    def _priors_report_section(self):
+        HTML_string = "<h2>Priors</h2>"
+        prior_folder = self.results_path + '/instance_' + str(self.instance) + '/prior_dists'
+        
+        if not os.path.exists(prior_folder):
+            HTML_string += "<p>No prior plots generated.</p>"
+        else:
+            # Start a div container for Flexbox to arrange images side by side
+            HTML_string += '<div style="display: flex; justify-content: space-between;">\n'
+            
+            for param_name in self.inference_params.keys():
+                if self.inference_params[param_name].n_dims == 1:
+                    filename = 'prior_dist_' + param_name + '.png'
+                elif self.inference_params[param_name].n_dims == 2:
+                    param_1_name = self.inference_params[param_name].name[0]
+                    param_2_name = self.inference_params[param_name].name[1]
+                    filename = 'prior_dist_' + param_1_name + '_' + param_2_name + '.png'
+                else:
+                    continue
+
+                full_path = prior_folder + '/' + filename
+                rel_path = './prior_dists/' + filename
+
+                if os.path.exists(full_path):
+                    # Add each image to the div with a smaller width and auto height
+                    HTML_string += f'<img src="{rel_path}" alt="Prior distribution for {param_name}" style="width: 30%; height: auto; margin-right: 10px;">\n'
+                else:
+                    HTML_string += f"<p>Prior plot for {param_name} not found.</p>\n"
+            
+            # Close the div container
+            HTML_string += '</div><br>\n'
+        
+        return HTML_string
+    
+    def _posteriors_report_section(self):
+        HTML_string = "<h2>Posteriors</h2>"
+        posterior_folder = self.results_path + '/instance_' + str(self.instance) + '/posterior_dists'
+
+        if not os.path.exists(posterior_folder):
+            HTML_string += "<p>No posterior plots generated.</p>"
+        else:
+            # Start a div container for Flexbox to arrange images side by side
+            HTML_string += '<div style="display: flex; justify-content: space-between;">\n'
+            
+            for param_name in self.inference_params.keys():
+                if self.inference_params[param_name].n_dims == 1:
+                    filename = 'posterior_dist_' + param_name + '.png'
+                elif self.inference_params[param_name].n_dims == 2:
+                    param_1_name = self.inference_params[param_name].name[0]
+                    param_2_name = self.inference_params[param_name].name[1]
+                    filename = 'posterior_dist_' + param_1_name + '_' + param_2_name + '.png'
+                else:
+                    continue
+
+                full_path = posterior_folder + '/' + filename
+                rel_path = './posterior_dists/' + filename
+
+                if os.path.exists(full_path):
+                    # Add each image to the div with a smaller width and auto height
+                    HTML_string += f'<img src="{rel_path}" alt="Posterior distribution for {param_name}" style="width: 30%; height: auto; margin-right: 10px;">\n'
+                else:
+                    HTML_string += f"<p>Posterior plot for {param_name} not found.</p>\n"
+            
+            # Close the div container
+            HTML_string += '</div><br>\n'
+        return HTML_string
+    
+    def _autocorrelations_report_section(self):
+        HTML_string = "<h2>Autocorrelations</h2>"
+        autocorr_folder = self.results_path + '/instance_' + str(self.instance) + '/autocorrelations'
+
+        if not os.path.exists(autocorr_folder):
+            HTML_string += "<p>No autocorrelation plots generated.</p>"
+        else:
+            for chain in range(self.n_chains):
+                HTML_string += f"<h3>Chain {chain + 1}</h3>"
+                HTML_string += '<div style="display: flex; flex-wrap: wrap;">\n'
+                
+                for param in self.samples.columns:
+                    filename = f'autocorrelations_{param}_chain_{chain + 1}.png'
+                    full_path = autocorr_folder + '/' + filename
+                    rel_path = './autocorrelations/' + filename
+
+                    if os.path.exists(full_path):
+                        HTML_string += f'<img src="{rel_path}" alt="Autocorrelation for {param} in chain {chain + 1}" style="width: {100/(len(self.samples.columns)+1)}%; height: auto; margin-right: 10px; margin-bottom: 10px;">\n'
+                    else:
+                        HTML_string += f"<p>Autocorrelation plot for {param} in chain {chain + 1} not found.</p>\n"
+                
+                HTML_string += '</div><br>\n'
+        return HTML_string 
+    
+    def _summary_report_section(self):
+        HTML_string = "<h2>Results Summary</h2>"
+
+        summary = self.get_summary()
+           
+        # Overall statistics
+        HTML_string += f"<p><strong>RMSE:</strong> {summary['RMSE']:.2f}</p>"
+        HTML_string += f"<p><strong>AIC:</strong> {summary['AIC']:.2f}</p>"
+        HTML_string += f"<p><strong>BIC:</strong> {summary['BIC']:.2f}</p>"
+        
+        # Start a container for side-by-side tables
+        HTML_string += "<div style='display: flex; flex-wrap: wrap;'>"
+
+        # Chain data side by side
+        for chain_name, chain_data in summary.items():
+            if chain_name not in ["RMSE", "AIC", "BIC", "overall"]:
+                HTML_string += f"<div style='flex: 1; margin-right: 20px;'>"
+                HTML_string += f"<h3>{chain_name.capitalize()}</h3>"
+                HTML_string += "<table border='1' style='border-collapse: collapse;'><tr><th>Parameter</th><th>Lower</th><th>Mean</th><th>Upper</th><th>Tau</th></tr>"
+                for param_name, param_data in chain_data.items():
+                    HTML_string += f"<tr><td>{param_name.capitalize()}</td>"
+                    HTML_string += f"<td>{param_data['lower']:.2g}</td>"
+                    HTML_string += f"<td>{param_data['mean']:.2g}</td>"
+                    HTML_string += f"<td>{param_data['upper']:.2g}</td>"
+                    HTML_string += f"<td>{param_data['tau']:.2g}</td></tr>"
+                HTML_string += "</table></div>"
+        
+        # Close the div for side-by-side layout
+        HTML_string += "</div>"
+
+        # Overall statistics for parameters
+        if 'overall' in summary:
+            HTML_string += "<div style='margin-top: 20px;'>"
+            HTML_string += "<h3>Overall</h3>"
+            HTML_string += "<table border='1' style='border-collapse: collapse;'><tr><th>Parameter</th><th>Lower</th><th>Mean</th><th>Upper</th><th>Tau</th></tr>"
+            for param_name, param_data in summary['overall'].items():
+                HTML_string += f"<tr><td>{param_name.capitalize()}</td>"
+                HTML_string += f"<td>{param_data['lower']:.2g}</td>"
+                HTML_string += f"<td>{param_data['mean']:.2g}</td>"
+                HTML_string += f"<td>{param_data['upper']:.2g}</td>"
+                HTML_string += f"<td>{param_data['tau']:.2g}</td></tr>"
+            HTML_string += "</table></div>"
+        
+        return HTML_string
+    
+    def _traceplots_report_section(self):
+        HTML_string = "<h2>Traceplots</h2>"
+        traceplot_folder = self.results_path + '/instance_' + str(self.instance) + '/traceplots'
+
+        if not os.path.exists(traceplot_folder):
+            HTML_string += "<p>No traceplots generated.</p>"
+        else:
+            HTML_string += '<div style="display: flex; justify-content: space-between;">'
+            for chain in range(self.n_chains):
+                
+                filename = f'traceplot_{chain + 1}.png'
+                full_path = traceplot_folder + '/' + filename
+                rel_path = './traceplots/' + filename
+
+                if os.path.exists(full_path):
+                    HTML_string += f'<img src="{rel_path}" alt="Traceplot for chain {chain + 1}" style="width: {100/self.n_chains}%; height: auto; margin-right: 10px;">\n'
+                else:
+                    HTML_string += f"<p>Traceplot for chain {chain + 1} not found.</p>\n"
+                
+            HTML_string += '</div><br>\n'
+        return HTML_string
+  
+    def _data_visualisation_report_section(self):
+        HTML_string = "<h2>Data</h2>"
+        if type(self.data_processor) == SimDataProcessor:
+            data_vis_file= self.data_processor.data_path + '/processed_sim_data/' + self.data_processor.processed_data_name + '/data_plot.png'
+            if not os.path.exists(data_vis_file):
+                HTML_string += "<p>No data visualisation plot generated.</p>"
+            else:
+                rel_data_vis_file = os.path.relpath(data_vis_file, start=self.results_path + '/instance_' + str(self.instance))
+                HTML_string += f'<img src="{rel_data_vis_file}" alt="Data visualisation plot" style="width: 50%; height: auto;">\n'
+            return HTML_string
+    
+        elif type(self.data_processor) == RawDataProcessor:
+            data_vis_folder = self.data_processor.data_path + '/processed_raw_data/' + self.data_processor.processed_data_name
+            if not os.path.exists(data_vis_folder):
+                HTML_string += "<p>No data visualisation plots generated.</p>"
+            else:
+                HTML_string += '<div style="display: flex; flex-wrap: wrap;">\n'
+                num_figures = len([file for file in os.listdir(data_vis_folder) if file.endswith('.png')])
+                for file in os.listdir(data_vis_folder):
+                    
+                    if file.endswith('.png'):
+                        rel_path = os.path.relpath(os.path.join(data_vis_folder, file), start=self.results_path + '/instance_' + str(self.instance))
+                        HTML_string += f'<img src="{rel_path}" alt="Data visualisation plot" style="width: {100/(num_figures+1)}%; height: auto; margin-right: 10px; margin-bottom: 10px;">\n'
+                HTML_string += '</div><br>\n'
+            return HTML_string
+        else:
+            raise ValueError("Visualiser - Data processor must be a RawDataProcessor or SimDataProcessor.")
+
+    def _predictions_report_section(self):
+        HTML_string = "<h2>Predictions</h2>"
+        predictions_folder = self.results_path + '/instance_' + str(self.instance) + '/predictions'
+        for prediction in self.prediction_plots:
+            plots_folder = predictions_folder + '/' +prediction['name'] + '_' + prediction['plot_type']
+            if prediction['plot_type'] =='1D':
+                pass
+            elif prediction['plot_type'] == '2D':
+                pass
+            elif prediction['plot_type'] == '3D':
+                pass
+            elif prediction['plot_type'] == '2D_cross_sections':
+                pass
+ 
+        return HTML_string
+    
+    def _format_prior_params(self, params, modes = 1):
+        """
+        Format prior parameters to display them tidily inside the table.
+        Handles arrays, lists, or individual values.
+        """
+        if modes > 1:
+            # Format multiple modes in a structured way
+            modes_array = []
+            for i in range (modes):
+                mode_str = ""
+                mode_str += f"<strong>Mode {i + 1}</strong><br>"
+                formatted_dict = []
+                for key, value in params.items():
+                    if key == 'overall_scale':
+                        formatted_dict.append(f"Overall Scale: {value}")
+                    else:
+                        formatted_dict.append(f"{key.capitalize()}: {value[i]}")
+                mode_str += "<br>".join(formatted_dict)
+                modes_array.append(mode_str)
+            return "<br><br>".join(modes_array)
+
+        else:
+            # Format a dictionary by separating key-value pairs into new lines
+            formatted_dict = []
+            for key, value in params.items():
+                formatted_dict.append(f"{key.capitalize()}: {value}")
+            return "<br>".join(formatted_dict)
+
+    def _generate_input_summary(self):
+        HTML_string = "<h2>Input Summary</h2>"
+        construction = self.construction
+
+        equation = Eq(symbols(construction['model']['dependent_variables'][0]), self.model_sum_expr)
+
+        latex_model_expr = latex(equation)
+
+        # Model section
+        HTML_string += "<h3>Model</h3>"
+        HTML_string += f'<p style = "font-size:150%;">\\[{latex_model_expr}\\]</p>'
+        HTML_string += "<p>Independent Variables: " + ", ".join(construction['model']['independent_variables']) + "</p>"
+        HTML_string += "<p>Dependent Variables: " + ", ".join(construction['model']['dependent_variables']) + "</p>"
+        
+        # Inference Parameters section
+        HTML_string += "<h3>Inference Parameters</h3>"
+        HTML_string += "<table border='1' style='border-collapse: collapse;'>"
+        HTML_string += "<tr><th>Name</th><th>Prior Selection</th><th>Prior Parameters</th><th>Order</th><th>Multi Mode</th></tr>"
+
+        for param in construction['inference_params']:
+            # Handle list of names vs. single name
+            param_name = ', '.join(param['name']) if isinstance(param['name'], list) else param['name']
+            
+            # Handle multi_mode formatting
+            if param['multi_mode']:
+                n_modes = len(param['prior_params'][list(param['prior_params'].keys())[0]])
+                if n_modes == 1:
+                    raise ValueError("Visualiser - Must have multiple modes, given multi_mode is True.")
+                prior_param_formatted = self._format_prior_params(param['prior_params'], modes = n_modes)
+                prior_param_cell = f"<td>{prior_param_formatted}</td>"
+            else:
+                prior_params = self._format_prior_params(param['prior_params'])
+                prior_param_cell = f"<td>{prior_params}</td>"
+
+            # Build the table rows dynamically
+            HTML_string += f"<tr><td>{param_name}</td>"
+            HTML_string += f"<td>{param['prior_select']}</td>"
+            HTML_string += prior_param_cell  # Prior parameter section
+            HTML_string += f"<td>{param['order']}</td>"
+            HTML_string += f"<td>{'Yes' if param['multi_mode'] else 'No'}</td></tr>"
+
+        HTML_string += "</table>"
+
+        # Likelihood section
+        HTML_string += "<h3>Likelihood</h3>"
+        HTML_string += f"<p>Likelihood Selection: {construction['likelihood']['likelihood_select']}</p>"
+
+        # Data Processor section
+        HTML_string += "<h3>Data Processor</h3>"
+
+        if type(self.data_processor) == SimDataProcessor:
+            HTML_string += f"<p>Section not yet implemented</p>"
+
+        elif type(self.data_processor) == RawDataProcessor:
+            HTML_string += f"<p>Raw Data Filename: {construction['data_processor']['raw_data_filename']}</p>"
+            HTML_string += f"<p>Processed Data Name: {construction['data_processor']['processed_data_name']}</p>"
+            HTML_string += f"<p>Processor Selection: {construction['data_processor']['processor_select']}</p>"
+            HTML_string += f"<p>Experiments List: {', '.join(construction['data_processor']['processor_params']['experiments_list'])}</p>"
+            HTML_string += f"<p>Metadata Selection: {construction['data_processor']['processor_params']['meta_data_select']}</p>"
+            HTML_string += f"<p>Input Header: {construction['data_processor']['processor_params']['input_header']}</p>"
+            HTML_string += f"<p>Output Header: {construction['data_processor']['processor_params']['output_header']}</p>"
+            HTML_string += f"<p>Log Output Data: {construction['data_processor']['processor_params']['log_output_data']}</p>"
+            HTML_string += f"<p>Gridding: {', '.join(map(str, construction['data_processor']['processor_params']['gridding']))}</p>"
+        else:
+            raise ValueError("Visualiser - Data processor must be a RawDataProcessor or SimDataProcessor.")
+        
+
+        # Sampling Information
+        HTML_string += "<h3>Sampling Information</h3>"
+        HTML_string += f"<p>Number of Samples: {construction['n_samples']}</p>"
+        HTML_string += f"<p>Number of Chains: {construction['n_chains']}</p>"
+        HTML_string += f"<p>Thinning Rate: {construction['thinning_rate']}</p>"
+        HTML_string += f"<p>Warmup Proportion: {construction['p_warmup']}</p>"
+
+        return HTML_string
+
+    def embed_report(self):
+        """
+        Embeds the HTML report in a Jupyter notebook.
+        """
+
+        full_path = self.results_path + '/instance_' + str(self.instance) + '/report.html'
+        if os.path.exists(full_path):
+            with open(full_path, 'r') as f:
+                html_string = f.read()
+        else:
+            raise Exception('Visualiser - HTML report not generated!')
+        # Function to convert image to Base64
+        def convert_image_to_base64(image_path):
+            with open(image_path, 'rb') as image_file:
+                return base64.b64encode(image_file.read()).decode('utf-8')
+
+        # Parse the HTML content
+        soup = BeautifulSoup(html_string, 'html.parser')
+
+        # Find all <img> tags
+        img_tags = soup.find_all('img')
+
+        # Process each image tag
+        for img in img_tags:
+            img_src = img['src']  # Get the src attribute of the image
+
+            # Ensure we are dealing with a local image, not an external URL
+            if not img_src.startswith('http'):  # Skip external URLs
+                # Make sure the image path is relative to the HTML file directory
+                img_abs_path = os.path.join(os.path.dirname(full_path), img_src)
+
+                # Check if the image file exists
+                if os.path.exists(img_abs_path):
+                    # Convert image to Base64
+                    img_format = img_abs_path.split('.')[-1].lower()  # Get image format (e.g., png, jpg)
+                    try:
+                        img_base64 = convert_image_to_base64(img_abs_path)
+                        img['src'] = f"data:image/{img_format};base64,{img_base64}"  # Replace src with Base64
+                    except Exception as e:
+                        print(f"Error embedding image {img_src}: {e}")
+                else:
+                    print(f"Image file not found: {img_abs_path}")
+
+        # Save the modified HTML content with embedded images
+        output_html_file = self.results_path + '/instance_' + str(self.instance) + '/embedded_report.html'
+        with open(output_html_file, 'w', encoding='utf-8') as file:
+            file.write(str(soup))

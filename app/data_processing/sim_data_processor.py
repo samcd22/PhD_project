@@ -3,7 +3,7 @@ import os
 import matplotlib.gridspec as gridspec
 import numpy as np
 import pandas as pd
-# import scipy.stats as stats
+import scipy.stats as stats
 
 from data_processing.data_processor import DataProcessor
 from inference_toolbox.model import Model
@@ -46,6 +46,8 @@ class SimDataProcessor(DataProcessor):
         - simulated_data (pd.DataFrame): The simulated data.
         - data_path (str): The root data path.
         - plot_data (bool): Whether to plot the simulated
+        - dependent_variables (list): The dependent variables of the model.
+        - independent_variables (list): The independent variables of the model.
 
     """
 
@@ -86,6 +88,8 @@ class SimDataProcessor(DataProcessor):
         self.noise_level = noise_level
         self.noise_percentage = noise_percentage
         self.plot_data = plot_data
+        self.dependent_variables = model.dependent_variables
+        self.independent_variables = model.independent_variables
 
         if self.noise_dist == 'no_noise':
             if self.noise_level is not None or self.noise_percentage is not None:
@@ -99,13 +103,13 @@ class SimDataProcessor(DataProcessor):
         Gets the construction parameters.
         The construction parameters includes all of the config information used to simulate the data.
         This checks if the simulated data already exists. It includes:
-            - processed_data_name: The name of the processed data.
-            - noise_dist: The distribution of noise.
-            - noise_level: The level of noise.
-            - noise_percentage: The percentage of noise.
-            - train_test_split: Ratio of training to test data.
-            - model_params: The parameters for the model.
-            - domain_params: The parameters for the domain.
+        - processed_data_name: The name of the processed data.
+        - noise_dist: The distribution of noise.
+        - noise_level: The level of noise.
+        - noise_percentage: The percentage of noise.
+        - train_test_split: Ratio of training to test data.
+        - model_params: The parameters for the model.
+        - domain_params: The parameters for the domain.
 
         Returns:
             - dict: The construction parameters.
@@ -144,15 +148,16 @@ class SimDataProcessor(DataProcessor):
             try:
                 with open(data_filepath + '/construction.json', 'r') as f:
                     construction_data = json.load(f)
-
-                if construction_data == self.get_construction():
-                    return True
-                else:
-                    raise Exception(
-                        'SimDataProcessor - construction.json file under the data_name ' + self.processed_data_name + 'does not match simulator parameters')
+                    
             except:
                 raise FileNotFoundError(
                     'SimDataProcessor - construction.json file not found')
+
+            if construction_data == self.get_construction():
+                return True
+            else:
+                raise Exception(
+                    'SimDataProcessor - construction.json file under the data_name ' + self.processed_data_name + ' does not match simulator parameters')
 
     def _save_data(self, simulated_data):
         """
@@ -182,17 +187,17 @@ class SimDataProcessor(DataProcessor):
         Returns:
             - tuple: A tuple containing the training data and test data.
         """
-        points = self.domain.create_domain()
-        model_func = self.model.get_model()
 
-        all_points = pd.DataFrame({})
-        for indep_var in self.model.independent_variables:
-            if points.ndim < 2:
-                all_points[indep_var] = points
-            else:
-                all_points[indep_var] = points[:, self.model.independent_variables.index(indep_var)]
+        if self.domain.points is None:
+            raise ValueError('SimDataProcessor - domain has not been built, run domain.build_domain outside of the processor')
+
+        points = self.domain.points
+        model_func = self.model.get_model()
+        if not all(self.independent_variables == points.columns):
+            raise ValueError('SimDataProcessor - The domain points do not match the model independent variables')
+
         if not self._check_data_exists():
-            mu = model_func(pd.Series({}), all_points)
+            mu = model_func(pd.Series({}), points)
             if self.noise_percentage is not None:
                 vec_noise = self.noise_percentage*mu
             else:
@@ -200,20 +205,17 @@ class SimDataProcessor(DataProcessor):
                     vec_noise = self.noise_level*np.ones(mu.size)
             if self.noise_dist == 'gaussian':
                 C = np.array([mu[i] + vec_noise[i]**2*np.random.normal() for i in range(mu.size)])
+            elif self.noise_dist == 'truncate_gaussian':
+                C = np.array([mu[i] + vec_noise[i]*stats.truncnorm.rvs(0, np.inf) for i in range(mu.size)])
             elif self.noise_dist == 'no_noise':
                 C = mu
             else:
                 raise Exception('SimDataProcess - Noise distribution invalid!')
 
-            independent_vars = self.model.independent_variables
-            data = pd.DataFrame({})
-            for i in range(len(independent_vars)):
-                if points.ndim < 2:
-                    data[independent_vars[i]] = points
-                else:
-                    data[independent_vars[i]] = points[:, i]
+            data = points.copy()
             data[self.model.dependent_variables[0]] = C
             data[self.model.dependent_variables[0] + '_true'] = mu
+            data.replace([np.inf, -np.inf], np.nan, inplace=True)
             data.dropna(inplace=True)
             self.processed_data = data
             self._save_data(self.processed_data)
@@ -223,15 +225,17 @@ class SimDataProcessor(DataProcessor):
             self.processed_data = pd.read_csv(data_path + '/data.csv')
             print('Data loaded from ' + data_path)
 
-        train_data, test_data = train_test_split(
+        if self.plot_data:
+            self.plot_sim_data()
+        
+        if self.train_test_split == 1:
+            return self.processed_data, self.processed_data
+
+        else:
+            return train_test_split(
             self.processed_data,
             test_size=1 - self.train_test_split,
             random_state=42)
-
-        if self.plot_data:
-            self.plot_sim_data()
-
-        return train_data, test_data
 
     def plot_sim_data(self):
         """
@@ -261,8 +265,32 @@ class SimDataProcessor(DataProcessor):
                 ax.set_title(title)
                 ax.legend()
             elif self.domain.n_dims == 2:
-                raise ValueError(
-                    'SimDataProcessor - 2D data plotting not implemented')
+                fig = plt.figure(figsize=(7, 8))
+                # Create grid for plot and colour bar.
+                gs = gridspec.GridSpec(2, 1, height_ratios=[5, 0.2])
+
+                ax = fig.add_subplot(gs[0])
+                sc = ax.scatter(
+                    self.processed_data[self.model.independent_variables[0]],
+                    self.processed_data[self.model.independent_variables[1]],
+                    c=self.processed_data[self.model.dependent_variables[0]],
+                    cmap='viridis', s=10,
+                    vmin=np.percentile(
+                        self.processed_data[self.model.dependent_variables[0]],
+                        5),
+                    vmax=np.percentile(
+                        self.processed_data[self.model.dependent_variables[0]],
+                        95))
+                ax.set_xlabel(self.model.independent_variables[0])
+                ax.set_ylabel(self.model.independent_variables[1])
+                ax.set_title(title)
+
+                # Add colorbar in the second grid row.
+                cbar_ax = fig.add_subplot(gs[1])
+                fig.colorbar(sc, cax=cbar_ax, orientation='horizontal')
+                cbar_ax.set_xlabel(self.model.dependent_variables[0])
+                fig.tight_layout()
+
             elif self.domain.n_dims == 3:
                 fig = plt.figure(figsize=(7, 8))
                 # Create grid for plot and colour bar.
