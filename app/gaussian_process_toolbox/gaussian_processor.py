@@ -6,6 +6,7 @@ from jaxlib.xla_extension import ArrayImpl
 from sklearn.gaussian_process.kernels import Sum, Product
 from sklearn.gaussian_process.kernels import Kernel as GP_Kernel
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, Matern, RationalQuadratic, ExpSineSquared, DotProduct, ConstantKernel
+from sklearn.preprocessing import StandardScaler
 
 import ast
 
@@ -30,47 +31,6 @@ import os
 
 from data_processing.data_processor import DataProcessor
 from gaussian_process_toolbox.kernel import Kernel
-
-# def load_GP(pre_processor, name):
-#     """
-#     Load a Gaussian Process model from a pre-processed dataset and a given name.
-
-#     Parameters
-#         pre_processor (PreProcessor): Pre-processed data object
-#         name (str): Name of the model to load
-#     """
-#     gp = GP(pre_processor, print_results=False, dummy=True, name = name)
-#     results_path = gp.results_path
-#     location = gp.location
-#     identifier = gp.identifier
-
-#     with open(f'{results_path}/{location}/{identifier}/{name}/gaussian_process_config.json', 'r') as config_file:
-#         gp_config = json.load(config_file)
-#         gp.kernel = gp_config['kernel']
-#         gp.kernel_params = gp_config['kernel_params']
-#         gp.accuracy = gp_config['accuracy']
-#         gp.zero_count_error = gp_config['zero_count_error']
-#         gp.train_test_ratio = gp_config['train_test_ratio']
-#         gp.covariates = gp_config['covariates']
-#         gp.dependent_variable = gp_config['dependent_variable']
-#         gp.n_restarts_optimizer = gp_config['n_restarts_optimizer']
-
-#     gp.spatial_covariates, gp.temporal_covariates, gp.other_covariates = gp._categorize_covariates()
-    
-#     with open(f'{results_path}/{location}/{identifier}/{name}/results.json', 'r') as results_file:
-#         results = json.load(results_file)
-#         gp.optimized_params = results['fitted_kernel_params']
-#         gp.training_r2 = results['training_r2']
-#         gp.testing_r2 = results['testing_r2']
-#         gp.mae = results['mae']
-#         gp.rmse = results['rmse']
-#         gp.nrmse = results['nrmse']
-#         gp.av_log_likelihood = results['av_log_likelihood']
-
-#     gp.gp = joblib.load(f'{results_path}/{name}/{identifier}/gaussian_process_model.pkl')
-#     gp.trained = True
-
-#     return gp
 
 class GP:
     """
@@ -122,6 +82,18 @@ class GP:
 
         self.X_test = self.testing_data[self.independent_variables].values
         self.y_test = self.testing_data[self.dependent_variable].values
+
+        self.X_scaler = StandardScaler()
+        self.y_scaler = StandardScaler()
+
+        self.X_train_scaled = self.X_scaler.fit_transform(self.X_train)
+        self.y_train_scaled = self.y_scaler.fit_transform(self.y_train.reshape(-1, 1)).flatten()
+
+        self.X_test_scaled = self.X_scaler.transform(self.X_test)
+        self.y_test_scaled = self.y_scaler.transform(self.y_test.reshape(-1, 1)).flatten()
+
+        self.gp_model = None
+        self.trained = False
 
     def _validate_kernel(self):
         # Extract unique covariate identifiers from kernel_config
@@ -181,7 +153,7 @@ class GP:
             gp_model = joblib.load(gp_model_file)
         else:
             gp_model = GaussianProcessRegressor(kernel=self.kernel, n_restarts_optimizer=5)
-            gp_model.fit(self.X_train, self.y_train)
+            gp_model.fit(self.X_train_scaled, self.y_train_scaled)
             self._save_run(gp_model)
 
         results_file = os.path.join(self.results_path, f'instance_{self.instance}', 'results.json')
@@ -190,6 +162,9 @@ class GP:
             print(results)
             with open(results_file, 'w') as f:
                 json.dump(results, f, indent=4)
+        
+        self.trained = True
+        self.gp_model = gp_model
 
         return gp_model
     
@@ -205,44 +180,51 @@ class GP:
         """
         optimized_params = {"type": type(kernel).__name__}
 
-        # ✅ Handle KernelTransformer explicitly
-        if isinstance(kernel, Kernel._KernelTransformer):
-            optimized_params["dims"] = kernel.dims  # Store which dimensions it applies to
+        # ✅ Handle KernelTransformer explicitly (preserving its dimensions)
+        if isinstance(kernel, Kernel._KernelTransformer) or isinstance(kernel, self.kernel_obj._KernelTransformer):
+            optimized_params["dims"] = kernel.dims
             optimized_params["base_kernel"] = self._extract_optimized_kernel_params(kernel.base_kernel)
             return optimized_params
 
-        # ✅ Handle composite kernels (arbitrarily deep nested structures)
+        # ✅ Handle composite kernels (Sum, Product) for ANY number of sub-kernels
         if isinstance(kernel, (Sum, Product)):
             optimized_params["operation"] = "Sum" if isinstance(kernel, Sum) else "Product"
-            optimized_params["sub_kernels"] = [self._extract_optimized_kernel_params(sub) for sub in [kernel.k1, kernel.k2]]
+            optimized_params["sub_kernels"] = []
+            
+            # Dynamically find sub-kernels (k1, k2, k3, ...)
+            for attr_name in dir(kernel):
+                if attr_name.startswith("k") and attr_name[1:].isdigit():  # Matches k1, k2, k3, ...
+                    sub_kernel = getattr(kernel, attr_name)
+                    if isinstance(sub_kernel, GP_Kernel):  # Ensure it's a valid sub-kernel
+                        optimized_params["sub_kernels"].append(self._extract_optimized_kernel_params(sub_kernel))
+            
+            return optimized_params
 
-        # ✅ Extract parameters from individual base kernels
-        elif isinstance(kernel, (RBF, WhiteKernel, Matern, RationalQuadratic, ExpSineSquared, DotProduct, ConstantKernel)):
+        # ✅ Extract parameters from individual base kernels (RBF, Matern, etc.)
+        if isinstance(kernel, (RBF, WhiteKernel, Matern, RationalQuadratic, ExpSineSquared, DotProduct, ConstantKernel)):
             optimized_params["parameters"] = {}
 
             for param_name, param_value in kernel.get_params().items():
                 if isinstance(param_value, np.ndarray):  # Convert NumPy arrays to lists
                     optimized_params["parameters"][param_name] = param_value.tolist()
-                elif isinstance(param_value, (float, int)):  # Store scalars as they are
+                elif isinstance(param_value, (float, int)):  # Convert scalars directly
                     optimized_params["parameters"][param_name] = param_value
                 elif isinstance(param_value, GP_Kernel):  # Handle nested kernel parameters
                     optimized_params["parameters"][param_name] = self._extract_optimized_kernel_params(param_value)
                 else:
                     optimized_params["parameters"][param_name] = str(param_value)  # Fallback for unknown types
 
-        else:
-            raise ValueError(f"Unsupported kernel type: {type(kernel)}")
+            return optimized_params
 
-        return optimized_params
+        raise ValueError(f"Unsupported kernel type: {type(kernel)}")
 
 
 
     def _get_training_results(self, gp_model):
-        self.optimized_params = self._extract_optimized_kernel_params
+        self.optimized_params = self._extract_optimized_kernel_params(gp_model.kernel_)
 
-
-        self.training_r2 = gp_model.score(self.X_train, self.y_train)
-        self.testing_r2 = gp_model.score(self.X_test, self.y_test)
+        self.training_r2 = gp_model.score(self.X_train_scaled, self.y_train_scaled)
+        self.testing_r2 = gp_model.score(self.X_test_scaled, self.y_test_scaled)
         
         # y_pred, y_std = gp_model.predict(self.X_test, return_std=True)
         # y_pred = np.expm1(y_pred)
@@ -279,8 +261,6 @@ class GP:
         }
 
         return results
-
-    #     self.trained = True
         
     def _convert_arrays_to_lists(self, obj):
         """
@@ -316,7 +296,6 @@ class GP:
         else:
             return d
 
-
     def _convert_string_keys_to_tuples(self, d):
         """Converts string keys back to tuples if they were originally tuples."""
         if isinstance(d, dict):
@@ -336,6 +315,28 @@ class GP:
             return [self._convert_string_keys_to_tuples(i) for i in d]
         else:
             return d
+
+    def predict(self, points):
+        """
+        Predict the dependent variable at given points.
+
+        Args:
+            points (array-like): The points at which to make predictions.
+
+        Returns:
+            array-like: The predicted values at the given points.
+        """
+        if not self.trained:
+            raise ValueError("Model has not been trained yet")
+
+        points_scaled = self.X_scaler.transform(points)
+
+        mean_preds_scaled, std_preds_scaled = self.gp_model.predict(points_scaled, return_std=True)
+        mean_preds = self.y_scaler.inverse_transform(mean_preds_scaled.reshape(-1, 1)).flatten()
+        std_preds = self.y_scaler.inverse_transform(std_preds_scaled.reshape(-1, 1)).flatten()
+
+        return mean_preds, std_preds
+        
 
     #     # Fit the model
     #     X = self.gridded_data[self.covariates].values
