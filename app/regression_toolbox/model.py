@@ -27,7 +27,7 @@ class Model:
         - model_select (str): The selected model. This is the key used to select the model from the models.json file.
         - model_func_string (str): The model function string.
         - independent_variables (list): A list of independent variable names.
-        - dependent_variables (list): A list of dependent variable names.
+        - dependent_variable (str): The dependent variable name.
         - all_param_names (list): A list of all parameter names.
     """
 
@@ -57,7 +57,7 @@ class Model:
         
         self.model_string_expr = models_data[self.model_select]["model"]
         self.independent_variables = models_data[self.model_select]["independent_variables"]
-        self.dependent_variables = models_data[self.model_select]["dependent_variables"]
+        self.dependent_variable = models_data[self.model_select]["dependent_variable"]
         self.all_param_names = models_data[self.model_select]["all_param_names"]
 
 
@@ -134,7 +134,7 @@ class Model:
             - model_select: The selected model.
             - fixed_model_params: The fixed model parameters.
             - independent_variables: A list of independent variable names.
-            - dependent_variables: A list of dependent variable names.
+            - dependent_variable: The dependent variable name.
             - all_param_names: A list of all parameter names.
             - model_func_string: The model function string.
         """
@@ -142,21 +142,21 @@ class Model:
             'model_select': self.model_select,
             'fixed_model_params': self.fixed_model_params.to_dict(),
             'independent_variables': self.independent_variables,
-            'dependent_variables': self.dependent_variables,
+            'dependent_variable': self.dependent_variable,
             'all_param_names': self.all_param_names,
             'model_func_string': self.model_string_expr
         }
         return construction
 
-def add_model(model_name: str, model_str: str, independent_variables: List[str], dependent_variables: List[str], all_param_names: List[str]):
+def add_model(model_name: str, model_str: str, independent_variables: List[str], dependent_variable: str, all_param_names: List[str]):
     """
     Adds a model to the model.json. The model string should be a mathematical expression that can be evaluated using SymPy. The model string should contain the independent variables, dependent variables, and all parameter names. A list of how mathematical expressions in the model string should be formatted is provided below.
 
     Args:
         - model_name (str): The name of the model. This name should be unique.
         - model_str (str): The model string. This should be a mathematical expression that can be evaluated using SymPy.
-        - independent_variables (list): A list of independent variable names.
-        - dependent_variables (list): A list of dependent variable names.
+        - independent_variable (list): A list of independent variable names.
+        - dependent_variable (list): The dependent variable name.
         - all_param_names (list): A list of all parameter names.
 
     Mathematical expressions:
@@ -201,14 +201,14 @@ def add_model(model_name: str, model_str: str, independent_variables: List[str],
     model_func_vars = re.findall(r'\b(?:[a-zA-Z]+\d*\w*|\d+[a-zA-Z]+\w*)\b', model_str)
     model_func_vars = [var for var in model_func_vars if var not in mathematical_words]
 
-    missing_vars = [var for var in model_func_vars if var not in independent_variables and var not in dependent_variables and var not in all_param_names]
+    missing_vars = [var for var in model_func_vars if var not in independent_variables and var not in dependent_variable and var not in all_param_names]
     if missing_vars:
         raise Exception(f"Model function contains variables that are not accounted for: {', '.join(missing_vars)}")
     
     models_data[model_name] = {}
     models_data[model_name]['model'] = model_str
     models_data[model_name]["independent_variables"] = independent_variables
-    models_data[model_name]["dependent_variables"] = dependent_variables
+    models_data[model_name]["dependent_variable"] = dependent_variable
     models_data[model_name]["all_param_names"] = all_param_names
 
     with open(models_file, 'w') as f:

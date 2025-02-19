@@ -1,7 +1,7 @@
 Likelihood
 ==========
 
-.. automodule:: inference_toolbox.likelihood
+.. automodule:: regression_toolbox.likelihood
    :members:
    :undoc-members:
    :show-inheritance:

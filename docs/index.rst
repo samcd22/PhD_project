@@ -14,15 +14,15 @@ documentation for details.
    :maxdepth: 2
    :caption: Controllers:
 
-   controllers/sampler
+   regression_toolbox/sampler
 
 .. toctree::
    :maxdepth: 2
    :caption: Inference Toolbox:
 
-   inference_toolbox/likelihood
-   inference_toolbox/model
-   inference_toolbox/parameter
+   regression_toolbox/likelihood
+   regression_toolbox/model
+   regression_toolbox/parameter
 
 .. toctree::
    :maxdepth: 2

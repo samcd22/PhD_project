@@ -9,29 +9,14 @@ from jaxlib.xla_extension import ArrayImpl
 from jax import random
 import jax
 
-from inference_toolbox.model import Model
-from inference_toolbox.likelihood import Likelihood
+from regression_toolbox.model import Model
+from regression_toolbox.likelihood import Likelihood
 from data_processing.data_processor import DataProcessor
 
 
 class Sampler:
     """
     A class for performing sampling using the NUTS algorithm. The Sampler class is used to generate samples from the posterior distribution of the inference parameters.
-
-    Args:
-        - inference_params (pd.Series): A pandas Series containing the inference parameters. Each element is a parameter object
-        - model (Model): The model object.
-        - likelihood (Likelihood): The likelihood object.
-        - data_processor (RawDataProcessor, SimDataProcessor): The data processor object.
-        - n_samples (int, optional): The number of samples to draw. Defaults to 10000.
-        - p_warmup (float, optional): The proportion of warmup samples. Defaults to 0.5. So if p_warmup is 0.5 then 50% more samples will be drawn and thrown out before the actual sampling process begins.
-        - n_chains (int, optional): The number of chains to run in parallel. Defaults to 1. If set to greater than 1, the sampler will be run multiple times beginning in different locations in the parameter space.
-        - thinning_rate (int, optional): The thinning rate for the samples. Defaults to 1. If thinning_rate is 1, all samples are saved. If thinning_rate is 2, every second sample is saved, and so on.
-        - root_results_path (str, optional): The root path to save the results. Defaults to '/results/inference_results'.
-        - controller (str, optional): The controller type. Must be one of 'sandbox', 'generator', or 'optimisor'. Defaults to 'sandbox'.
-        - generator_name (str, optional): The name of the generator. Required if controller is 'generator'. Defaults to None.
-        - optimiser_name (str, optional): The name of the optimiser. Required if controller is 'optimisor'. Defaults to None.
-
 
     Attributes:
         - inference_params (pd.Series): A pandas Series containing the inference parameters.
@@ -48,7 +33,7 @@ class Sampler:
         - data_construction (dict): The construction of the data processor.
         - model_func (callable): The model function.
         - independent_variables (list): The independent variable names of the model.
-        - dependent_variables (list): The dependent variable names of the model.
+        - dependent_variable (str): The dependent variable name of the model.
         - all_model_param_names (list): All parameter names of the model.
         - fixed_model_params (pd.Series): The fixed model parameters.
         - likelihood_func (callable): The likelihood function.
@@ -73,7 +58,7 @@ class Sampler:
                  p_warmup:float=0.5, 
                  n_chains:int=1, 
                  thinning_rate:int=1, 
-                 root_results_path:str='/results/inference_results', 
+                 root_results_path:str='/results/regression_results', 
                  controller:str='sandbox', 
                  generator_name:str=None, 
                  optimiser_name:str=None):
@@ -89,14 +74,9 @@ class Sampler:
             - p_warmup (float, optional): The proportion of warmup samples. Defaults to 0.5.
             - n_chains (int, optional): The number of chains to run in parallel. Defaults to 1.
             - thinning_rate (int, optional): The thinning rate for the samples. Defaults to 1.
-            - root_results_path (str, optional): The root path to save the results. Defaults to '/results/inference_results'.
-            - controller (str, optional): The controller type. Must be one of 'sandbox', 'generator', or 'optimisor'. Defaults to 'sandbox'.
-            - generator_name (str, optional): The name of the generator. Required if controller is 'generator'. Defaults to None.
-            - optimiser_name (str, optional): The name of the optimiser. Required if controller is 'optimisor'. Defaults to None.
+            - root_results_path (str, optional): The root path to save the results. Defaults to '/results/regression_results'.
         """
         
-        root_results_path = os.getcwd() + root_results_path
-
         if not isinstance(inference_params, pd.Series):
             raise TypeError("Sampler - inference_params must be a pandas Series")
         if not isinstance(model, Model):
@@ -115,12 +95,8 @@ class Sampler:
             raise TypeError("Sampler - thinning_rate must be a positive integer")
         if not isinstance(root_results_path, str):
             raise TypeError("Sampler - root_results_path must be a string")
-        if not isinstance(controller, str):
-            raise TypeError("Sampler - controller must be a string")
-        if not isinstance(generator_name, str) and generator_name is not None:
-            raise TypeError("Sampler - generator_name must be a string or None")
-        if not isinstance(optimiser_name, str) and optimiser_name is not None:
-            raise TypeError("Sampler - optimiser_name must be a string or None")
+        
+        root_results_path = os.getcwd() + root_results_path
 
         self.inference_params = inference_params
         self.n_samples = n_samples
@@ -138,7 +114,7 @@ class Sampler:
         
         self.model_func = model.get_model()
         self.independent_variables = model.independent_variables
-        self.dependent_variables = model.dependent_variables
+        self.dependent_variable = model.dependent_variable
         self.all_model_param_names = model.all_param_names
         self.fixed_model_params = model.fixed_model_params
 
@@ -151,14 +127,7 @@ class Sampler:
 
         self.sampled = False
 
-        if controller == 'sandbox':
-            self.results_path = os.path.join(root_results_path, data_processor.processed_data_name, 'general_instances')
-        elif controller == 'generator':
-            self.results_path = os.path.join(root_results_path, data_processor.processed_data_name, 'auto_gen_instances', generator_name)
-        elif controller == 'optimisor':
-            self.results_path = os.path.join(root_results_path, data_processor.processed_data_name, 'auto_gen_instances', optimiser_name)
-        else:
-            raise ValueError('Controller must be one of "sandbox", "generator" or "optimisor"')
+        self.results_path = os.path.join(root_results_path, data_processor.processed_data_name)
 
         os.makedirs(self.results_path, exist_ok=True)
 
@@ -258,7 +227,7 @@ class Sampler:
 
         if not set(self.independent_variables).issubset(data.columns):
             raise Exception('Sampler - Data does not contain all independent variables of the model!')
-        if not set(self.dependent_variables).issubset(data.columns):
+        if not set([self.dependent_variable]).issubset(data.columns):
             raise Exception('Sampler - Data does not contain all dependent variables of the model!')
 
     def sample_one(self):
@@ -294,8 +263,8 @@ class Sampler:
             print('Sampler - Error in likelihood function')
 
         mu = numpyro.deterministic('mu', mu)
-        with numpyro.plate('data', len(self.training_data[self.dependent_variables[0]])):
-            numpyro.sample('obs', self.likelihood_func(mu, current_params_sample), obs=jnp.array(self.training_data[self.dependent_variables[0]].values))
+        with numpyro.plate('data', len(self.training_data[self.dependent_variable])):
+            numpyro.sample('obs', self.likelihood_func(mu, current_params_sample), obs=jnp.array(self.training_data[self.dependent_variable[0]].values))
 
     def _safe_exponentiation(self, base, exponent):
         """

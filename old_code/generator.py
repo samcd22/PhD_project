@@ -9,11 +9,11 @@ import matplotlib.colors as colors
 
 
 from app.controllers.controllers.controller import Controller
-from toolboxes.inference_toolbox.parameter import Parameter
-from app.toolboxes.inference_toolbox.model import Model
-from toolboxes.inference_toolbox.likelihood import Likelihood
-from toolboxes.inference_toolbox.sampler import Sampler
-from toolboxes.inference_toolbox.visualiser import Visualiser
+from toolboxes.regression_toolbox.parameter import Parameter
+from app.toolboxes.regression_toolbox.model import Model
+from toolboxes.regression_toolbox.likelihood import Likelihood
+from toolboxes.regression_toolbox.sampler import Sampler
+from toolboxes.regression_toolbox.visualiser import Visualiser
 from toolboxes.data_processing_toolbox.get_data import get_data
 
 # Generator class - generates multiple instances of the sampler based on varying their default parameters

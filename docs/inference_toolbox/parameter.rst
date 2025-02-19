@@ -1,7 +1,7 @@
 Parameter
 =========
 
-.. automodule:: inference_toolbox.parameter
+.. automodule:: regression_toolbox.parameter
    :members:
    :undoc-members:
    :show-inheritance:

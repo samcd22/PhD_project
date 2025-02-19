@@ -21,7 +21,7 @@ class TruncatedNormal(dist.Distribution):
 
     def sample(self, key, sample_shape=()):
         u = numpyro.distributions.util.clamp_probs(
-            jax.random.uniform(key, shape=sample_shape + self.batch_shape)
+            jnp.random.uniform(key, shape=sample_shape + self.batch_shape)
         )
         p = self._low_cdf + u * (self._high_cdf - self._low_cdf)
         return self._transform(self.base_dist.icdf(p))

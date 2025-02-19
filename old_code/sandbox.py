@@ -6,11 +6,11 @@ import json
 from numpyencoder import NumpyEncoder
 
 from controllers.controllers.controller import Controller
-from toolboxes.inference_toolbox.parameter import Parameter
-from toolboxes.inference_toolbox.model import Model
-from toolboxes.inference_toolbox.likelihood import Likelihood
-from toolboxes.inference_toolbox.sampler import Sampler
-from toolboxes.inference_toolbox.visualiser import Visualiser
+from toolboxes.regression_toolbox.parameter import Parameter
+from toolboxes.regression_toolbox.model import Model
+from toolboxes.regression_toolbox.likelihood import Likelihood
+from toolboxes.regression_toolbox.sampler import Sampler
+from toolboxes.regression_toolbox.visualiser import Visualiser
 from toolboxes.data_processing_toolbox.get_data import get_data
 
 

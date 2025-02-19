@@ -49,7 +49,7 @@ class RawDataProcessor(DataProcessor):
         - plot_data (bool): Whether to plot the processed data.
         - processor_func (callable): The data processor function.
         - plotting_func (callable): The plotting function.
-        - dependent_variables (list): The dependent variables.
+        - dependent_variable (str): The dependent variable.
         - independent_variables (list): The independent variables.
     """
 
@@ -82,6 +82,8 @@ class RawDataProcessor(DataProcessor):
             - train_test_split (float, optional): Ratio of training to test data. Defaults to 0.8.
             - data_path (str, optional): The path to the data directory. Defaults to 'data'.
             - plot_data (bool, optional): Whether to plot the processed data. Defaults to True.
+            - plotting_func (callable, optional): A custom plotting function. Defaults to None. Not required if using the Great Barrier Reef processor, which has its own plotting function.
+            - slices (dict, optional): A dictionary of slices to plot. Defaults to None.
         """
 
         self.raw_data_filename = raw_data_filename
@@ -99,7 +101,7 @@ class RawDataProcessor(DataProcessor):
 
         self.plot_data = plot_data
         self.slices = slices
-        self.dependent_variables = None
+        self.dependent_variable = None
         self.independent_variables = None
 
     def get_construction(self) -> dict:
@@ -137,11 +139,7 @@ class RawDataProcessor(DataProcessor):
             - tuple: A tuple containing two DataFrames, training data and test data.
         """
         if not self._check_data_exists():
-            try:
-                self.processed_data = self.processor_func()
-
-            except Exception as e:
-                raise Exception(f"RawDataProcessor - Error when calling the inputted processor: {e}")
+            self.processed_data = self.processor_func()
 
             self._save_data(self.processed_data)
         else:
@@ -165,17 +163,20 @@ class RawDataProcessor(DataProcessor):
         return train_data, test_data
 
     def plot_data_values(self):
-        if len(self.independent_variables) == 3:
-            self._plot_3D_data()
-            if self.slices:
-                for slice_axis, slice_value in self.slices.items():
-                    self._plot_2D_data_slice(self.processed_data, slice_axis, slice_value)
-        elif len(self.independent_variables) == 2:
-            self._plot_2D_data(self.processed_data)
-        elif len(self.independent_variables) == 1:
-            self._plot_1D_data(self.processed_data)
+        if self.plotting_func is not None:
+            self.plotting_func(self.processed_data)
         else:
-            raise Exception('RawDataProcessor - Invalid number of independent variables')
+            if len(self.independent_variables) == 3:
+                self._plot_3D_data()
+                if self.slices:
+                    for slice_axis, slice_value in self.slices.items():
+                        self._plot_2D_data_slice(self.processed_data, slice_axis, slice_value)
+            elif len(self.independent_variables) == 2:
+                self._plot_2D_data(self.processed_data)
+            elif len(self.independent_variables) == 1:
+                self._plot_1D_data(self.processed_data)
+            else:
+                raise Exception('RawDataProcessor - Invalid number of independent variables')
 
     def _check_data_exists(self):
         """
@@ -466,16 +467,8 @@ class RawDataProcessor(DataProcessor):
 
             city_and_country = _get_nearest_major_city(raw_data['decimallatitude'][0], raw_data['decimallongitude'][0])
             location_name = f"{city_and_country[0]}_{city_and_country[1]}"
-            processed_data_path = f'{self.data_path}/processed_raw_data/{self.processed_data_name}/{location_name}/{identifier}'
-            query_data_file = f'{processed_data_path}/query_data.csv'
-            
-            if not os.path.exists(processed_data_path):
-                os.makedirs(f'{self.data_path}/processed_raw_data/{self.processed_data_name}/{location_name}/{identifier}', exist_ok=True)
-            if os.path.exists(query_data_file):
-                print(f"Queried data already exists at {query_data_file}")
-                queried_data = pd.read_csv(query_data_file)
-                return queried_data, processed_data_path
 
+            self.processor_params['location_name'] = location_name
 
             if tax_group == 'scientificname':
 
@@ -489,46 +482,27 @@ class RawDataProcessor(DataProcessor):
             elif tax_group == 'class':
 
                 input_class = identifier
-
-                class_counts = raw_data['class'].value_counts()
-                class_counts.to_csv(f'{self.data_path}/{location_name}/class_counts.csv', header=['count'])
-
                 filtered_occurance_data = raw_data[raw_data['class'] == input_class]
 
             elif tax_group == 'order':
 
                 input_order = identifier
-
-                order_counts = raw_data['order'].value_counts()
-                order_counts.to_csv(f'{self.data_path}/{location_name}/order_counts.csv', header=['count'])
-
                 filtered_occurance_data = raw_data[raw_data['order'] == input_order]
 
             elif tax_group == 'family':
 
                 input_family = identifier
-
-                family_counts = raw_data['family'].value_counts()
-                family_counts.to_csv(f'{self.data_path}/{location_name}/family_counts.csv', header=['count'])
-
                 filtered_occurance_data = raw_data[raw_data['family'] == input_family]
 
             elif tax_group == 'genus':
 
                 input_genus = identifier
 
-                genus_counts = raw_data['genus'].value_counts()
-                genus_counts.to_csv(f'{self.data_path}/{location_name}/genus_counts.csv', header=['count'])
-
                 filtered_occurance_data = raw_data[raw_data['genus'] == input_genus]
 
             elif tax_group == 'phylum':
                 
                 input_phylum = identifier
-
-                phylum_counts = raw_data['phylum'].value_counts()
-                phylum_counts.to_csv(f'{self.data_path}/{location_name}/phylum_counts.csv', header=['count'])
-
                 filtered_occurance_data = raw_data[raw_data['phylum'] == input_phylum]
                 
             if len(filtered_occurance_data) <= 20:
@@ -543,16 +517,10 @@ class RawDataProcessor(DataProcessor):
 
             selected_column_data = selected_column_data.drop(columns=['day', 'month'])
 
-            selected_column_data.to_csv(query_data_file, index=False)
-            return selected_column_data, processed_data_path
+            return selected_column_data
         
         def grid_data(queried_data, num_x_cells, num_y_cells, timestep, raw_data):
-            gridded_data_file =f'{self.processed_data_path}/gridded_data.csv'
-            if os.path.exists(gridded_data_file):
-                print(f"Gridded data already exists at {gridded_data_file}")
-                self.gridded_data = pd.read_csv(gridded_data_file)
-                return self.gridded_data
-            
+           
             lat_min, lat_max = raw_data['decimallatitude'].min(), raw_data['decimallatitude'].max()
             lon_min, lon_max = raw_data['decimallongitude'].min(), raw_data['decimallongitude'].max()
             lat_cell_size = (lat_max - lat_min) / num_y_cells
@@ -569,7 +537,7 @@ class RawDataProcessor(DataProcessor):
                 return x_idx, y_idx
             
             gridded_data = queried_data.copy()
-            gridded_data[['grid_x', 'grid_y']] = self.queried_data.apply(
+            gridded_data[['grid_x', 'grid_y']] = queried_data.apply(
                 lambda row: pd.Series(get_grid_cell(row['decimallatitude'], row['decimallongitude'])),
                 axis=1
             )
@@ -604,8 +572,8 @@ class RawDataProcessor(DataProcessor):
                 lat_cell_size = (lat_max - lat_min) / num_y_cells
                 lon_cell_size = (lon_max - lon_min) / num_x_cells
 
-                yearly_grid_counts_complete['centroid_x'] = yearly_grid_counts_complete['grid_x'] * lon_cell_size + lon_min + (lon_cell_size / 2)
-                yearly_grid_counts_complete['centroid_y'] = yearly_grid_counts_complete['grid_y'] * lat_cell_size + lat_min + (lat_cell_size / 2)
+                yearly_grid_counts_complete['x'] = yearly_grid_counts_complete['grid_x'] * lon_cell_size + lon_min + (lon_cell_size / 2)
+                yearly_grid_counts_complete['y'] = yearly_grid_counts_complete['grid_y'] * lat_cell_size + lat_min + (lat_cell_size / 2)
 
                 gridded_data = yearly_grid_counts_complete
 
@@ -638,19 +606,19 @@ class RawDataProcessor(DataProcessor):
                 lat_cell_size = (lat_max - lat_min) / num_y_cells
                 lon_cell_size = (lon_max - lon_min) / num_x_cells
 
-                daily_grid_counts_complete['centroid_x'] = daily_grid_counts_complete['grid_x'] * lon_cell_size + lon_min + (lon_cell_size / 2)
-                daily_grid_counts_complete['centroid_y'] = daily_grid_counts_complete['grid_y'] * lat_cell_size + lat_min + (lat_cell_size / 2)
+                daily_grid_counts_complete['x'] = daily_grid_counts_complete['grid_x'] * lon_cell_size + lon_min + (lon_cell_size / 2)
+                daily_grid_counts_complete['y'] = daily_grid_counts_complete['grid_y'] * lat_cell_size + lat_min + (lat_cell_size / 2)
 
                 gridded_data = daily_grid_counts_complete
 
             gridded_data = gridded_data.copy()
-            gridded_data.to_csv(gridded_data_file, index=False)
             return gridded_data
-    
-                
-        queried_data, self.processed_data_path = query_data(raw_data, identifier, tax_group)
+            
+        queried_data = query_data(raw_data, identifier, tax_group)
         
-        gridded_data = grid_data(queried_data, num_x_cells, num_y_cells, timestep)
+        gridded_data = grid_data(queried_data, num_x_cells, num_y_cells, timestep, raw_data)
+
+        gridded_data = gridded_data.drop(columns=['grid_x', 'grid_y'])
         
         return gridded_data
         

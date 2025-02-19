@@ -2,7 +2,7 @@ import pandas as pd
 import numpyro
 from typing import Union
 import jax.numpy as jnp
-from inference_toolbox.tr_norm import TruncatedNormal
+from regression_toolbox.tr_norm import TruncatedNormal
 
 LikelihoodInput = Union[str, int, float]
 

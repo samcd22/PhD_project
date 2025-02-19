@@ -4,9 +4,9 @@
         "independent_variables": [
             "x"
         ], 
-        "dependent_variables": [
+        "dependent_variable":
             "y"
-        ], 
+    , 
         "all_param_names": [
             "m", 
             "c"
@@ -17,9 +17,9 @@
         "independent_variables": [
             "x"
         ], 
-        "dependent_variables": [
+        "dependent_variable":
             "y"
-        ], 
+    , 
         "all_param_names": [
             "a", 
             "b"
@@ -30,9 +30,9 @@
         "independent_variables": [
             "x"
         ], 
-        "dependent_variables": [
+        "dependent_variable":
             "y"
-        ], 
+    , 
         "all_param_names": [
             "a", 
             "b"
@@ -45,9 +45,9 @@
             "y", 
             "z"
         ], 
-        "dependent_variables": [
-            "Concentration"
-        ], 
+        "dependent_variable":
+            "C"
+    , 
         "all_param_names": [
             "I_y", 
             "I_z", 
@@ -62,9 +62,9 @@
             "y", 
             "z"
         ], 
-        "dependent_variables": [
-            "Concentration"
-        ], 
+        "dependent_variable":
+            "C"
+    , 
         "all_param_names": [
             "I_y", 
             "I_z", 
@@ -79,9 +79,9 @@
             "y", 
             "z"
         ], 
-        "dependent_variables": [
-            "Concentration"
-        ], 
+        "dependent_variable":
+            "C"
+    , 
         "all_param_names": [
             "I_y", 
             "I_z", 
@@ -98,9 +98,9 @@
         "independent_variables": [
             "P"
         ], 
-        "dependent_variables": [
+        "dependent_variable":
             "r"
-        ], 
+    , 
         "all_param_names": [
             "a", 
             "n"
@@ -111,9 +111,9 @@
         "independent_variables": [
             "x"
         ], 
-        "dependent_variables": [
+        "dependent_variable":
             "y"
-        ], 
+    , 
         "all_param_names": [
             "a"
         ]
@@ -123,9 +123,9 @@
         "independent_variables": [
             "x"
         ], 
-        "dependent_variables": [
+        "dependent_variable":
             "y"
-        ], 
+    , 
         "all_param_names": [
             "a", 
             "b"
@@ -138,9 +138,9 @@
             "y", 
             "z"
         ], 
-        "dependent_variables": [
-            "Concentration"
-        ], 
+        "dependent_variable":
+            "C"
+    , 
         "all_param_names": [
             "Q", 
             "R_y", 
@@ -157,9 +157,9 @@
             "y", 
             "z"
         ], 
-        "dependent_variables": [
-            "Concentration"
-        ], 
+        "dependent_variable":
+            "C"
+    , 
         "all_param_names": [
             "Q", 
             "R_y", 
@@ -176,9 +176,9 @@
             "y", 
             "z"
         ], 
-        "dependent_variables": [
-            "Concentration"
-        ], 
+        "dependent_variable":
+            "C"
+    , 
         "all_param_names": [
             "H", 
             "Q", 
@@ -195,9 +195,9 @@
         "independent_variables": [
             "x"
         ], 
-        "dependent_variables": [
+        "dependent_variable":
             "y"
-        ], 
+    , 
         "all_param_names": [
             "a", 
             "b"
@@ -210,9 +210,9 @@
             "y", 
             "z"
         ], 
-        "dependent_variables": [
-            "Concentration"
-        ], 
+        "dependent_variable":
+            "C"
+    , 
         "all_param_names": [
             "H", 
             "I_y", 
@@ -226,9 +226,9 @@
             "x", 
             "y"
         ], 
-        "dependent_variables": [
+        "dependent_variable":
             "C"
-        ], 
+    , 
         "all_param_names": [
             "a", 
             "b"
@@ -241,9 +241,9 @@
             "y", 
             "z"
         ], 
-        "dependent_variables": [
+        "dependent_variable":
             "C"
-        ], 
+    , 
         "all_param_names": [
             "a", 
             "b", 

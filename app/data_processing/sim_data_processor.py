@@ -6,7 +6,7 @@ import pandas as pd
 import scipy.stats as stats
 
 from data_processing.data_processor import DataProcessor
-from inference_toolbox.model import Model
+from regression_toolbox.model import Model
 from matplotlib import pyplot as plt
 from numpyencoder import NumpyEncoder
 from sklearn.model_selection import train_test_split
@@ -46,7 +46,7 @@ class SimDataProcessor(DataProcessor):
         - simulated_data (pd.DataFrame): The simulated data.
         - data_path (str): The root data path.
         - plot_data (bool): Whether to plot the simulated
-        - dependent_variables (list): The dependent variables of the model.
+        - dependent_variable (str): The dependent variable of the model.
         - independent_variables (list): The independent variables of the model.
 
     """
@@ -88,7 +88,7 @@ class SimDataProcessor(DataProcessor):
         self.noise_level = noise_level
         self.noise_percentage = noise_percentage
         self.plot_data = plot_data
-        self.dependent_variables = model.dependent_variables
+        self.dependent_variable = model.dependent_variable
         self.independent_variables = model.independent_variables
 
         if self.noise_dist == 'no_noise':
@@ -213,8 +213,8 @@ class SimDataProcessor(DataProcessor):
                 raise Exception('SimDataProcess - Noise distribution invalid!')
 
             data = points.copy()
-            data[self.model.dependent_variables[0]] = C
-            data[self.model.dependent_variables[0] + '_true'] = mu
+            data[self.model.dependent_variable] = C
+            data[self.model.dependent_variable + '_true'] = mu
             data.replace([np.inf, -np.inf], np.nan, inplace=True)
             data.dropna(inplace=True)
             self.processed_data = data
@@ -248,20 +248,20 @@ class SimDataProcessor(DataProcessor):
         if not os.path.exists(file_path):
             os.makedirs(file_path)
         if not os.path.exists(file_path + '/data_plot.png'):
-            title = 'Simulated ' + self.model.dependent_variables[0] + ' data'
+            title = 'Simulated ' + self.model.dependent_variable + ' data'
             if self.domain.n_dims == 1:
                 fig, ax = plt.subplots()
                 ax.scatter(
                     self.processed_data[self.model.independent_variables[0]],
-                    self.processed_data[self.model.dependent_variables[0]],
+                    self.processed_data[self.model.dependent_variable],
                     label='Simulated Data', s=10)
                 ax.plot(
                     self.processed_data[self.model.independent_variables[0]],
                     self.processed_data[
-                        self.model.dependent_variables[0] + '_true'],
+                        self.model.dependent_variable + '_true'],
                     label='Simulated Data No Noise', color='red')
                 ax.set_xlabel(self.model.independent_variables[0])
-                ax.set_ylabel(self.model.dependent_variables[0])
+                ax.set_ylabel(self.model.dependent_variable)
                 ax.set_title(title)
                 ax.legend()
             elif self.domain.n_dims == 2:
@@ -273,13 +273,13 @@ class SimDataProcessor(DataProcessor):
                 sc = ax.scatter(
                     self.processed_data[self.model.independent_variables[0]],
                     self.processed_data[self.model.independent_variables[1]],
-                    c=self.processed_data[self.model.dependent_variables[0]],
+                    c=self.processed_data[self.model.dependent_variable],
                     cmap='viridis', s=10,
                     vmin=np.percentile(
-                        self.processed_data[self.model.dependent_variables[0]],
+                        self.processed_data[self.model.dependent_variable],
                         5),
                     vmax=np.percentile(
-                        self.processed_data[self.model.dependent_variables[0]],
+                        self.processed_data[self.model.dependent_variable],
                         95))
                 ax.set_xlabel(self.model.independent_variables[0])
                 ax.set_ylabel(self.model.independent_variables[1])
@@ -288,7 +288,7 @@ class SimDataProcessor(DataProcessor):
                 # Add colorbar in the second grid row.
                 cbar_ax = fig.add_subplot(gs[1])
                 fig.colorbar(sc, cax=cbar_ax, orientation='horizontal')
-                cbar_ax.set_xlabel(self.model.dependent_variables[0])
+                cbar_ax.set_xlabel(self.model.dependent_variable)
                 fig.tight_layout()
 
             elif self.domain.n_dims == 3:
@@ -301,13 +301,13 @@ class SimDataProcessor(DataProcessor):
                     self.processed_data[self.model.independent_variables[0]],
                     self.processed_data[self.model.independent_variables[1]],
                     self.processed_data[self.model.independent_variables[2]],
-                    c=self.processed_data[self.model.dependent_variables[0]],
+                    c=self.processed_data[self.model.dependent_variable],
                     cmap='viridis', s=10,
                     vmin=np.percentile(
-                        self.processed_data[self.model.dependent_variables[0]],
+                        self.processed_data[self.model.dependent_variable],
                         5),
                     vmax=np.percentile(
-                        self.processed_data[self.model.dependent_variables[0]],
+                        self.processed_data[self.model.dependent_variable],
                         95))
                 ax.set_xlabel(self.model.independent_variables[0])
                 ax.set_ylabel(self.model.independent_variables[1])
