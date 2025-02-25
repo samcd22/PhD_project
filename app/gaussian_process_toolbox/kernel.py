@@ -51,32 +51,40 @@ class Kernel:
             'white': ['noise_level'],
             'constant': ['constant_value']
         }
+        
         for (kernel_name, identifier), params in self.kernel_params.items():
             if kernel_name not in valid_params:
                 raise ValueError(f"Invalid kernel type '{kernel_name}' in parameters.")
+            
             for param in params.keys():
-                if param not in valid_params[kernel_name]:
+                # Allow bounds parameters (e.g., "length_scale_bounds", "noise_level_bounds")
+                if param not in valid_params[kernel_name] and not param.endswith("_bounds"):
                     raise ValueError(f"Invalid parameter '{param}' for kernel '{kernel_name}'. Expected parameters: {valid_params[kernel_name]}")
 
     def add_kernel_param(self, kernel_name, identifier, param_name, val):
         """
         Adds a parameter to a specific kernel instance and marks it for rebuilding.
-        
+
         Args:
             - kernel_name (string): The type of kernel to add the parameter to.
             - identifier (string): A unique identifier for the kernel instance.
             - param_name (string): The name of the parameter to add.
-            - val (float): The value of the parameter.
-
+            - val (float, list, or tuple): The value of the parameter. 
+            Bounds should be passed as a list or tuple of (min, max).
+        
         Returns:
             - self: The Kernel instance with the added parameter
         """
         key = (kernel_name, identifier)
         if key not in self.kernel_params:
             self.kernel_params[key] = {}
+
+        # Ensure bounds are stored as tuples, as required by sklearn
+        if "bounds" in param_name and isinstance(val, (list, tuple)) and len(val) == 2:
+            val = tuple(val)  # Convert to tuple for sklearn compatibility
+
         self.kernel_params[key][param_name] = val
         self.dirty = True
-
         return self
 
     class _KernelTransformer(GP_Kernel):
@@ -193,4 +201,5 @@ class Kernel:
             'kernel_params': self.kernel_params,
             'kernel_concatination': self.kernel_concatination
         }
+
         return construction

@@ -4,9 +4,7 @@
         "independent_variables": [
             "x"
         ], 
-        "dependent_variable":
-            "y"
-    , 
+        "dependent_variable": "y", 
         "all_param_names": [
             "m", 
             "c"
@@ -17,9 +15,7 @@
         "independent_variables": [
             "x"
         ], 
-        "dependent_variable":
-            "y"
-    , 
+        "dependent_variable": "y", 
         "all_param_names": [
             "a", 
             "b"
@@ -30,9 +26,7 @@
         "independent_variables": [
             "x"
         ], 
-        "dependent_variable":
-            "y"
-    , 
+        "dependent_variable": "y", 
         "all_param_names": [
             "a", 
             "b"
@@ -45,9 +39,7 @@
             "y", 
             "z"
         ], 
-        "dependent_variable":
-            "C"
-    , 
+        "dependent_variable": "C", 
         "all_param_names": [
             "I_y", 
             "I_z", 
@@ -62,9 +54,7 @@
             "y", 
             "z"
         ], 
-        "dependent_variable":
-            "C"
-    , 
+        "dependent_variable": "C", 
         "all_param_names": [
             "I_y", 
             "I_z", 
@@ -79,9 +69,7 @@
             "y", 
             "z"
         ], 
-        "dependent_variable":
-            "C"
-    , 
+        "dependent_variable": "C", 
         "all_param_names": [
             "I_y", 
             "I_z", 
@@ -98,9 +86,7 @@
         "independent_variables": [
             "P"
         ], 
-        "dependent_variable":
-            "r"
-    , 
+        "dependent_variable": "r", 
         "all_param_names": [
             "a", 
             "n"
@@ -111,9 +97,7 @@
         "independent_variables": [
             "x"
         ], 
-        "dependent_variable":
-            "y"
-    , 
+        "dependent_variable": "y", 
         "all_param_names": [
             "a"
         ]
@@ -123,9 +107,7 @@
         "independent_variables": [
             "x"
         ], 
-        "dependent_variable":
-            "y"
-    , 
+        "dependent_variable": "y", 
         "all_param_names": [
             "a", 
             "b"
@@ -138,9 +120,7 @@
             "y", 
             "z"
         ], 
-        "dependent_variable":
-            "C"
-    , 
+        "dependent_variable": "C", 
         "all_param_names": [
             "Q", 
             "R_y", 
@@ -157,9 +137,7 @@
             "y", 
             "z"
         ], 
-        "dependent_variable":
-            "C"
-    , 
+        "dependent_variable": "C", 
         "all_param_names": [
             "Q", 
             "R_y", 
@@ -176,9 +154,7 @@
             "y", 
             "z"
         ], 
-        "dependent_variable":
-            "C"
-    , 
+        "dependent_variable": "C", 
         "all_param_names": [
             "H", 
             "Q", 
@@ -195,9 +171,7 @@
         "independent_variables": [
             "x"
         ], 
-        "dependent_variable":
-            "y"
-    , 
+        "dependent_variable": "y", 
         "all_param_names": [
             "a", 
             "b"
@@ -210,9 +184,7 @@
             "y", 
             "z"
         ], 
-        "dependent_variable":
-            "C"
-    , 
+        "dependent_variable": "C", 
         "all_param_names": [
             "H", 
             "I_y", 
@@ -226,9 +198,7 @@
             "x", 
             "y"
         ], 
-        "dependent_variable":
-            "C"
-    , 
+        "dependent_variable": "C", 
         "all_param_names": [
             "a", 
             "b"
@@ -241,12 +211,42 @@
             "y", 
             "z"
         ], 
-        "dependent_variable":
-            "C"
-    , 
+        "dependent_variable": "C", 
         "all_param_names": [
             "a", 
             "b", 
+            "d"
+        ]
+    }, 
+    "test2D": {
+        "model": "A*sin(x/a)*cos(y/b) + B*exp(-(x^2 + y^2)/c^2)", 
+        "independent_variables": [
+            "x", 
+            "y"
+        ], 
+        "dependent_variable": "C", 
+        "all_param_names": [
+            "A", 
+            "B", 
+            "a", 
+            "b", 
+            "c"
+        ]
+    }, 
+    "test3D": {
+        "model": "A*sin(x/a)*cos(y/b)*exp(-z^2/d^2) + B*exp(-(x^2 + y^2 + z^2)/c^2)*cos(z)", 
+        "independent_variables": [
+            "x", 
+            "y", 
+            "z"
+        ], 
+        "dependent_variable": "C", 
+        "all_param_names": [
+            "A", 
+            "B", 
+            "a", 
+            "b", 
+            "c", 
             "d"
         ]
     }

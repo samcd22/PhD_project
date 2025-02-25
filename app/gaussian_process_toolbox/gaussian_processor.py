@@ -41,6 +41,8 @@ class GP:
     def __init__(self, 
                  data_processor,
                  kernel: Kernel,
+                 uncertainty_method = None,
+                 uncertainty_params = None,
                  root_results_path = '/results/gaussian_process_results'):
 
         if not isinstance(data_processor, DataProcessor):
@@ -57,8 +59,8 @@ class GP:
         self.kernel_config = kernel.kernel_config
         self.kernel_params = kernel.kernel_params
         
-        self.uncertainty_method = None
-        self.uncertainty_params = None
+        self.uncertainty_method = uncertainty_method
+        self.uncertainty_params = uncertainty_params
 
         self.training_data, self.testing_data = data_processor.process_data()
         self.data_construction = data_processor.get_construction()
@@ -95,18 +97,23 @@ class GP:
         self.gp_model = None
         self.trained = False
 
+        self.optimized_params = None
+        self.num_params = None
+
     def _validate_kernel(self):
         # Extract unique covariate identifiers from kernel_config
-        kernel_covariates = sorted(set(identifier for _, identifier in self.kernel_config.keys()))
+        num_kernel_covariates = np.unique([i for sublist in [val for val in self.kernel_config.values()] for i in sublist]).size
 
         # Check if kernel covariates match the independent variables
-        if kernel_covariates != sorted(self.independent_variables):
+        if num_kernel_covariates != len(self.independent_variables):
             raise ValueError("Kernel covariates do not match the independent variables")
         
     def get_construction(self):
         construction = {
             'kernel': self.kernel_obj.get_construction(),
             'data_processor': self.data_construction,
+            'uncertainty_method': self.uncertainty_method,
+            'uncertainty_params': self.uncertainty_params
         }
         return construction
 
@@ -138,7 +145,10 @@ class GP:
                     json_safe_data = json.load(f)
                 instance_hyperparams = self._convert_string_keys_to_tuples(json_safe_data)
                 
-                if self._convert_arrays_to_lists(self.get_construction()) == instance_hyperparams:
+                print(self._convert_tuples_to_lists(instance_hyperparams))
+                print(self._convert_tuples_to_lists(self._convert_arrays_to_lists(self.get_construction())))
+
+                if self._convert_tuples_to_lists(self._convert_arrays_to_lists(self.get_construction())) == self._convert_tuples_to_lists(instance_hyperparams):
                     return int(instance_folder.split('_')[1])
 
         instances = [int(folder.split('_')[1]) for folder in instance_folders if '_' in folder]
@@ -150,16 +160,17 @@ class GP:
         """
         gp_model_file = os.path.join(self.results_path, f'instance_{self.instance}', 'gaussian_process_model.pkl')
         if os.path.exists(gp_model_file):
+            print(f'Loading existing GP model from {gp_model_file}')
             gp_model = joblib.load(gp_model_file)
         else:
             gp_model = GaussianProcessRegressor(kernel=self.kernel, n_restarts_optimizer=5)
             gp_model.fit(self.X_train_scaled, self.y_train_scaled)
+            print(f'Fitted new GP model and saving to {gp_model_file}')
             self._save_run(gp_model)
 
         results_file = os.path.join(self.results_path, f'instance_{self.instance}', 'results.json')
+        results = self._get_training_results(gp_model)
         if not os.path.exists(results_file):
-            results = self._get_training_results(gp_model)
-            print(results)
             with open(results_file, 'w') as f:
                 json.dump(results, f, indent=4)
         
@@ -218,10 +229,41 @@ class GP:
 
         raise ValueError(f"Unsupported kernel type: {type(kernel)}")
 
+    def _count_kernel_parameters(self, kernel_dict=None):
+        """
+        Recursively counts the number of actual hyperparameters in a kernel dictionary.
+        Ignores metadata like bounds.
 
+        Args:
+            kernel_dict (dict): Dictionary representation of the kernel structure.
+
+        Returns:
+            int: Total number of hyperparameters.
+        """
+        param_count = 0
+
+        if kernel_dict is None:
+            kernel_dict = self.optimized_params
+
+        if "parameters" in kernel_dict:
+            for key, value in kernel_dict["parameters"].items():
+                if "bounds" not in key:  # Ignore bounds
+                    if isinstance(value, list):  # Count each element in a list separately
+                        param_count += len(value)
+                    else:
+                        param_count += 1
+
+        if "sub_kernels" in kernel_dict:  # Handle composite kernels (Sum, Product)
+            param_count += sum(self._count_kernel_parameters(sub_kernel) for sub_kernel in kernel_dict["sub_kernels"])
+
+        if "base_kernel" in kernel_dict:  # Handle _KernelTransformer
+            param_count += self._count_kernel_parameters(kernel_dict["base_kernel"])
+
+        return param_count
 
     def _get_training_results(self, gp_model):
         self.optimized_params = self._extract_optimized_kernel_params(gp_model.kernel_)
+        self.num_params = self._count_kernel_parameters()
 
         self.training_r2 = gp_model.score(self.X_train_scaled, self.y_train_scaled)
         self.testing_r2 = gp_model.score(self.X_test_scaled, self.y_test_scaled)
@@ -252,8 +294,9 @@ class GP:
         # Serialize results to JSON
         results = {
             'fitted_kernel_params': self.optimized_params,
+            'num_params': self.num_params,
             'training_r2': self.training_r2,
-            'testing_r2': self.testing_r2,
+            'testing_r2': self.testing_r2
             # 'mae': self.mae,
             # 'rmse': self.rmse,
             # 'nrmse': self.nrmse,
@@ -315,6 +358,26 @@ class GP:
             return [self._convert_string_keys_to_tuples(i) for i in d]
         else:
             return d
+        
+    def _convert_tuples_to_lists(self, obj):
+        """
+        Recursively converts all tuples in a nested structure (dict, list, tuple, etc.) to lists.
+        
+        Args:
+            obj (any): The input object (dict, list, tuple, etc.).
+            
+        Returns:
+            any: The same structure with tuples converted to lists.
+        """
+        if isinstance(obj, dict):
+            # Convert tuples in keys, but ensure keys remain hashable (only convert non-keys)
+            return {k if not isinstance(k, tuple) else tuple(self._convert_tuples_to_lists(k)): self._convert_tuples_to_lists(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._convert_tuples_to_lists(i) for i in obj]
+        elif isinstance(obj, tuple):
+            return [self._convert_tuples_to_lists(i) for i in obj]  # Convert tuple to list
+        else:
+            return obj  # Base case: return the object as is if it's not a tuple, list, or dict
 
     def predict(self, points):
         """
@@ -333,7 +396,7 @@ class GP:
 
         mean_preds_scaled, std_preds_scaled = self.gp_model.predict(points_scaled, return_std=True)
         mean_preds = self.y_scaler.inverse_transform(mean_preds_scaled.reshape(-1, 1)).flatten()
-        std_preds = self.y_scaler.inverse_transform(std_preds_scaled.reshape(-1, 1)).flatten()
+        std_preds = std_preds_scaled * self.y_scaler.scale_[0]  # Only multiply by standard deviation
 
         return mean_preds, std_preds
         

@@ -58,10 +58,7 @@ class Sampler:
                  p_warmup:float=0.5, 
                  n_chains:int=1, 
                  thinning_rate:int=1, 
-                 root_results_path:str='/results/regression_results', 
-                 controller:str='sandbox', 
-                 generator_name:str=None, 
-                 optimiser_name:str=None):
+                 root_results_path:str='/results/regression_results'):
         """
         Initializes the Sampler class.
 
