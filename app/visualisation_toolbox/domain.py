@@ -43,7 +43,7 @@ class Domain:
             - cylindrical: Cylindrical domain with radius, height, mass, and optional center/angle
             - spherical: Spherical domain with radius, mass, and optional center/theta/phi
     """
-    def __init__(self, n_dims, domain_select, dim_names = ['x', 'y', 'z']):
+    def __init__(self, n_dims, domain_select, dim_names = ['x', 'y', 'z'], time_array = None):
         """
         Initialize the Domain class with the specified number of dimensions and domain type.
 
@@ -51,6 +51,7 @@ class Domain:
             - n_dims (int): Number of dimensions (1, 2, or 3)
             - domain_select (str): Type of domain to generate
             - dim_names (list): Names of dimensions (default: ['x', 'y', 'z'])
+            - time_array (list): Time array for time-varying domains (default: None)
         """
         self.n_dims = n_dims
         self.domain_select = domain_select
@@ -67,6 +68,9 @@ class Domain:
 
         self.domain_params = {}
         self.points = None
+
+        self.time_array = time_array
+            
 
     def add_domain_param(self, param_name, param_value):
         """
@@ -746,7 +750,27 @@ class Domain:
             'domain_params': self.domain_params,
             'transformations': self.transformations,
             'cuts': self.cuts,
+            'time_array': self.time_array
         }
 
         return self._convert_arrays_to_lists(construction)
-        
+
+    def _add_time_to_points(self):
+        """
+        Expands the points DataFrame by adding a time dimension.
+        Each unique combination of spatial coordinates will be duplicated for each time step.
+        """
+        if self.time_array is None:
+            raise ValueError('Domain - Time range is not defined')
+        if 't' not in self.dim_names:
+            raise ValueError('Domain - Time varying domains require a time dimension (t)')
+
+        time_points = self.time_array  # Array of time values
+        points = self.points.copy()  # Copy original spatial points DataFrame
+
+        # Repeat each row for every time step
+        expanded_points = pd.concat([points.assign(t=t) for t in time_points], ignore_index=True)
+
+        self.points = expanded_points  # Update the points attribute
+
+        return expanded_points  # Optional: Return the modified DataFrame

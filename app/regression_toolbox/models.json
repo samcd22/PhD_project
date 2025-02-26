@@ -249,5 +249,65 @@
             "c", 
             "d"
         ]
+    }, 
+    "ellipsoid3D": {
+        "model": "A * exp(-(x^2/a^2 + y^2/b^2 + z^2/c^2))", 
+        "independent_variables": [
+            "x", 
+            "y", 
+            "z"
+        ], 
+        "dependent_variable": "D", 
+        "all_param_names": [
+            "A", 
+            "a", 
+            "b", 
+            "c"
+        ]
+    }, 
+    "wave1D": {
+        "model": "A * sin(2 * pi * (x / a - t / b))", 
+        "independent_variables": [
+            "x", 
+            "t"
+        ], 
+        "dependent_variable": "D", 
+        "all_param_names": [
+            "A", 
+            "a", 
+            "b"
+        ]
+    }, 
+    "wave2D": {
+        "model": "A * sin(2 * pi * (x / a + y / b - t / c))", 
+        "independent_variables": [
+            "x", 
+            "y", 
+            "t"
+        ], 
+        "dependent_variable": "D", 
+        "all_param_names": [
+            "A", 
+            "a", 
+            "b", 
+            "c"
+        ]
+    }, 
+    "wave3D": {
+        "model": "A * exp(-((x/a)^2 + (y/b)^2 + (z/c)^2)) * sin(2 * pi * (t / d))", 
+        "independent_variables": [
+            "x", 
+            "y", 
+            "z", 
+            "t"
+        ], 
+        "dependent_variable": "D", 
+        "all_param_names": [
+            "A", 
+            "a", 
+            "b", 
+            "c", 
+            "d"
+        ]
     }
 }
