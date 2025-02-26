@@ -19,6 +19,7 @@ from sympy import Eq, symbols
 import jax.numpy as jnp
 import io
 from abc import abstractmethod
+from matplotlib.colors import Normalize, SymLogNorm
 
 from regression_toolbox.sampler import Sampler
 from gaussian_process_toolbox.gaussian_processor import GP
@@ -83,7 +84,7 @@ class Visualiser:
     def _make_predictions(self, domain_points):
         pass
 
-    def show_predictions(self, domain: Domain, plot_name: str, plot_type: str = '3D', title: str = None, cross_section_params = None):
+    def show_predictions(self, domain: Domain, plot_name: str, plot_type: str = '3D', title: str = None, scale = 'linear'):
         """
         Outputs the plots for visualising the modelled system based on the concluded lower, median and upper bound parameters and an inputted domain. Plots are saved and include a summary of the parameter values and the sampling success.
 
@@ -98,7 +99,9 @@ class Visualiser:
 
             - title (str, optional): Overall title of the plot. Defaults to None.
             - cross_section_params (dict, optional): Dictionary containing the cross section parameters. Defaults to None.
-
+            - scale (str, optional): Scale of the plot. Defaults to 'linear'. Options are:
+                - 'linear': Linear scale
+                - 'log': Logarithmic scale
         """
 
         if domain.points is None:
@@ -108,25 +111,25 @@ class Visualiser:
         if domain.time_array is not None:
             domain_points = domain._add_time_to_points()
 
-        if not all(self.independent_variables == domain_points.columns):
+        if not sorted(self.independent_variables) == sorted(domain_points.columns):
             raise Exception('Visualiser - domain columns do not match the independent variables!')
 
         if plot_type == '3D':
-            self._show_3D_predictions(domain_points, plot_name, title)
+            self._show_3D_predictions(domain_points, plot_name, title, scale)
         elif plot_type == '2D':
-            self._show_2D_predictions(domain_points, plot_name, title)
+            self._show_2D_predictions(domain_points, plot_name, title, scale)
         elif plot_type == '1D':
-            self._show_1D_predictions(domain_points, plot_name, title)
+            self._show_1D_predictions(domain_points, plot_name, title, scale)
         elif plot_type == '2D_cross_sections':
-            self._show_2D_cross_sections_predictions(domain, plot_name, title, cross_section_params)
+            self._show_2D_cross_sections_predictions(domain, plot_name, title, scale)
         elif plot_type == '3D_recursive':
-            self._show_3D_recursive_predictions(domain_points, plot_name, title)
+            self._show_3D_recursive_predictions(domain_points, plot_name, title, scale)
         elif plot_type == '1D_time':
-            self._show_1D_time_predictions(domain_points, plot_name, title)
+            self._show_1D_time_predictions(domain_points, plot_name, title, scale)
         elif plot_type == '2D_time':
-            self._show_2D_time_predictions(domain_points, plot_name, title)
+            self._show_2D_time_predictions(domain_points, plot_name, title, scale)
         elif plot_type == '3D_time':
-            self._show_3D_time_predictions(domain_points, plot_name, title)
+            self._show_3D_time_predictions(domain_points, plot_name, title, scale)
         else: 
             raise Exception('Visualiser - Invalid plot type!')
     
@@ -206,7 +209,7 @@ class Visualiser:
 
         return fig, axes
 
-    def _show_1D_predictions(self, domain_points, plot_name, title):
+    def _show_1D_predictions(self, domain_points, plot_name, title, scale):
 
         dir_name = self.results_path + '/instance_' + str(self.instance) + '/' + plot_name
         if not os.path.exists(dir_name):
@@ -238,12 +241,14 @@ class Visualiser:
             axes[0].set_title(title_lower, fontsize = 20)
             axes[0].set_xlabel(self.independent_variables[0])
             axes[0].set_ylabel(self.dependent_variable)
+            axes[0].set_yscale(scale)
 
             # Defines the median subplot
             axes[1].plot(results_df[self.independent_variables[0]], median_pred, label='Predicted ' + self.dependent_variable)
             axes[1].set_title(title_median, fontsize = 20)
             axes[1].set_xlabel(self.independent_variables[0])
             axes[1].set_ylabel(self.dependent_variable)
+            axes[1].set_yscale(scale)
             # Fill the area between the lower and upper bound predictions
             axes[1].fill_between(results_df[self.independent_variables[0]], lower_pred, upper_pred, color='gray', alpha=0.3, label='Prediction Interval')
 
@@ -252,6 +257,7 @@ class Visualiser:
             axes[2].set_title(title_upper, fontsize = 20)
             axes[2].set_xlabel(self.independent_variables[0])
             axes[2].set_ylabel(self.dependent_variable)
+            axes[2].set_yscale(scale)
 
             axes[0].scatter(self.testing_data[self.independent_variables[0]],self.testing_data[self.dependent_variable], s = 20, c = 'r', label='Measured ' + self.dependent_variable + ' test values')
             axes[1].scatter(self.testing_data[self.independent_variables[0]],self.testing_data[self.dependent_variable], s = 20, c = 'r', label='Measured ' + self.dependent_variable + ' test values')
@@ -275,7 +281,7 @@ class Visualiser:
             fig.savefig(full_path)
             plt.close()
     
-    def _show_1D_time_predictions(self, domain_points, plot_name, title):
+    def _show_1D_time_predictions(self, domain_points, plot_name, title, scale):
         dir_name = self.results_path + '/instance_' + str(self.instance) + '/' + plot_name
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
@@ -315,7 +321,7 @@ class Visualiser:
                 axes[0].set_title(title_lower, fontsize=20)
                 axes[0].set_xlabel(self.independent_variables[0])
                 axes[0].set_ylabel(self.dependent_variable)
-
+                axes[0].set_yscale(scale)
                 # Median Plot
                 axes[1].plot(X, median_frame, label='Predicted ' + self.dependent_variable)
                 axes[1].set_title(title_median, fontsize=20)
@@ -323,13 +329,13 @@ class Visualiser:
                 axes[1].set_ylabel(self.dependent_variable)
                 # Fill the area between the lower and upper bound predictions
                 axes[1].fill_between(X, lower_frame, upper_frame, color='gray', alpha=0.3, label='Prediction Interval')
-
+                axes[1].set_yscale(scale)
                 # Upper Bound Plot
                 axes[2].plot(X, upper_frame, label='Predicted ' + self.dependent_variable)
                 axes[2].set_title(title_upper, fontsize=20)
                 axes[2].set_xlabel(self.independent_variables[0])
                 axes[2].set_ylabel(self.dependent_variable)
-
+                axes[2].set_yscale(scale)
                 # Get axis limits from the median plot
                 if y_lim is None:
                     y_lim = axes[1].get_ylim()
@@ -351,7 +357,7 @@ class Visualiser:
 
             self._animate_figures(figs, full_path)
 
-    def _show_2D_predictions(self, domain_points, plot_name, title):
+    def _show_2D_predictions(self, domain_points, plot_name, title, scale):
         dir_name = self.results_path + '/instance_' + str(self.instance) + '/' + plot_name
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
@@ -395,9 +401,8 @@ class Visualiser:
                 title_median = 'Median GP prediction'
                 title_upper = 'Upper bound GP prediction'
 
-
             # Defines the lower bound subplot
-            plot_1 = axes[0].tricontourf(X, Y, lower_pred, vmin=min_val, vmax=max_val, levels=100, cmap = 'jet', alpha = 0.7)
+            plot_1 = axes[0].tricontourf(X, Y, lower_pred, norm=scale, levels=100, cmap = 'jet', alpha = 0.7, vmin=min_val, vmax=max_val)
             axes[0].set_title(title_lower, fontsize=20)
             axes[0].set_xlabel(self.independent_variables[0])
             axes[0].set_ylabel(self.independent_variables[1])
@@ -405,7 +410,7 @@ class Visualiser:
             axes[0].set_ylim(np.min(Y), np.max(Y))
 
             # Defines the mean subplot
-            axes[1].tricontourf(X, Y, median_pred, vmin=min_val, vmax=max_val, levels=100, cmap = 'jet', alpha = 0.7)
+            axes[1].tricontourf(X, Y, median_pred, norm=scale, levels=100, cmap = 'jet', alpha = 0.7, vmin=min_val, vmax=max_val)
             axes[1].set_title(title_median, fontsize=20)
             axes[1].set_xlabel(self.independent_variables[0])
             axes[1].set_ylabel(self.independent_variables[1])
@@ -413,7 +418,7 @@ class Visualiser:
             axes[1].set_ylim(np.min(Y), np.max(Y))
 
             # Defines the upper bound subplot
-            axes[2].tricontourf(X, Y, upper_pred, vmin=min_val, vmax=max_val, levels=100, cmap = 'jet', alpha = 0.7)
+            axes[2].tricontourf(X, Y, upper_pred, norm=scale, levels=100, cmap = 'jet', alpha = 0.7, vmin=min_val, vmax=max_val)
             axes[2].set_title(title_upper, fontsize=20)
             axes[2].set_xlabel(self.independent_variables[0])
             axes[2].set_ylabel(self.independent_variables[1])
@@ -431,7 +436,7 @@ class Visualiser:
             fig.savefig(full_path)
             plt.close()
 
-    def _show_2D_time_predictions(self, domain_points, plot_name, title):
+    def _show_2D_time_predictions(self, domain_points, plot_name, title, scale):
         dir_name = self.results_path + '/instance_' + str(self.instance) + '/' + plot_name
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
@@ -445,8 +450,12 @@ class Visualiser:
             results_df['mean_res'] = median_pred
             results_df['upper_res'] = upper_pred
 
-            min_val = np.percentile([lower_pred, median_pred, upper_pred], 10)
-            max_val = np.percentile([lower_pred, median_pred, upper_pred], 90)
+            results_df.to_csv(dir_name +'/results_df.csv')
+            
+
+            min_val = np.percentile([lower_pred, median_pred, upper_pred], 5)
+            max_val = np.percentile([lower_pred, median_pred, upper_pred], 95)
+            contour_levels = np.linspace(min_val, max_val, 100)
 
             figs = []
             for time in np.sort(domain_points['t'].unique()):
@@ -470,7 +479,7 @@ class Visualiser:
                     title_upper = 'Upper bound GP prediction'
 
                 # Lower Bound Plot
-                plot_1 = axes[0].tricontourf(X, Y, lower_frame, levels=100, cmap='jet', alpha=0.7, vmin=min_val, vmax=max_val)
+                plot_1 = axes[0].tricontourf(X, Y, lower_frame, levels=contour_levels, cmap='jet', alpha=0.7, norm = scale)
                 axes[0].set_title(title_lower, fontsize=20)
                 axes[0].set_xlabel(self.independent_variables[0])
                 axes[0].set_ylabel(self.independent_variables[1])
@@ -478,7 +487,7 @@ class Visualiser:
                 axes[0].set_ylim(np.min(Y), np.max(Y))
 
                 # Median Plot
-                axes[1].tricontourf(X, Y, median_frame, levels=100, cmap='jet', alpha=0.7, vmin=min_val, vmax=max_val)
+                plot_2 = axes[1].tricontourf(X, Y, median_frame, levels=contour_levels, cmap='jet', alpha=0.7, norm = scale)
                 axes[1].set_title(title_median, fontsize=20)
                 axes[1].set_xlabel(self.independent_variables[0])
                 axes[1].set_ylabel(self.independent_variables[1])
@@ -486,14 +495,17 @@ class Visualiser:
                 axes[1].set_ylim(np.min(Y), np.max(Y))
                 
                 # Upper Bound Plot
-                axes[2].tricontourf(X, Y, upper_frame, levels=100, cmap='jet', alpha=0.7, vmin=min_val, vmax=max_val)
+                plot_3 = axes[2].tricontourf(X, Y, upper_frame, levels=contour_levels, cmap='jet', alpha=0.7,  norm = scale)
                 axes[2].set_title(title_upper, fontsize=20)
                 axes[2].set_xlabel(self.independent_variables[0])
                 axes[2].set_ylabel(self.independent_variables[1])
                 axes[2].set_xlim(np.min(X), np.max(X))
                 axes[2].set_ylim(np.min(Y), np.max(Y))
 
-                # Define the colorbar
+                plot_1.set_clim(min_val, max_val)
+                plot_2.set_clim(min_val, max_val)
+                plot_3.set_clim(min_val, max_val)
+
                 cbar1 = plt.colorbar(plot_1, ax=axes[3], location='top', shrink=2)
                 cbar1.ax.set_title('Predicted ' + self.dependent_variable, fontsize=10)
 
@@ -506,7 +518,7 @@ class Visualiser:
 
             self._animate_figures(figs, full_path)
             
-    def _show_3D_recursive_predictions(self, domain_points, plot_name, title):
+    def _show_3D_recursive_predictions(self, domain_points, plot_name, title, scale):
         dir_name = self.results_path + '/instance_' + str(self.instance) + '/' + plot_name
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
@@ -554,7 +566,7 @@ class Visualiser:
 
                 # Lower Bound Plot
                 plot_1 = axes[0].scatter(X_frame, Y_frame, Z_frame, 
-                                        c=lower_frame, cmap='jet', vmin=vmin, vmax=vmax, alpha=0.7, s=1)
+                                        c=lower_frame, cmap='jet', vmin=vmin, vmax=vmax, alpha=0.7, s=1, norm = scale)
                 axes[0].set_title('Lower bound GP prediction', fontsize=20)
                 axes[0].set_xlim(min_X, max_X)
                 axes[0].set_ylim(min_Y, max_Y)
@@ -562,7 +574,7 @@ class Visualiser:
 
                 # Median Plot
                 axes[1].scatter(X_frame, Y_frame, Z_frame, 
-                                c=median_frame, cmap='jet', vmin=vmin, vmax=vmax, alpha=0.7, s=1)
+                                c=median_frame, cmap='jet', vmin=vmin, vmax=vmax, alpha=0.7, s=1, norm = scale)
                 axes[1].set_title('Median GP prediction', fontsize=20)
                 axes[1].set_xlim(min_X, max_X)
                 axes[1].set_ylim(min_Y, max_Y)
@@ -570,7 +582,7 @@ class Visualiser:
 
                 # Upper Bound Plot
                 axes[2].scatter(X_frame, Y_frame, Z_frame, 
-                                c=upper_frame, cmap='jet', vmin=vmin, vmax=vmax, alpha=0.7, s=1)
+                                c=upper_frame, cmap='jet', vmin=vmin, vmax=vmax, alpha=0.7, s=1, norm = scale)
                 axes[2].set_title('Upper bound GP prediction', fontsize=20)
                 axes[2].set_xlim(min_X, max_X)
                 axes[2].set_ylim(min_Y, max_Y)
@@ -589,7 +601,7 @@ class Visualiser:
             self._animate_figures(images, full_path)
             plt.close()
 
-    def _show_3D_time_predictions(self, domain_points, plot_name, title):
+    def _show_3D_time_predictions(self, domain_points, plot_name, title, scale):
         dir_name = self.results_path + '/instance_' + str(self.instance) + '/' + plot_name
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
@@ -629,7 +641,7 @@ class Visualiser:
                     title_upper = 'Upper bound GP prediction'
 
                 # Lower Bound Plot
-                plot_1 = axes[0].scatter(X, Y, Z, c=lower_frame, cmap='jet', alpha=0.7, s=1, vmin=vmin, vmax=vmax)
+                plot_1 = axes[0].scatter(X, Y, Z, c=lower_frame, cmap='jet', alpha=0.7, s=1, vmin=vmin, vmax=vmax, norm = scale)
                 axes[0].set_title(title_lower, fontsize=20)
                 axes[0].set_xlabel(self.independent_variables[0])
                 axes[0].set_ylabel(self.independent_variables[1])
@@ -639,7 +651,7 @@ class Visualiser:
                 axes[0].set_zlim(np.min(Z), np.max(Z))
 
                 # Median Plot
-                axes[1].scatter(X, Y, Z, c=median_frame, cmap='jet', alpha=0.7, s=1, vmin=vmin, vmax=vmax)
+                axes[1].scatter(X, Y, Z, c=median_frame, cmap='jet', alpha=0.7, s=1, vmin=vmin, vmax=vmax, norm = scale)
                 axes[1].set_title(title_median, fontsize=20)
                 axes[1].set_xlabel(self.independent_variables[0])
                 axes[1].set_ylabel(self.independent_variables[1])
@@ -649,7 +661,7 @@ class Visualiser:
                 axes[1].set_zlim(np.min(Z), np.max(Z))
 
                 # Upper Bound Plot
-                axes[2].scatter(X, Y, Z, c=upper_frame, cmap='jet', alpha=0.7, s=1, vmin=vmin, vmax=vmax)
+                axes[2].scatter(X, Y, Z, c=upper_frame, cmap='jet', alpha=0.7, s=1, vmin=vmin, vmax=vmax, norm = scale)
                 axes[2].set_title(title_upper, fontsize=20)
                 axes[2].set_xlabel(self.independent_variables[0])
                 axes[2].set_ylabel(self.independent_variables[1])
@@ -685,7 +697,7 @@ class Visualiser:
 
         print(f"Animation saved as {filename}")
 
-    def _show_2D_cross_sections_predictions(self, domain, plot_name, title, cross_section_params):
+    def _show_2D_cross_sections_predictions(self, domain, plot_name, title, scale):
         cross_sections = domain.cross_sections
         dir_name = self.results_path + '/instance_' + str(self.instance) + '/' + plot_name
         if not os.path.exists(dir_name):
@@ -726,21 +738,21 @@ class Visualiser:
                     title_median = 'Median GP prediction'
                     title_upper = 'Upper bound GP prediction'
 
-                plot_1 = axes[0].tricontourf(X, Y, lower_pred, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.7, s=1)
+                plot_1 = axes[0].tricontourf(X, Y, lower_pred, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.7, s=1, norm = scale)
                 axes[0].set_title(title_lower, fontsize = 20)
                 axes[0].set_xlabel(u_name)
                 axes[0].set_ylabel(v_name)
                 axes[0].set_xlim(np.min(X), np.max(X))
                 axes[0].set_ylim(np.min(Y), np.max(Y))
 
-                axes[1].tricontourf(X, Y, median_pred, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.7, s=1)
+                axes[1].tricontourf(X, Y, median_pred, cmap='jet', vmin=min_val, vmax=max_val, alpha = 0.7, s=1, norm = scale)
                 axes[1].set_title(title_median, fontsize = 20)
                 axes[1].set_xlabel(u_name)
                 axes[1].set_ylabel(v_name)
                 axes[1].set_xlim(np.min(X), np.max(X))
                 axes[1].set_ylim(np.min(Y), np.max(Y))
 
-                axes[2].tricontourf(X, Y, upper_pred, cmap='jet', vmin = min_val, vmax = max_val, alpha = 0.7, s=1)
+                axes[2].tricontourf(X, Y, upper_pred, cmap='jet', vmin = min_val, vmax = max_val, alpha = 0.7, s=1, norm = scale)
                 axes[2].set_title(title_upper, fontsize = 20)
                 axes[2].set_xlabel(u_name)
                 axes[2].set_ylabel(v_name)
@@ -757,7 +769,7 @@ class Visualiser:
                 fig.savefig(full_path)
                 plt.close()
                 
-    def _show_3D_predictions(self, domain_points, plot_name, title):
+    def _show_3D_predictions(self, domain_points, plot_name, title, scale):
         dir_name = self.results_path + '/instance_' + str(self.instance) + '/' + plot_name
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
@@ -815,21 +827,21 @@ class Visualiser:
                 title_upper = 'Upper bound GP prediction'
 
             # Lower Bound Plot
-            plot_1 = axes[0].scatter(X, Y, Z, c=lower_pred, cmap='jet', vmin=vmin, vmax=vmax, alpha=0.7, s=1)
+            plot_1 = axes[0].scatter(X, Y, Z, c=lower_pred, cmap='jet', vmin=vmin, vmax=vmax, alpha=0.7, s=1, norm = scale)
             axes[0].set_title(title_lower, fontsize=20)
             axes[0].set_xlim(min_X, max_X)
             axes[0].set_ylim(min_Y, max_Y)
             axes[0].set_zlim(min_Z, max_Z)
 
             # Median Plot
-            axes[1].scatter(X, Y, Z, c=median_pred, cmap='jet', vmin=vmin, vmax=vmax, alpha=0.7, s=1)
+            axes[1].scatter(X, Y, Z, c=median_pred, cmap='jet', vmin=vmin, vmax=vmax, alpha=0.7, s=1, norm = scale)
             axes[1].set_title(title_median, fontsize=20)
             axes[1].set_xlim(min_X, max_X)
             axes[1].set_ylim(min_Y, max_Y)
             axes[1].set_zlim(min_Z, max_Z)
 
             # Upper Bound Plot
-            axes[2].scatter(X, Y, Z, c=upper_pred, cmap='jet', vmin=vmin, vmax=vmax, alpha=0.7, s=1)
+            axes[2].scatter(X, Y, Z, c=upper_pred, cmap='jet', vmin=vmin, vmax=vmax, alpha=0.7, s=1, norm = scale)
             axes[2].set_title(title_upper, fontsize=20)
             axes[2].set_xlim(min_X, max_X)
             axes[2].set_ylim(min_Y, max_Y)
@@ -2051,7 +2063,7 @@ class GPVisualiser(Visualiser):
 
         X_test = gp_obj.X_test
         y_test = gp_obj.y_test
-        test_predictions, test_std = self.gp_obj.predict(X_test)
+        test_predictions, test_std, _ , _ = self.gp_obj.predict(X_test)
 
         num_kernel_params = self.gp_obj.num_params
 
@@ -2126,8 +2138,6 @@ class GPVisualiser(Visualiser):
 
     def _make_predictions(self, domain_points):
 
-        medium_pred, std_pred = self.gp_obj.predict(domain_points.values)
-        lower_pred = medium_pred - 1.96 * std_pred
-        upper_pred = medium_pred + 1.96 * std_pred
+        medium_pred, _ , lower_pred, upper_pred = self.gp_obj.predict(domain_points.values)
         return lower_pred, medium_pred, upper_pred
     

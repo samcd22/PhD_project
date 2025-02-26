@@ -26,6 +26,7 @@ class RawDataProcessor(DataProcessor):
         - processor_select (str): Type of data processor to use.
             Options are:
             - 'GBR_processor': The Great Barrier Reef processor.
+            - 'XYLO_processor': The XYLO processor.
             - A custom data processor function. This function must not take inputs and return a tuple containing two DataFrames (the training and test data).
         - processor_params (dict): The parameters for the data processor. Typically includes (for the Great Barrier Reef processor):
             - 'output_header' (str): The header for the output data.
@@ -103,6 +104,7 @@ class RawDataProcessor(DataProcessor):
         self.slices = slices
         self.dependent_variable = None
         self.independent_variables = None
+        self.plotting_func = plotting_func
 
     def get_construction(self) -> dict:
         """
@@ -149,6 +151,11 @@ class RawDataProcessor(DataProcessor):
             if 'Unnamed: 0' in self.processed_data.columns:
                 self.processed_data = self.processed_data.drop(columns=['Unnamed: 0'])
 
+        if 'output_header' not in self.processor_params:
+            raise ValueError('RawDataProcessor - Missing output header')
+        if self.processor_params['output_header'] not in self.processed_data.columns:
+            raise ValueError('RawDataProcessor - Invalid output header')
+        
         self.dependent_variable = self.processor_params['output_header']
         self.independent_variables = [col for col in self.processed_data.columns if col != self.dependent_variable]
 
@@ -468,8 +475,6 @@ class RawDataProcessor(DataProcessor):
             city_and_country = _get_nearest_major_city(raw_data['decimallatitude'][0], raw_data['decimallongitude'][0])
             location_name = f"{city_and_country[0]}_{city_and_country[1]}"
 
-            self.processor_params['location_name'] = location_name
-
             if tax_group == 'scientificname':
 
                 input_scientificname = identifier
@@ -576,6 +581,7 @@ class RawDataProcessor(DataProcessor):
                 yearly_grid_counts_complete['y'] = yearly_grid_counts_complete['grid_y'] * lat_cell_size + lat_min + (lat_cell_size / 2)
 
                 gridded_data = yearly_grid_counts_complete
+                gridded_data = gridded_data.rename(columns={'year': 't'})
 
             elif timestep == 'day':
                 daily_grid_counts = gridded_data.groupby(['day_number', 'grid_x', 'grid_y']).size().unstack(fill_value=0)
@@ -610,6 +616,7 @@ class RawDataProcessor(DataProcessor):
                 daily_grid_counts_complete['y'] = daily_grid_counts_complete['grid_y'] * lat_cell_size + lat_min + (lat_cell_size / 2)
 
                 gridded_data = daily_grid_counts_complete
+                gridded_data = gridded_data.rename(columns={'day_number': 't'})
 
             gridded_data = gridded_data.copy()
             return gridded_data
@@ -620,7 +627,7 @@ class RawDataProcessor(DataProcessor):
 
         gridded_data = gridded_data.drop(columns=['grid_x', 'grid_y'])
         
-        return gridded_data
+        return gridded_data[['x', 'y', 't', 'counts']]
         
 
     # ADD OTHER PROCESSORS HERE.

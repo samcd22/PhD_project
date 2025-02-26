@@ -309,5 +309,55 @@
             "c", 
             "d"
         ]
+    }, 
+    "wave3D_2": {
+        "model": "A * exp(-((x/a)^2 + (y/b)^2 + (z/c)^2)) * exp(2 * pi * (t / d))", 
+        "independent_variables": [
+            "x", 
+            "y", 
+            "z", 
+            "t"
+        ], 
+        "dependent_variable": "D", 
+        "all_param_names": [
+            "A", 
+            "a", 
+            "b", 
+            "c", 
+            "d"
+        ]
+    }, 
+    "test2D_2": {
+        "model": "exp(-(x^2 + y^2)/c^2)", 
+        "independent_variables": [
+            "x", 
+            "y"
+        ], 
+        "dependent_variable": "C", 
+        "all_param_names": [
+            "c"
+        ]
+    }, 
+    "test2D_3": {
+        "model": "exp((x^2 + y^2)/c^2)", 
+        "independent_variables": [
+            "x", 
+            "y"
+        ], 
+        "dependent_variable": "C", 
+        "all_param_names": [
+            "c"
+        ]
+    }, 
+    "test2D_4": {
+        "model": "exp(sqrt(x^2 + y^2)/c^2)", 
+        "independent_variables": [
+            "x", 
+            "y"
+        ], 
+        "dependent_variable": "C", 
+        "all_param_names": [
+            "c"
+        ]
     }
 }

@@ -1,36 +1,19 @@
 import numpy as np
-# import pandas as pd
 from sklearn.gaussian_process import GaussianProcessRegressor
-# from sklearn.preprocessing import StandardScaler
 from jaxlib.xla_extension import ArrayImpl
 from sklearn.gaussian_process.kernels import Sum, Product
 from sklearn.gaussian_process.kernels import Kernel as GP_Kernel
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, Matern, RationalQuadratic, ExpSineSquared, DotProduct, ConstantKernel
 from sklearn.preprocessing import StandardScaler
-
 import ast
-
-
 import json
 import joblib
 import os
-# from matplotlib import pyplot as plt
-# from matplotlib.patches import Rectangle
-# from matplotlib.transforms import Bbox
-# import imageio
-# import cartopy.crs as ccrs
-# import cartopy.feature as cfeature
-# from shapely.geometry import Point, Polygon, MultiPolygon
-# from shapely.strtree import STRtree
-# from PIL import Image
-# import matplotlib
-# from tqdm import tqdm
-# from matplotlib.colors import LogNorm
-# from matplotlib.lines import Line2D
-# from matplotlib.patches import Patch
+
 
 from data_processing.data_processor import DataProcessor
 from gaussian_process_toolbox.kernel import Kernel
+from gaussian_process_toolbox.transformation import Transformation
 
 class GP:
     """
@@ -43,6 +26,7 @@ class GP:
                  kernel: Kernel,
                  uncertainty_method = None,
                  uncertainty_params = None,
+                 transformation: Transformation = Transformation('identity'),
                  root_results_path = '/results/gaussian_process_results'):
 
         if not isinstance(data_processor, DataProcessor):
@@ -61,6 +45,8 @@ class GP:
         
         self.uncertainty_method = uncertainty_method
         self.uncertainty_params = uncertainty_params
+
+        self.transformation = transformation
 
         self.training_data, self.testing_data = data_processor.process_data()
         self.data_construction = data_processor.get_construction()
@@ -85,14 +71,17 @@ class GP:
         self.X_test = self.testing_data[self.independent_variables].values
         self.y_test = self.testing_data[self.dependent_variable].values
 
+        self.y_train_transformed = self.transformation.transform(self.y_train)
+        self.y_test_transformed = self.transformation.transform(self.y_test)
+
         self.X_scaler = StandardScaler()
         self.y_scaler = StandardScaler()
 
         self.X_train_scaled = self.X_scaler.fit_transform(self.X_train)
-        self.y_train_scaled = self.y_scaler.fit_transform(self.y_train.reshape(-1, 1)).flatten()
+        self.y_train_scaled = self.y_scaler.fit_transform(self.y_train_transformed.reshape(-1, 1)).flatten()
 
         self.X_test_scaled = self.X_scaler.transform(self.X_test)
-        self.y_test_scaled = self.y_scaler.transform(self.y_test.reshape(-1, 1)).flatten()
+        self.y_test_scaled = self.y_scaler.transform(self.y_test_transformed.reshape(-1, 1)).flatten()
 
         self.gp_model = None
         self.trained = False
@@ -113,7 +102,8 @@ class GP:
             'kernel': self.kernel_obj.get_construction(),
             'data_processor': self.data_construction,
             'uncertainty_method': self.uncertainty_method,
-            'uncertainty_params': self.uncertainty_params
+            'uncertainty_params': self.uncertainty_params,
+            'transformation': self.transformation.transformation_type
         }
         return construction
 
@@ -160,17 +150,20 @@ class GP:
         """
 
         if self.uncertainty_method is None:
-            return None
+            return 1e-6*np.ones_like(self.y_train)
 
         if self.uncertainty_method == 'precision':
-            return self._precision_uncertainties()
+            uncertainty = self._precision_uncertainties()
         elif self.uncertainty_method == 'constant':
-            return self._constant_uncertainties()
-        elif self.uncertainty_method == 'xylo_uncertainty':
-            return self._xylo_uncertainties()
+            uncertainty = self._constant_uncertainties()
+        elif self.uncertainty_method == 'XYLO_uncertainty':
+            uncertainty = self._xylo_uncertainties()
         else:
             raise ValueError(f'Unsupported uncertainty method: {self.uncertainty_method}')
-        
+        transformed_uncertainty = self.transformation.transform_alpha(self.y_train, uncertainty)
+        scaled_uncertainty = transformed_uncertainty / self.y_scaler.scale_[0]**2
+        return scaled_uncertainty
+    
     def _precision_uncertainties(self):
         """
         Calculate the precision uncertainties of the Gaussian Process model.
@@ -186,6 +179,23 @@ class GP:
         uncertainties = self.uncertainty_params['constant_error']
         return uncertainties
 
+    def _xylo_uncertainties(self):
+        """
+        Calculate the XYLO uncertainties of the Gaussian Process model.
+        """
+        if 'precision_error' not in self.uncertainty_params or 'zero_count_error' not in self.uncertainty_params:
+            raise ValueError('Precision error and zero count error must be provided for XYLO uncertainty')
+
+        precision_error = self.uncertainty_params['precision_error']
+        zero_count_error = self.uncertainty_params['zero_count_error']
+        uncertainties = np.zeros_like(self.y_train)
+        for i in range(len(self.y_train)):
+            if self.y_train[i] == 0:
+                uncertainties[i] = zero_count_error
+            else:
+                uncertainties[i] = precision_error*self.y_train[i]
+        return uncertainties
+
     def train(self):
         """
         Train the Gaussian Process model on the training data.
@@ -193,25 +203,22 @@ class GP:
         gp_model_file = os.path.join(self.results_path, f'instance_{self.instance}', 'gaussian_process_model.pkl')
         if os.path.exists(gp_model_file):
             print(f'Loading existing GP model from {gp_model_file}')
-            gp_model = joblib.load(gp_model_file)
+            self.gp_model = joblib.load(gp_model_file)
+            self.trained = True
         else:
             uncertainties = self._get_uncertainties()
-            gp_model = GaussianProcessRegressor(kernel=self.kernel, n_restarts_optimizer=5, alpha = uncertainties)
-            gp_model.fit(self.X_train_scaled, self.y_train_scaled)
+            self.gp_model = GaussianProcessRegressor(kernel=self.kernel, n_restarts_optimizer=5, alpha = uncertainties)
+            self.gp_model.fit(self.X_train_scaled, self.y_train_scaled)
             print(f'Fitted new GP model and saving to {gp_model_file}')
-            self._save_run(gp_model)
+            self._save_run(self.gp_model)
+            self.trained = True
 
         results_file = os.path.join(self.results_path, f'instance_{self.instance}', 'results.json')
-        results = self._get_training_results(gp_model)
+        results = self._get_training_results()
         if not os.path.exists(results_file):
             with open(results_file, 'w') as f:
                 json.dump(results, f, indent=4)
-        
-        self.trained = True
-        self.gp_model = gp_model
-
-        return gp_model
-    
+            
     def _extract_optimized_kernel_params(self, kernel):
         """
         Recursively extracts optimized hyperparameters from a fitted kernel object.
@@ -294,14 +301,17 @@ class GP:
 
         return param_count
 
-    def _get_training_results(self, gp_model):
-        self.optimized_params = self._extract_optimized_kernel_params(gp_model.kernel_)
+    def _get_training_results(self):
+        if not self.trained:
+            raise ValueError("Model has not been trained yet")
+
+        self.optimized_params = self._extract_optimized_kernel_params(self.gp_model.kernel_)
         self.num_params = self._count_kernel_parameters()
 
-        training_r2 = gp_model.score(self.X_train_scaled, self.y_train_scaled)
-        testing_r2 = gp_model.score(self.X_test_scaled, self.y_test_scaled)
+        training_r2 = self.gp_model.score(self.X_train_scaled, self.y_train_scaled)
+        testing_r2 = self.gp_model.score(self.X_test_scaled, self.y_test_scaled)
         
-        y_pred, y_std = self.predict(self.X_test, return_std=True)
+        y_pred, y_std, _, _ = self.predict(self.X_test)
 
         # Calculate the mean absolute error
         mae = np.mean(np.abs(self.y_test - y_pred))
@@ -310,7 +320,7 @@ class GP:
         rmse = np.sqrt(np.mean((self.y_test - y_pred)**2))
 
         # Calculate normalised root mean squared error
-        nrmse = self.rmse / np.std(self.y_test)
+        nrmse = rmse / np.std(self.y_test)
 
         # Calculate log likelihood of test data
         log_likelihoods = (
@@ -425,8 +435,16 @@ class GP:
         points_scaled = self.X_scaler.transform(points)
 
         mean_preds_scaled, std_preds_scaled = self.gp_model.predict(points_scaled, return_std=True)
-        mean_preds = self.y_scaler.inverse_transform(mean_preds_scaled.reshape(-1, 1)).flatten()
-        std_preds = std_preds_scaled * self.y_scaler.scale_[0]  # Only multiply by standard deviation
+        mean_preds_transformed = self.y_scaler.inverse_transform(mean_preds_scaled.reshape(-1, 1)).flatten()
+        std_preds_transformed = std_preds_scaled * self.y_scaler.scale_[0]  # Only multiply by standard deviation
 
-        return mean_preds, std_preds
+        lower_preds_transformed = mean_preds_transformed - 1.96 * std_preds_transformed
+        upper_preds_transformed = mean_preds_transformed + 1.96 * std_preds_transformed
+
+        lower_preds = self.transformation.inverse_transform(lower_preds_transformed)
+        upper_preds = self.transformation.inverse_transform(upper_preds_transformed)
+
+        mean_preds, std_preds = self.transformation.inverse_transform(mean_preds_transformed, std_preds_transformed)
+
+        return mean_preds, std_preds, lower_preds, upper_preds
         
