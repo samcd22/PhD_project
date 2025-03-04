@@ -359,5 +359,89 @@
         "all_param_names": [
             "c"
         ]
+    }, 
+    "sin": {
+        "model": "A * sin(B * x + C) + D", 
+        "independent_variables": [
+            "x"
+        ], 
+        "dependent_variable": "y", 
+        "all_param_names": [
+            "A", 
+            "B", 
+            "C", 
+            "D"
+        ]
+    }, 
+    "plane": {
+        "model": "a*x + b*y +c", 
+        "independent_variables": [
+            "x", 
+            "y"
+        ], 
+        "dependent_variable": "C", 
+        "all_param_names": [
+            "a", 
+            "b", 
+            "c"
+        ]
+    }, 
+    "3D_plane": {
+        "model": "a*x + b*y +c*z + d", 
+        "independent_variables": [
+            "x", 
+            "y", 
+            "z"
+        ], 
+        "dependent_variable": "C", 
+        "all_param_names": [
+            "a", 
+            "b", 
+            "c", 
+            "d"
+        ]
+    }, 
+    "exp_test": {
+        "model": "(A * sin(x/a + omega * t) * cos(y/b + nu * t) + B * exp(-(x**2 + y**2)/c**2)) * exp(-alpha * t)", 
+        "independent_variables": [
+            "x", 
+            "y", 
+            "t"
+        ], 
+        "dependent_variable": "C", 
+        "all_param_names": [
+            "A", 
+            "B", 
+            "a", 
+            "b", 
+            "c", 
+            "omega", 
+            "nu", 
+            "alpha"
+        ]
+    }, 
+    "nonlinear_1D": {
+        "model": "log(a) * sin(b * x**2) + exp(-a * x**2)", 
+        "independent_variables": [
+            "x"
+        ], 
+        "dependent_variable": "y", 
+        "all_param_names": [
+            "a", 
+            "b"
+        ]
+    }, 
+    "nonlinear_3D": {
+        "model": "a * x**y * sin(b * y / (z + x))", 
+        "independent_variables": [
+            "x", 
+            "y", 
+            "z"
+        ], 
+        "dependent_variable": "C", 
+        "all_param_names": [
+            "a", 
+            "b"
+        ]
     }
 }

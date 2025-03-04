@@ -435,7 +435,7 @@ class Domain:
 
         Parameters:
             - point (list): Point to cut the domain
-            - direction (list): Direction to cut the domain
+            - direction (list): Normal vector to the cut
 
         Returns:
             - points (DataFrame): DataFrame of cut points
@@ -464,7 +464,11 @@ class Domain:
     def _cut_2d(self, point, direction):
         if point.shape[0] != 2 or direction.shape[0] != 2:
             raise ValueError("Domain - Invalid point or direction vector")
-        signed_distance = (self.points[self.dim_names[0]] - point[0]) * direction[1] - (self.points[self.dim_names[1]] - point[1]) * direction[0]
+                
+        # Calculate the signed distance using the normal vector
+        signed_distance = (self.points[self.dim_names[0]] - point[0]) * direction[0] + (self.points[self.dim_names[1]] - point[1]) * direction[1]
+        
+        # Keep only points on the correct side (signed_distance <= 0)
         self.points = self.points[signed_distance <= 0]
 
         return self.points
@@ -658,6 +662,9 @@ class Domain:
         ax.set_xlabel(self.dim_names[0])
         ax.set_ylabel(self.dim_names[1])
         ax.set_zlabel(self.dim_names[2])
+        ax.set_xlim(self.points[self.dim_names[0]].min(), self.points[self.dim_names[0]].max())
+        ax.set_ylim(self.points[self.dim_names[1]].min(), self.points[self.dim_names[1]].max())
+        ax.set_zlim(self.points[self.dim_names[2]].min(), self.points[self.dim_names[2]].max())
         ax.set_title('3D Cross Section')
 
         # Plot the 2D cross section
@@ -738,7 +745,14 @@ class Domain:
 
     def get_construction(self):
         """
-        Get the construction parameters for the domain.
+        Get the construction parameters for the domain. The constriuction parameters include all of the config information used to construct the domain object. It includes:
+            - n_dims: Number of dimensions
+            - domain_select: Type of domain
+            - dim_names: Names of dimensions
+            - domain_params: Dictionary of domain parameters
+            - transformations: List of transformations
+            - cuts: List of cuts
+            - time_array: Time array for time-varying domains
 
         Returns:
             - construction (dict): Dictionary of construction parameters

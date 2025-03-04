@@ -69,8 +69,7 @@ class Kernel:
             - kernel_name (string): The type of kernel to add the parameter to.
             - identifier (string): A unique identifier for the kernel instance.
             - param_name (string): The name of the parameter to add.
-            - val (float, list, or tuple): The value of the parameter. 
-            Bounds should be passed as a list or tuple of (min, max).
+            - val (float, list, or tuple): The value of the parameter. Bounds should be passed as a list or tuple of (min, max).
         
         Returns:
             - self: The Kernel instance with the added parameter
@@ -191,7 +190,7 @@ class Kernel:
     
     def get_construction(self):
         """
-        Get the construction of the kernel. The conctruction parameters includes all of the config information used to construct the kernel object. It includes:
+        Get the construction of the kernel. The construction parameters includes all of the config information used to construct the kernel object. It includes:
             - kernel_config: A dictionary where keys are kernel instances and values are lists of dimensions they apply to.
             - kernel_params: A dictionary where keys are kernel instances and values are dictionaries of their parameters.
             - kernel_concatination: How to combine kernels ('+' for addition, '*' for multiplication)

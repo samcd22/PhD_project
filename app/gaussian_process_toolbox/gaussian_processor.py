@@ -19,6 +19,45 @@ class GP:
     """
     A class to represent a Gaussian Process model
     
+    Attributes:
+        - data_processor (DataProcessor): An instance of the DataProcessor class.
+        - kernel (sklearn.gaussian_process.kernels.Kernel): The kernel to use in the Gaussian Process model.
+        - kernel_config (dict): A dictionary where keys are kernel instances and values are lists of dimensions they apply to.
+        - kernel_params (dict): A dictionary where keys are kernel instances and values are dictionaries of their parameters.
+        - uncertainty_method (str): The method to calculate uncertainties.
+        - uncertainty_params (dict): Parameters for the uncertainty method.
+        - transformation (Transformation): An instance of the Transformation class.
+        - root_results_path (str): The root path to save the results.
+        - training_data (pd.DataFrame): The training data.
+        - testing_data (pd.DataFrame): The testing data.
+        - data_construction (dict): The construction of the data.
+        - independent_variables (list): The independent variables.
+        - dependent_variable (str): The dependent variable.
+        - results_path (str): The path to save the results.
+        - gp_construction (dict): The construction of the Gaussian Process model.
+        - instance (int): The instance number where the data is saved.
+        - X_train (np.array): The scaled training independent variables.
+        - y_train (np.array): The scaled training dependent variable.
+        - X_test (np.array): The scaled testing independent variables.
+        - y_test (np.array): The scaled testing dependent variable.
+        - y_train_transformed (np.array): The transformed training dependent variable.
+        - y_test_transformed (np.array): The transformed testing dependent variable.
+        - X_scaler (StandardScaler): The StandardScaler for the independent variables.
+        - y_scaler (StandardScaler): The StandardScaler for the dependent variable.
+        - X_train_scaled (np.array): The scaled training independent variables.
+        - y_train_scaled (np.array): The scaled training dependent variable.
+        - X_test_scaled (np.array): The scaled testing independent variables.
+        - y_test_scaled (np.array): The scaled testing dependent variable.
+        - gp_model (GaussianProcessRegressor): The Gaussian Process model.
+        - trained (bool): Whether the model has been trained.
+        - optimized_params (dict): The optimized parameters of the model.
+        - num_params (int): The number of parameters in the model.
+
+    Methods:
+
+        - get_construction(): Get the construction of the Gaussian Process model.
+        - train(): Train the Gaussian Process model on the training data.
+        - predict(points): Predict the dependent variable at given points.
     """
 
     def __init__(self, 
@@ -28,6 +67,18 @@ class GP:
                  uncertainty_params = None,
                  transformation: Transformation = Transformation('identity'),
                  root_results_path = '/results/gaussian_process_results'):
+
+        """
+        Initialize the Gaussian Process model.
+
+        Args:
+            - data_processor (DataProcessor): An instance of the DataProcessor class.
+            - kernel (Kernel): An instance of the Kernel class.
+            - uncertainty_method (str): The method to calculate uncertainties. Default is None.
+            - uncertainty_params (dict): Parameters for the uncertainty method. Default is None.
+            - transformation (Transformation): An instance of the Transformation class. Default is 'identity'.
+            - root_results_path (str): The root path to save the results. Default is '/results/gaussian_process_results'.
+        """
 
         if not isinstance(data_processor, DataProcessor):
             raise TypeError("Sampler - data_processor must be an instance of the DataProcessor class")
@@ -98,6 +149,18 @@ class GP:
             raise ValueError("Kernel covariates do not match the independent variables")
         
     def get_construction(self):
+        """
+        Get the construction of the Gaussian Process model. The construction parameters include all of the config information needed to construct the Gaussian Process model. It includes:
+            - kernel: The construction of the kernel.
+            - data_processor: The construction of the data.
+            - uncertainty_method: The method to calculate uncertainties.
+            - uncertainty_params: Parameters for the uncertainty method.
+            - transformation: The type of transformation applied to the dependent variable.
+
+        Returns:
+            dict: The construction of the Gaussian Process model.
+        """
+
         construction = {
             'kernel': self.kernel_obj.get_construction(),
             'data_processor': self.data_construction,
@@ -427,7 +490,10 @@ class GP:
             points (array-like): The points at which to make predictions.
 
         Returns:
-            array-like: The predicted values at the given points.
+            mean_preds (array-like): The mean predictions at the given points.
+            std_preds (array-like): The standard deviation of the predictions at the given points.
+            lower_preds (array-like): The lower bound of the predictions at the given points.
+            upper_preds (array-like): The upper bound of the predictions at the given points.
         """
         if not self.trained:
             raise ValueError("Model has not been trained yet")

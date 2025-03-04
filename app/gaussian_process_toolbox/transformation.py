@@ -3,21 +3,31 @@ import numpy as np
 class Transformation:
     """
     A class to handle transformations for Gaussian Process Regression, including:
-    - Applying transformations to data
-    - Adjusting uncertainty (alpha) for Gaussian Processes
-    - Performing inverse transformations on predictions and uncertainty
-
-    Supported transformations:
-    - 'log'      : Log transformation (with offset to avoid log(≤0))
-    - 'log1p'    : Log(x + 1) transformation
-    - 'sqrt'     : Square root transformation
-    - 'identity' : No transformation
+        - Applying transformations to data
+        - Adjusting uncertainty (alpha) for Gaussian Processes
+        - Performing inverse transformations on predictions and uncertainty
 
     Attributes:
-        transformation_type (str): Type of transformation applied
+        - transformation_type (str): Type of transformation applied. Supported types include:
+            - 'log'      : Log transformation
+            - 'log1p'    : Log(x + 1) transformation
+            - 'sqrt'     : Square root transformation
+            - 'identity' : No transformation
+
+    Methods:
+        - transform(y): Apply the chosen transformation to y.
+        - inverse_transform(y_transformed, std_transformed=None): Apply the inverse transformation to get predictions in original space.
+        - transform_alpha(y, alpha): Adjust alpha (uncertainty) for the transformed
     """
 
     def __init__(self, transformation_type="identity"):
+
+        """
+        Initialize the Transformation class to handle transformations for Gaussian Process Regression.
+
+        Args:
+            - transformation_type (str): Type of transformation to apply. Default is 'identity'.
+        """
         self.transformation_type = transformation_type
 
         # Ensure valid transformation type
@@ -29,6 +39,7 @@ class Transformation:
     def transform(self, y):
         """
         Apply the chosen transformation to y.
+
         Args:
             y (array-like): Data to transform.
         Returns:

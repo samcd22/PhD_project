@@ -42,6 +42,10 @@ class Visualiser:
         - RMSE (float): Root Mean Squared Error
         - AIC (float): Akaike Information Criterion
         - BIC (float): Bayesian Information Criterion
+        - construction (str): Construction of the model
+
+    Methods:
+        - show_predictions(domain, plot_name, plot_type, title, scale): Outputs the plots for visualising the modelled system based on the concluded lower, median and upper bound parameters and an inputted domain. Plots are saved and include a summary of the parameter values and the sampling success.
     """
 
     def __init__(self, input_obj: Sampler | GP):
@@ -95,7 +99,11 @@ class Visualiser:
                 - '1D': 1D plot
                 - '2D': 2D plot
                 - '3D': 3D plot
-                - '2D_cross_sections': 2D cross sections plot
+                - '2D_cross_sections': 2D plot with cross sections
+                - '3D_layers': 3D plot with layered sections
+                - '1D_time': 1D plot with time
+                - '2D_time': 2D plot with time
+                - '3D_time': 3D plot with time
 
             - title (str, optional): Overall title of the plot. Defaults to None.
             - cross_section_params (dict, optional): Dictionary containing the cross section parameters. Defaults to None.
@@ -122,8 +130,8 @@ class Visualiser:
             self._show_1D_predictions(domain_points, plot_name, title, scale)
         elif plot_type == '2D_cross_sections':
             self._show_2D_cross_sections_predictions(domain, plot_name, title, scale)
-        elif plot_type == '3D_recursive':
-            self._show_3D_recursive_predictions(domain_points, plot_name, title, scale)
+        elif plot_type == '3D_layers':
+            self._show_3D_layers_predictions(domain_points, plot_name, title, scale)
         elif plot_type == '1D_time':
             self._show_1D_time_predictions(domain_points, plot_name, title, scale)
         elif plot_type == '2D_time':
@@ -518,12 +526,12 @@ class Visualiser:
 
             self._animate_figures(figs, full_path)
             
-    def _show_3D_recursive_predictions(self, domain_points, plot_name, title, scale):
+    def _show_3D_layers_predictions(self, domain_points, plot_name, title, scale):
         dir_name = self.results_path + '/instance_' + str(self.instance) + '/' + plot_name
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
 
-        full_path = dir_name + '/recursive_predictions.gif'
+        full_path = dir_name + '/layered_predictions.gif'
         if not os.path.exists(full_path):
 
             lower_pred, median_pred, upper_pred = self._make_predictions(domain_points)
@@ -1296,6 +1304,13 @@ class RegressionVisualiser(Visualiser):
         - BIC (float): Bayesian Information Criterion
         - autocorrs (dict): A dictionary containing the autocorrelation values for each parameter
 
+    Methods:
+        - show_predictions: Generates and saves the predictions from the sampled results
+        - get_traceplots: Generates and saves the traceplots from the sampled results
+        - plot_prior: Plots the prior distribution for a given parameter
+        - plot_posterior: Plots the posterior distribution for a given parameter
+        - get_autocorrelations: Calculates and plots the autocorrelation values for each parameter
+        - get_summary: Returns a summary of the results
     """
 
     def __init__(self, sampler: Sampler):
@@ -2050,6 +2065,18 @@ class GPVisualiser(Visualiser):
         - instance (int): The instance number of the inference.
         - params_upper (pd.Series): A Series containing the upper values of the parameters.
         - data_processor (DataProcessor): The DataProcessor object used to process the data.
+        - RMSE (float): The Root Mean Squared Error of the GP.
+        - AIC (float): The Akaike Information Criterion of the GP.
+        - BIC (float): The Bayesian Information Criterion of the GP.
+        - training_data (pd.DataFrame): The training data used to train the GP.
+        - testing_data (pd.DataFrame): The testing data used to evaluate the GP.
+        - dependent_variable (str): The name of the dependent variable.
+        - independent_variables (list): A list of the names of the independent variables.
+        - results_path (str): The path to the directory where the results are saved.
+        - instance (int): The instance number of the inference.
+
+    Methods:
+        - show_predictions: Generates and saves the predictions from the GP.
     """
 
     def __init__(self, gp_obj):

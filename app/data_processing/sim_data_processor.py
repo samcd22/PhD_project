@@ -75,6 +75,7 @@ class SimDataProcessor(DataProcessor):
             - train_test_split (float, optional): Ratio of training to test data. Defaults to 0.8.
             - noise_dist (str, optional): The distribution of noise. Defaults to 'no_noise'. Options are:
                 - 'gaussian': Gaussian noise. Takes the noise_level as the standard deviation of the Gaussian distribution.
+                - 'truncate_gaussian': Truncated Gaussian noise. Takes the noise_level as the standard deviation of the Gaussian distribution.
                 - 'no_noise': No noise.
             - noise_level (float, optional): The level of noise. Defaults to None. Can be used interchangeably with noise_percentage.
             - noise_percentage (float, optional): The percentage of noise reletive to the predicted values of the model. Defaults to None. Can be used interchangeably with noise_level.
