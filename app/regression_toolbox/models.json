@@ -373,19 +373,6 @@
             "D"
         ]
     }, 
-    "plane": {
-        "model": "a*x + b*y +c", 
-        "independent_variables": [
-            "x", 
-            "y"
-        ], 
-        "dependent_variable": "C", 
-        "all_param_names": [
-            "a", 
-            "b", 
-            "c"
-        ]
-    }, 
     "3D_plane": {
         "model": "a*x + b*y +c*z + d", 
         "independent_variables": [
@@ -437,6 +424,42 @@
             "x", 
             "y", 
             "z"
+        ], 
+        "dependent_variable": "C", 
+        "all_param_names": [
+            "a", 
+            "b"
+        ]
+    }, 
+    "polynomial": {
+        "model": "a*x^2 + b*x + c", 
+        "independent_variables": [
+            "x"
+        ], 
+        "dependent_variable": "y", 
+        "all_param_names": [
+            "a", 
+            "b", 
+            "c"
+        ]
+    }, 
+    "log": {
+        "model": "a*log(b*x + c)", 
+        "independent_variables": [
+            "x"
+        ], 
+        "dependent_variable": "y", 
+        "all_param_names": [
+            "a", 
+            "b", 
+            "c"
+        ]
+    }, 
+    "plane": {
+        "model": "a*x + b*y", 
+        "independent_variables": [
+            "x", 
+            "y"
         ], 
         "dependent_variable": "C", 
         "all_param_names": [
