@@ -569,7 +569,7 @@ class Visualiser:
 
                 # Select points where median prediction >= min_C
                 mask = median_pred >= min_C
-                X_frame, Y_frame, Z_frame = X[mask], Y[mask], Z[mask]
+                X_frame, Y_frame, Z_frame = X.values[mask], Y.values[mask], Z.values[mask]
                 lower_frame, median_frame, upper_frame = lower_pred[mask], median_pred[mask], upper_pred[mask]
 
                 # Lower Bound Plot

@@ -466,5 +466,17 @@
             "a", 
             "b"
         ]
+    }, 
+    "nonlinear_2D": {
+        "model": "sin(x)/(y+a) + 1/(b+x^2)", 
+        "independent_variables": [
+            "x", 
+            "y"
+        ], 
+        "dependent_variable": "C", 
+        "all_param_names": [
+            "a", 
+            "b"
+        ]
     }
 }

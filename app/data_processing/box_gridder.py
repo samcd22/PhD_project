@@ -43,7 +43,7 @@ class BoxGridder:
                  grid_size: List[float] = None,
                  output_path: str = None,
                  independent_variables: List[str] = ['x', 'y', 'z'],
-                 dependent_variable: str = 'Concentration',
+                 dependent_variable: str = 'C',
                  input_data_logarithmised: bool = False,
                  output_data_logarithmised: bool = False,
                  processed_data=None) -> None:

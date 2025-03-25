@@ -36,7 +36,7 @@ RUN /build/miniconda3/bin/conda clean -afy
 RUN /build/miniconda3/bin/conda info -e
 
 # Install Python dependencies inside the Conda environment
-# RUN /build/miniconda3/envs/myenv/bin/pip install -r /PhD_project/requirements.txt
+RUN /build/miniconda3/envs/myenv/bin/pip install -r /PhD_project/requirements.txt
 
 # Set the environment variables to activate the environment by default
 ENV PATH="/build/miniconda3/envs/myenv/bin:$PATH"
