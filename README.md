@@ -36,7 +36,7 @@ Place the `run_bayespace.ps1` PowerShell script **directly into your working dir
 
 ### 3. Open PowerShell in the working directory
 
-Navigate to the folder where `run.ps1` is located. You can do this by right-clicking in the folder and selecting:
+Navigate to the folder where `run_bayespace.ps1` is located. You can do this by right-clicking in the folder and selecting:
 
 > **"Open in Terminal"** or **"Open in PowerShell"**
 
