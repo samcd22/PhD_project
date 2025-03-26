@@ -22,7 +22,7 @@ Decide where you want to work from — this is where your `data/`, `results/`, a
 
 ---
 
-### 2. Download the `run.ps1` script
+### 2. Download the [`run.ps1`](https://raw.githubusercontent.com/samcd22/BayeSpace/main/run.ps1) script
 
 Place the `run.ps1` PowerShell script **directly into your working directory**. This script:
 
