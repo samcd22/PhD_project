@@ -44,8 +44,22 @@ Navigate to the folder where `run.ps1` is located. You can do this by right-clic
 
 In PowerShell, run the following command to allow the script to execute and start the container:
 
-```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\run.ps1
 
+---
 
+### 5. Attach VS Code to the container
+
+Once the container is running:
+
+- Open Visual Studio Code
+- Press Ctrl+Shift+P (or F1) to open the Command Palette
+- Type and select:
+
+Dev Containers: Attach to Running Container
+From the list of running containers, select:
+
+bayespace-container
+
+This will open a full VS Code workspace inside the running container, with access to all project files in /BayeSpace.
