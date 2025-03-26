@@ -1,0 +1,328 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Domain &mdash; BayeSpace  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Visualiser" href="visualiser.html" />
+    <link rel="prev" title="Truncated Normal Distribution" href="../regression_toolbox/tr_norm.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            BayeSpace
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Regression Toolbox:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/likelihood.html">Likelihood</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/model.html">Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/parameter.html">Parameter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/sampler.html">Sampler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/tr_norm.html">Truncated Normal Distribution</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualisation Toolbox:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Domain</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#visualisation_toolbox.domain.Domain"><code class="docutils literal notranslate"><span class="pre">Domain</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.domain.Domain.add_domain_param"><code class="docutils literal notranslate"><span class="pre">Domain.add_domain_param()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.domain.Domain.apply_cross_section"><code class="docutils literal notranslate"><span class="pre">Domain.apply_cross_section()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.domain.Domain.build_domain"><code class="docutils literal notranslate"><span class="pre">Domain.build_domain()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.domain.Domain.cut_domain"><code class="docutils literal notranslate"><span class="pre">Domain.cut_domain()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.domain.Domain.get_construction"><code class="docutils literal notranslate"><span class="pre">Domain.get_construction()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.domain.Domain.plot_cross_sections"><code class="docutils literal notranslate"><span class="pre">Domain.plot_cross_sections()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.domain.Domain.plot_domain"><code class="docutils literal notranslate"><span class="pre">Domain.plot_domain()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.domain.Domain.transform_domain"><code class="docutils literal notranslate"><span class="pre">Domain.transform_domain()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="visualiser.html">Visualiser</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Data Processing:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/data_processor.html">Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/sim_data_processor.html">Sim Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/raw_data_processor.html">Raw Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/box_gridder.html">Box Gridder</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Gaussian Processing</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/gaussian_processor.html">Gaussian Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/kernel.html">Kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/transformation.html">Transformation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">BayeSpace</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Domain</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/visualisation_toolbox/domain.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-visualisation_toolbox.domain">
+<span id="domain"></span><h1>Domain<a class="headerlink" href="#module-visualisation_toolbox.domain" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="visualisation_toolbox.domain.Domain">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">visualisation_toolbox.domain.</span></span><span class="sig-name descname"><span class="pre">Domain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_dims</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain_select</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">['x',</span> <span class="pre">'y',</span> <span class="pre">'z']</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_array</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.domain.Domain" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Domain class for generating and manipulating points in 1D, 2D, and 3D domains.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><ul class="simple">
+<li><p>n_dims: Number of dimensions (1, 2, or 3)</p></li>
+<li><p>domain_select: Type of domain to generate (linear, log, rectangular, circular, triangular, polygonal, cuboidal, cylindrical, spherical)</p></li>
+<li><p>dim_names: Names of dimensions (default: [‘x’, ‘y’, ‘z’])</p></li>
+<li><p>transformations: List of transformations applied to the domain</p></li>
+<li><p>cuts: List of cuts made to the domain</p></li>
+<li><p>domain_dict: Dictionary of valid domain types for each dimension</p></li>
+<li><p>domain_params: Dictionary of domain parameters</p></li>
+<li><p>points: DataFrame of generated points</p></li>
+<li><p>cross_sections: List of cross sections made to the domain</p></li>
+</ul>
+</dd>
+<dt>Methods:</dt><dd><ul class="simple">
+<li><p>add_domain_param: Add a parameter to the domain for generating points</p></li>
+<li><p>build_domain: Build the domain based on the specified domain type and parameters</p></li>
+<li><p>cut_domain: Cut the domain based on a point and direction</p></li>
+<li><p>transform_domain: Transform the domain using a transformation matrix</p></li>
+<li><p>apply_cross_section: Generate a cross section of the domain based on a point, normal direction, and width</p></li>
+<li><p>plot_cross_sections: Plot the cross sections of the domain</p></li>
+<li><p>plot_domain: Plot the generated points in the domain</p></li>
+<li><p>get_construction: Get the construction parameters for the domain</p></li>
+</ul>
+</dd>
+<dt>Domain Types:</dt><dd><ul class="simple">
+<li><dl class="simple">
+<dt>1D:</dt><dd><ul>
+<li><p>linear: Linear domain with min, max, and number of points</p></li>
+<li><p>log: Logarithmic domain with min, max, and number of points</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>2D:</dt><dd><ul>
+<li><p>rectangular: Rectangular domain with min/max x/y, and number of points in x/y</p></li>
+<li><p>circular: Circular domain with radius, mass, and optional center/angle</p></li>
+<li><p>triangular: Triangular domain with 3 vertices and mass</p></li>
+<li><p>polygonal: Polygonal domain with vertices and mass</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>3D:</dt><dd><ul>
+<li><p>cuboidal: Cuboidal domain with min/max x/y/z, and number of points in x/y/z</p></li>
+<li><p>cylindrical: Cylindrical domain with radius, height, mass, and optional center/angle</p></li>
+<li><p>spherical: Spherical domain with radius, mass, and optional center/theta/phi</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.domain.Domain.add_domain_param">
+<span class="sig-name descname"><span class="pre">add_domain_param</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.domain.Domain.add_domain_param" title="Link to this definition"></a></dt>
+<dd><p>Add a parameter to the domain for generating points.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p>param_name (str): Name of the parameter</p></li>
+<li><p>param_value: Value of the parameter</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.domain.Domain.apply_cross_section">
+<span class="sig-name descname"><span class="pre">apply_cross_section</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.domain.Domain.apply_cross_section" title="Link to this definition"></a></dt>
+<dd><p>Generate a cross section of the domain based on a point, normal direction, and width.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p>point (list): Point on the plane</p></li>
+<li><p>normal (list): Normal direction of the plane</p></li>
+<li><p>width (float): Width of the cross section</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p>cross_section_points (DataFrame): DataFrame of cross section points</p></li>
+<li><p>projected_points (DataFrame): DataFrame of projected points</p></li>
+</ul>
+</dd>
+<dt>Raises:</dt><dd><ul class="simple">
+<li><p>ValueError: If the domain has no points, invalid dimensions, or invalid point/normal</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.domain.Domain.build_domain">
+<span class="sig-name descname"><span class="pre">build_domain</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.domain.Domain.build_domain" title="Link to this definition"></a></dt>
+<dd><p>Build the domain based on the specified domain type and parameters.</p>
+<dl class="simple">
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p>points (DataFrame): DataFrame of generated points</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.domain.Domain.cut_domain">
+<span class="sig-name descname"><span class="pre">cut_domain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">direction</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.domain.Domain.cut_domain" title="Link to this definition"></a></dt>
+<dd><p>Cut the domain based on a point and direction.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p>point (list): Point to cut the domain</p></li>
+<li><p>direction (list): Normal vector to the cut</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p>points (DataFrame): DataFrame of cut points</p></li>
+</ul>
+</dd>
+<dt>Raises:</dt><dd><ul class="simple">
+<li><p>ValueError: If the domain has no points, invalid dimensions, or invalid point/direction</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.domain.Domain.get_construction">
+<span class="sig-name descname"><span class="pre">get_construction</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.domain.Domain.get_construction" title="Link to this definition"></a></dt>
+<dd><dl class="simple">
+<dt>Get the construction parameters for the domain. The constriuction parameters include all of the config information used to construct the domain object. It includes:</dt><dd><ul class="simple">
+<li><p>n_dims: Number of dimensions</p></li>
+<li><p>domain_select: Type of domain</p></li>
+<li><p>dim_names: Names of dimensions</p></li>
+<li><p>domain_params: Dictionary of domain parameters</p></li>
+<li><p>transformations: List of transformations</p></li>
+<li><p>cuts: List of cuts</p></li>
+<li><p>time_array: Time array for time-varying domains</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p>construction (dict): Dictionary of construction parameters</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.domain.Domain.plot_cross_sections">
+<span class="sig-name descname"><span class="pre">plot_cross_sections</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.domain.Domain.plot_cross_sections" title="Link to this definition"></a></dt>
+<dd><p>Plot the cross sections of the domain.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.domain.Domain.plot_domain">
+<span class="sig-name descname"><span class="pre">plot_domain</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.domain.Domain.plot_domain" title="Link to this definition"></a></dt>
+<dd><p>Plot the generated points in the domain.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.domain.Domain.transform_domain">
+<span class="sig-name descname"><span class="pre">transform_domain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">transformation</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.domain.Domain.transform_domain" title="Link to this definition"></a></dt>
+<dd><p>Transform the domain using a transformation matrix.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p>transformation: Transformation matrix</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p>points (DataFrame): DataFrame of transformed points</p></li>
+</ul>
+</dd>
+<dt>Raises:</dt><dd><ul class="simple">
+<li><p>ValueError: If the domain has no points, invalid dimensions, or invalid transformation matrix</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../regression_toolbox/tr_norm.html" class="btn btn-neutral float-left" title="Truncated Normal Distribution" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="visualiser.html" class="btn btn-neutral float-right" title="Visualiser" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Samuel Davis.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

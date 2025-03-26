@@ -1,0 +1,302 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parameter &mdash; BayeSpace  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Sampler" href="sampler.html" />
+    <link rel="prev" title="Model" href="model.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            BayeSpace
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Regression Toolbox:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="likelihood.html">Likelihood</a></li>
+<li class="toctree-l1"><a class="reference internal" href="model.html">Model</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Parameter</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#regression_toolbox.parameter.Parameter"><code class="docutils literal notranslate"><span class="pre">Parameter</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.parameter.Parameter.add_prior_param"><code class="docutils literal notranslate"><span class="pre">Parameter.add_prior_param()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.parameter.Parameter.get_construction"><code class="docutils literal notranslate"><span class="pre">Parameter.get_construction()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.parameter.Parameter.get_prior_function"><code class="docutils literal notranslate"><span class="pre">Parameter.get_prior_function()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.parameter.Parameter.sample_param"><code class="docutils literal notranslate"><span class="pre">Parameter.sample_param()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="sampler.html">Sampler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tr_norm.html">Truncated Normal Distribution</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualisation Toolbox:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../visualisation_toolbox/domain.html">Domain</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../visualisation_toolbox/visualiser.html">Visualiser</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Data Processing:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/data_processor.html">Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/sim_data_processor.html">Sim Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/raw_data_processor.html">Raw Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/box_gridder.html">Box Gridder</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Gaussian Processing</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/gaussian_processor.html">Gaussian Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/kernel.html">Kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/transformation.html">Transformation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">BayeSpace</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Parameter</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/regression_toolbox/parameter.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-regression_toolbox.parameter">
+<span id="parameter"></span><h1>Parameter<a class="headerlink" href="#module-regression_toolbox.parameter" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="regression_toolbox.parameter.Parameter">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">regression_toolbox.parameter.</span></span><span class="sig-name descname"><span class="pre">Parameter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior_select</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'gaussian'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multi_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.parameter.Parameter" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A class representing an inferred parameter of the model by the sampler. The Parameter class is used to define the prior distribution of the parameter, which is used to estimate the posterior distribution during the inference process. The Sampler class requires a series of Parameter objects to generate the sampled posterior.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><p>name (str or list): The name(s) of the parameter. If the parameter is multivariate, the name should be a list of names.</p></li>
+<li><dl class="simple">
+<dt>prior_select (str, optional): The type of prior distribution to use. Defaults to “gaussian”. Options are:</dt><dd><ul>
+<li><dl class="simple">
+<dt>“gaussian”: Gaussian distribution </dt><dd><ul>
+<li><p>Can handle single and multivariate cases.</p></li>
+<li><p>Can handle single and multimodal cases.</p></li>
+<li><p>Requires ‘mu’ and ‘sigma’ hyperparameters.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>“gamma”: Gamma distribution </dt><dd><ul>
+<li><p>Can only handle single variate cases.</p></li>
+<li><p>Can only handle single mode cases</p></li>
+<li><p>Requires either ‘mu’ and ‘sigma’ or ‘alpha’ and ‘beta’ hyperparameters.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>“uniform”: Uniform distribution.</dt><dd><ul>
+<li><p>Can only handle single variate cases.</p></li>
+<li><p>Can only handle single mode cases</p></li>
+<li><p>Requires ‘low’ and ‘high’ hyperparameters.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>“log_norm”: Log-normal distribution.</dt><dd><ul>
+<li><p>Can handle single and multivariate cases.</p></li>
+<li><p>Can handle single and multimodal cases.</p></li>
+<li><p>Requires either ‘mu’ and ‘sigma’, ‘loc’ and ‘scale’, or ‘peak’ and ‘scale’ hyperparameters.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>“exponential”: Exponential distribution.</dt><dd><ul>
+<li><p>Can only handle single variate cases.</p></li>
+<li><p>Can only handle single and multimodal cases.</p></li>
+<li><p>Requires ‘rate’ hyperparameter.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>“beta”: Beta distribution.</dt><dd><ul>
+<li><p>Can only handle single variate cases.</p></li>
+<li><p>Can only handle single and multimodal cases.</p></li>
+<li><p>Requires ‘alpha’ and ‘beta’ hyperparameters.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>order (int, optional): The order of the parameter. This is used to specify the order of magnitude of the parameter. The input hyperparameter values are generally set between 0.1 and 10, then specify the order of magnitude using “order”. The hyperparameters are multiplied by 10^a, where a is the order. Defaults to 0.</p></li>
+<li><p>multi_mode (bool, optional): Indicates whether the parameter is multimodal or not. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt>Attributes:</dt><dd><ul class="simple">
+<li><p>prior_params (pd.Series): A series to store the prior hyperparameters.</p></li>
+<li><p>name (str or list): The name or list of names of the parameter/joint parameters.</p></li>
+<li><p>prior_select (str): The type of prior distribution to use.</p></li>
+<li><p>multivar (bool): Indicates whether the parameter is multivariate or not.</p></li>
+<li><p>multi_mode (bool): Indicates whether the parameter is multimodal or not.</p></li>
+<li><p>joined_name (str): The combined name of the parameter/joint parameters.</p></li>
+<li><p>order (int): The order of magnitude of the parameter - input hyperparameter values generally between 0.1 and 10, then specify the order of magnitude using “order”.</p></li>
+<li><p>n_dims (int): The number of dimensions of the parameter.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="regression_toolbox.parameter.Parameter.add_prior_param">
+<span class="sig-name descname"><span class="pre">add_prior_param</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.parameter.Parameter.add_prior_param" title="Link to this definition"></a></dt>
+<dd><p>Saves a named prior hyperparameter to the Parameter class before generating the parameter’s prior distribution.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#regression_toolbox.parameter.Parameter" title="regression_toolbox.parameter.Parameter"><code class="xref py py-class docutils literal notranslate"><span class="pre">Parameter</span></code></a></span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><p>name (str): The name of the prior hyperparameter.</p></li>
+<li><p>val (float, int or np.ndarray): The value of the prior hyperparameter.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="regression_toolbox.parameter.Parameter.get_construction">
+<span class="sig-name descname"><span class="pre">get_construction</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.parameter.Parameter.get_construction" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Get the construction parameters of the parameter. The conctruction parameters includes all of the config information used to construct the parameter object. It includes:</dt><dd><ul class="simple">
+<li><p>name: The name of the parameter.</p></li>
+<li><p>prior_select: The selected prior distribution.</p></li>
+<li><p>prior_params: The prior hyperparameters.</p></li>
+<li><p>order: The order of magnitude of the parameter.</p></li>
+<li><p>multi_mode: Indicates whether the parameter is multimodal or not.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="regression_toolbox.parameter.Parameter.get_prior_function">
+<span class="sig-name descname"><span class="pre">get_prior_function</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.parameter.Parameter.get_prior_function" title="Link to this definition"></a></dt>
+<dd><p>Generates the selected prior distribution using the prior hyperparameters. The prior distribution is used alongside the Likelihood function to estimate the posterior distribution of the parameter during the inference process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">callable</span></code></span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p>callable: The prior distribution function. This function is a callable Numpyro distribution object.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="regression_toolbox.parameter.Parameter.sample_param">
+<span class="sig-name descname"><span class="pre">sample_param</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_samples</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.parameter.Parameter.sample_param" title="Link to this definition"></a></dt>
+<dd><p>Generates a sample for this parameter. The sample is generated from the prior distribution of the parameter. This function is used by the Sampler class to generate samples for the parameter during the inference process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>] | <code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><p>n_samples (int): The number of samples to generate. If None, only one sample is generated.</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p>float or list[float]: The sampled parameter value.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="model.html" class="btn btn-neutral float-left" title="Model" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sampler.html" class="btn btn-neutral float-right" title="Sampler" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Samuel Davis.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

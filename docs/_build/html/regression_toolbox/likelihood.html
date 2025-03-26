@@ -1,0 +1,216 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Likelihood &mdash; BayeSpace  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Model" href="model.html" />
+    <link rel="prev" title="BayeSpace documentation" href="../index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            BayeSpace
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Regression Toolbox:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Likelihood</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#regression_toolbox.likelihood.Likelihood"><code class="docutils literal notranslate"><span class="pre">Likelihood</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.likelihood.Likelihood.add_likelihood_param"><code class="docutils literal notranslate"><span class="pre">Likelihood.add_likelihood_param()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.likelihood.Likelihood.get_construction"><code class="docutils literal notranslate"><span class="pre">Likelihood.get_construction()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.likelihood.Likelihood.get_likelihood_function"><code class="docutils literal notranslate"><span class="pre">Likelihood.get_likelihood_function()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="model.html">Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parameter.html">Parameter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sampler.html">Sampler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tr_norm.html">Truncated Normal Distribution</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualisation Toolbox:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../visualisation_toolbox/domain.html">Domain</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../visualisation_toolbox/visualiser.html">Visualiser</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Data Processing:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/data_processor.html">Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/sim_data_processor.html">Sim Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/raw_data_processor.html">Raw Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/box_gridder.html">Box Gridder</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Gaussian Processing</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/gaussian_processor.html">Gaussian Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/kernel.html">Kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/transformation.html">Transformation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">BayeSpace</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Likelihood</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/regression_toolbox/likelihood.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-regression_toolbox.likelihood">
+<span id="likelihood"></span><h1>Likelihood<a class="headerlink" href="#module-regression_toolbox.likelihood" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="regression_toolbox.likelihood.Likelihood">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">regression_toolbox.likelihood.</span></span><span class="sig-name descname"><span class="pre">Likelihood</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">likelihood_select</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.likelihood.Likelihood" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A class representing the Likelihood function used to describe the relationship between the modeled and measured data. The likelihood function is used to estimate the parameters of the model, and is a key component of the Bayesian inference process. The Sampler class requires a Likelihood object to generate the sampled posterior.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><dl class="simple">
+<dt>likelihood_select (str): The selected likelihood function. Options are:</dt><dd><ul>
+<li><p>‘gaussian’: Gaussian likelihood function.</p></li>
+<li><p>‘gaussian_fixed_sigma’: Gaussian likelihood function without estimating sigma.</p></li>
+<li><p>‘gaussian_percentage_error’: Gaussian likelihood function using percentage error.</p></li>
+<li><p>Other likelihood functions can be added as needed.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</dd>
+<dt>Attributes:</dt><dd><ul class="simple">
+<li><p>fixed_likelihood_params (pd.Series): A pandas Series object to store the fixed likelihood parameters.</p></li>
+<li><p>likelihood_select (str): The selected likelihood function.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="regression_toolbox.likelihood.Likelihood.add_likelihood_param">
+<span class="sig-name descname"><span class="pre">add_likelihood_param</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.likelihood.Likelihood.add_likelihood_param" title="Link to this definition"></a></dt>
+<dd><p>Saves a named parameter to the Likelihood class before generating the likelihood function. This parameter is fixed and not estimated during the inference process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#regression_toolbox.likelihood.Likelihood" title="regression_toolbox.likelihood.Likelihood"><code class="xref py py-class docutils literal notranslate"><span class="pre">Likelihood</span></code></a></span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><p>name (str): The name of the parameter.</p></li>
+<li><p>val (str, int, float): The value of the parameter, can be an int, float, or str.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="regression_toolbox.likelihood.Likelihood.get_construction">
+<span class="sig-name descname"><span class="pre">get_construction</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.likelihood.Likelihood.get_construction" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Gets the construction parameters. The conctruction parameters includes all of the config information used to construct the likelihood object. It includes:</dt><dd><ul class="simple">
+<li><p>likelihood_select: The selected likelihood function.</p></li>
+<li><p>fixed_likelihood_params: The fixed likelihood parameters.</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p>dict: A dictionary containing the construction parameters.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="regression_toolbox.likelihood.Likelihood.get_likelihood_function">
+<span class="sig-name descname"><span class="pre">get_likelihood_function</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.likelihood.Likelihood.get_likelihood_function" title="Link to this definition"></a></dt>
+<dd><p>Generates the selected likelihood function using the likelihood parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">callable</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../index.html" class="btn btn-neutral float-left" title="BayeSpace documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="model.html" class="btn btn-neutral float-right" title="Model" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Samuel Davis.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

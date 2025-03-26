@@ -1,0 +1,364 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visualiser &mdash; BayeSpace  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Data Processor" href="../data_processing/data_processor.html" />
+    <link rel="prev" title="Domain" href="domain.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            BayeSpace
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Regression Toolbox:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/likelihood.html">Likelihood</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/model.html">Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/parameter.html">Parameter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/sampler.html">Sampler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/tr_norm.html">Truncated Normal Distribution</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualisation Toolbox:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="domain.html">Domain</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Visualiser</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#visualisation_toolbox.visualiser.GPVisualiser"><code class="docutils literal notranslate"><span class="pre">GPVisualiser</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#visualisation_toolbox.visualiser.RegressionVisualiser"><code class="docutils literal notranslate"><span class="pre">RegressionVisualiser</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.visualiser.RegressionVisualiser.get_autocorrelations"><code class="docutils literal notranslate"><span class="pre">RegressionVisualiser.get_autocorrelations()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.visualiser.RegressionVisualiser.get_summary"><code class="docutils literal notranslate"><span class="pre">RegressionVisualiser.get_summary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.visualiser.RegressionVisualiser.get_traceplots"><code class="docutils literal notranslate"><span class="pre">RegressionVisualiser.get_traceplots()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.visualiser.RegressionVisualiser.plot_posterior"><code class="docutils literal notranslate"><span class="pre">RegressionVisualiser.plot_posterior()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.visualiser.RegressionVisualiser.plot_prior"><code class="docutils literal notranslate"><span class="pre">RegressionVisualiser.plot_prior()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#visualisation_toolbox.visualiser.Visualiser"><code class="docutils literal notranslate"><span class="pre">Visualiser</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.visualiser.Visualiser.embed_report"><code class="docutils literal notranslate"><span class="pre">Visualiser.embed_report()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.visualiser.Visualiser.generate_report"><code class="docutils literal notranslate"><span class="pre">Visualiser.generate_report()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualisation_toolbox.visualiser.Visualiser.show_predictions"><code class="docutils literal notranslate"><span class="pre">Visualiser.show_predictions()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Data Processing:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/data_processor.html">Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/sim_data_processor.html">Sim Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/raw_data_processor.html">Raw Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/box_gridder.html">Box Gridder</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Gaussian Processing</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/gaussian_processor.html">Gaussian Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/kernel.html">Kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/transformation.html">Transformation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">BayeSpace</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Visualiser</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/visualisation_toolbox/visualiser.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-visualisation_toolbox.visualiser">
+<span id="visualiser"></span><h1>Visualiser<a class="headerlink" href="#module-visualisation_toolbox.visualiser" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="visualisation_toolbox.visualiser.GPVisualiser">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">visualisation_toolbox.visualiser.</span></span><span class="sig-name descname"><span class="pre">GPVisualiser</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gp_obj</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.visualiser.GPVisualiser" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#visualisation_toolbox.visualiser.Visualiser" title="visualisation_toolbox.visualiser.Visualiser"><code class="xref py py-class docutils literal notranslate"><span class="pre">Visualiser</span></code></a></p>
+<p>A class to visualise the results of a Gaussian Process inference.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><ul class="simple">
+<li><p>results_path (str): The path to the directory where the results are saved.</p></li>
+<li><p>instance (int): The instance number of the inference.</p></li>
+<li><p>params_upper (pd.Series): A Series containing the upper values of the parameters.</p></li>
+<li><p>data_processor (DataProcessor): The DataProcessor object used to process the data.</p></li>
+<li><p>RMSE (float): The Root Mean Squared Error of the GP.</p></li>
+<li><p>AIC (float): The Akaike Information Criterion of the GP.</p></li>
+<li><p>BIC (float): The Bayesian Information Criterion of the GP.</p></li>
+<li><p>training_data (pd.DataFrame): The training data used to train the GP.</p></li>
+<li><p>testing_data (pd.DataFrame): The testing data used to evaluate the GP.</p></li>
+<li><p>dependent_variable (str): The name of the dependent variable.</p></li>
+<li><p>independent_variables (list): A list of the names of the independent variables.</p></li>
+<li><p>results_path (str): The path to the directory where the results are saved.</p></li>
+<li><p>instance (int): The instance number of the inference.</p></li>
+</ul>
+</dd>
+<dt>Methods:</dt><dd><ul class="simple">
+<li><p>show_predictions: Generates and saves the predictions from the GP.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="visualisation_toolbox.visualiser.RegressionVisualiser">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">visualisation_toolbox.visualiser.</span></span><span class="sig-name descname"><span class="pre">RegressionVisualiser</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sampler</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.visualiser.RegressionVisualiser" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#visualisation_toolbox.visualiser.Visualiser" title="visualisation_toolbox.visualiser.Visualiser"><code class="xref py py-class docutils literal notranslate"><span class="pre">Visualiser</span></code></a></p>
+<p>A class to handle the visualisation of the results from a regression model. This class inherits from the Visualiser class.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><p>sampler (Sampler): The sampler object</p></li>
+</ul>
+</dd>
+<dt>Attributes:</dt><dd><ul class="simple">
+<li><p>n_samples (int): Number of samples</p></li>
+<li><p>n_chains (int): Number of chains</p></li>
+<li><p>samples (pd.DataFrame): Samples from the sampler</p></li>
+<li><p>chain_samples (pd.DataFrame): Samples from each chain</p></li>
+<li><p>fields (list): Fields of the sampler</p></li>
+<li><p>data_processor (SimDataProcessor or RawDataProcessor): Data processor object</p></li>
+<li><p>training_data (pd.DataFrame): Training data</p></li>
+<li><p>testing_data (pd.DataFrame): Testing data</p></li>
+<li><p>model_func (function): Model function</p></li>
+<li><p>dependent_variable (str): Dependent variable of the model</p></li>
+<li><p>independent_variables (list): Independent variables of the model</p></li>
+<li><p>inference_params (pd.Series): Inference parameters. This is a series containing the Parameter objects</p></li>
+<li><p>likelihood_func (function): Likelihood function</p></li>
+<li><p>results_path (str): Path to save results</p></li>
+<li><p>instance (int): Instance number</p></li>
+<li><p>params_min (pd.Series): Minimum parameter values from the sampled results</p></li>
+<li><p>params_lower (pd.Series): Lower bound parameter values from the sampled results</p></li>
+<li><p>params_median (pd.Series): Median parameter values from the sampled results</p></li>
+<li><p>params_upper (pd.Series): Upper bound parameter values from the sampled results</p></li>
+<li><p>params_max (pd.Series): Maximum parameter values from the sampled results</p></li>
+<li><p>RMSE (float): Root Mean Squared Error</p></li>
+<li><p>AIC (float): Akaike Information Criterion</p></li>
+<li><p>BIC (float): Bayesian Information Criterion</p></li>
+<li><p>autocorrs (dict): A dictionary containing the autocorrelation values for each parameter</p></li>
+</ul>
+</dd>
+<dt>Methods:</dt><dd><ul class="simple">
+<li><p>show_predictions: Generates and saves the predictions from the sampled results</p></li>
+<li><p>get_traceplots: Generates and saves the traceplots from the sampled results</p></li>
+<li><p>plot_prior: Plots the prior distribution for a given parameter</p></li>
+<li><p>plot_posterior: Plots the posterior distribution for a given parameter</p></li>
+<li><p>get_autocorrelations: Calculates and plots the autocorrelation values for each parameter</p></li>
+<li><p>get_summary: Returns a summary of the results</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.visualiser.RegressionVisualiser.get_autocorrelations">
+<span class="sig-name descname"><span class="pre">get_autocorrelations</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.visualiser.RegressionVisualiser.get_autocorrelations" title="Link to this definition"></a></dt>
+<dd><p>Generates and saves autocorrelation plots for each parameter of the MCMC samples. A plot is generated for each parameter within each chain.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.visualiser.RegressionVisualiser.get_summary">
+<span class="sig-name descname"><span class="pre">get_summary</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.visualiser.RegressionVisualiser.get_summary" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Generates and saves the summary of the inference results. This is a JSON file which includes:</dt><dd><ul class="simple">
+<li><p>RMSE, AIC and BIC values</p></li>
+<li><p>The lower, median and upper values for each parameter in each chain</p></li>
+<li><p>The autocorrelation values for each parameter in each chain</p></li>
+<li><p>The lower, median and upper values for each parameter overall</p></li>
+<li><p>The autocorrelation values for each parameter overall</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><p>dict: A dictionary containing the summary of the inference results.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.visualiser.RegressionVisualiser.get_traceplots">
+<span class="sig-name descname"><span class="pre">get_traceplots</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.visualiser.RegressionVisualiser.get_traceplots" title="Link to this definition"></a></dt>
+<dd><p>Generates and saves the traceplots from the sampled results. If there are multiple chains of samples then multiple traceplots are generated and saved. One file is saved per chain, including the traceplot for each inferred parameter.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.visualiser.RegressionVisualiser.plot_posterior">
+<span class="sig-name descname"><span class="pre">plot_posterior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_range</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">references</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.visualiser.RegressionVisualiser.plot_posterior" title="Link to this definition"></a></dt>
+<dd><p>Plots the posterior distribution for a given parameter. Either a 1D or 2D plot is generated based on the number of dimensions of the parameter. The plot is saved in the results directory.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><p>param_name (str): The name of the parameter. If the parameter is a 2D parameter, the name should be the name of the parameter is the one given as the key in the inference_params series.</p></li>
+<li><p>param_range (list): The range of the parameter values for the plot. Indicates the maximum and minimum values of the parameter to plot the sampled posterior between. The range should be a list containing two floats or integers in the 1D case and a list of of two lists, each containing two floats or integers in the 2D case.</p></li>
+<li><p>references (dict, optional): A dictionary containing reference values for the parameter. The dictionary must have keys ‘labels’ and ‘vals’, which are lists of labels and values respectively. Defaults to None.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.visualiser.RegressionVisualiser.plot_prior">
+<span class="sig-name descname"><span class="pre">plot_prior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_range</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">references</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_estimate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.visualiser.RegressionVisualiser.plot_prior" title="Link to this definition"></a></dt>
+<dd><p>Plots the prior distribution for a given parameter. Either a 1D or 2D plot is generated based on the number of dimensions of the parameter. The plot is saved in the results directory.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><p>param_name (str): The name of the parameter. If the parameter is a 2D parameter, the name should be the name of the parameter is the one given as the key in the inference_params series.</p></li>
+<li><p>param_range (list): The range of the parameter values for the plot. Indicates the maximum and minimum values of the parameter to plot the prior between. The range should be a list containing two floats or integers in the 1D case and a list of of two lists, each containing two floats or integers in the 2D case.</p></li>
+<li><p>references (dict, optional): A dictionary containing reference values for the parameter. The dictionary must have keys ‘labels’ and ‘vals’, which are lists of labels and values respectively. Defaults to None.</p></li>
+<li><p>show_estimate (bool, optional): Whether to show the estimated median value from the sampled posterior. Defaults to False.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="visualisation_toolbox.visualiser.Visualiser">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">visualisation_toolbox.visualiser.</span></span><span class="sig-name descname"><span class="pre">Visualiser</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_obj</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.visualiser.Visualiser" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Visualiser class - Used for processing and visualising the results from the sampler. The class contains methods for generating traceplots of the samples, visualising the modelled system and summarising the results and success of the sampler.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><ul class="simple">
+<li><p>data_processor (SimDataProcessor or RawDataProcessor): Data processor object</p></li>
+<li><p>training_data (pd.DataFrame): Training data</p></li>
+<li><p>testing_data (pd.DataFrame): Testing data</p></li>
+<li><p>dependent_variable (str): Dependent variable of the model</p></li>
+<li><p>independent_variables (list): Independent variables of the model</p></li>
+<li><p>results_path (str): Path to save results</p></li>
+<li><p>instance (int): Instance number</p></li>
+<li><p>RMSE (float): Root Mean Squared Error</p></li>
+<li><p>AIC (float): Akaike Information Criterion</p></li>
+<li><p>BIC (float): Bayesian Information Criterion</p></li>
+<li><p>construction (str): Construction of the model</p></li>
+</ul>
+</dd>
+<dt>Methods:</dt><dd><ul class="simple">
+<li><p>show_predictions(domain, plot_name, plot_type, title, scale): Outputs the plots for visualising the modelled system based on the concluded lower, median and upper bound parameters and an inputted domain. Plots are saved and include a summary of the parameter values and the sampling success.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.visualiser.Visualiser.embed_report">
+<span class="sig-name descname"><span class="pre">embed_report</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.visualiser.Visualiser.embed_report" title="Link to this definition"></a></dt>
+<dd><p>Embeds the HTML report in a Jupyter notebook.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.visualiser.Visualiser.generate_report">
+<span class="sig-name descname"><span class="pre">generate_report</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">title</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'all'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.visualiser.Visualiser.generate_report" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualisation_toolbox.visualiser.Visualiser.show_predictions">
+<span class="sig-name descname"><span class="pre">show_predictions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'3D'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'linear'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualisation_toolbox.visualiser.Visualiser.show_predictions" title="Link to this definition"></a></dt>
+<dd><p>Outputs the plots for visualising the modelled system based on the concluded lower, median and upper bound parameters and an inputted domain. Plots are saved and include a summary of the parameter values and the sampling success.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><p>domain (Domain): Domain object, must be built</p></li>
+<li><p>plot_name (str): Name of the plot for saving purposes</p></li>
+<li><dl class="simple">
+<dt>plot_type (str, optional): Type of plot. Defaults to ‘3D’. Options are: </dt><dd><ul>
+<li><p>‘1D’: 1D plot</p></li>
+<li><p>‘2D’: 2D plot</p></li>
+<li><p>‘3D’: 3D plot</p></li>
+<li><p>‘2D_cross_sections’: 2D plot with cross sections</p></li>
+<li><p>‘3D_layers’: 3D plot with layered sections</p></li>
+<li><p>‘1D_time’: 1D plot with time</p></li>
+<li><p>‘2D_time’: 2D plot with time</p></li>
+<li><p>‘3D_time’: 3D plot with time</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>title (str, optional): Overall title of the plot. Defaults to None.</p></li>
+<li><p>cross_section_params (dict, optional): Dictionary containing the cross section parameters. Defaults to None.</p></li>
+<li><dl class="simple">
+<dt>scale (str, optional): Scale of the plot. Defaults to ‘linear’. Options are:</dt><dd><ul>
+<li><p>‘linear’: Linear scale</p></li>
+<li><p>‘log’: Logarithmic scale</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="domain.html" class="btn btn-neutral float-left" title="Domain" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../data_processing/data_processor.html" class="btn btn-neutral float-right" title="Data Processor" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Samuel Davis.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

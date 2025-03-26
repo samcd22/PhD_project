@@ -1,0 +1,245 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Raw Data Processor &mdash; BayeSpace  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Box Gridder" href="box_gridder.html" />
+    <link rel="prev" title="Sim Data Processor" href="sim_data_processor.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            BayeSpace
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Regression Toolbox:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/likelihood.html">Likelihood</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/model.html">Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/parameter.html">Parameter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/sampler.html">Sampler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regression_toolbox/tr_norm.html">Truncated Normal Distribution</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualisation Toolbox:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../visualisation_toolbox/domain.html">Domain</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../visualisation_toolbox/visualiser.html">Visualiser</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Data Processing:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="data_processor.html">Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sim_data_processor.html">Sim Data Processor</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Raw Data Processor</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#data_processing.raw_data_processor.RawDataProcessor"><code class="docutils literal notranslate"><span class="pre">RawDataProcessor</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#data_processing.raw_data_processor.RawDataProcessor.get_construction"><code class="docutils literal notranslate"><span class="pre">RawDataProcessor.get_construction()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#data_processing.raw_data_processor.RawDataProcessor.plot_data_values"><code class="docutils literal notranslate"><span class="pre">RawDataProcessor.plot_data_values()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#data_processing.raw_data_processor.RawDataProcessor.process_data"><code class="docutils literal notranslate"><span class="pre">RawDataProcessor.process_data()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="box_gridder.html">Box Gridder</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Gaussian Processing</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/gaussian_processor.html">Gaussian Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/kernel.html">Kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/transformation.html">Transformation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">BayeSpace</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Raw Data Processor</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/data_processing/raw_data_processor.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-data_processing.raw_data_processor">
+<span id="raw-data-processor"></span><h1>Raw Data Processor<a class="headerlink" href="#module-data_processing.raw_data_processor" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="data_processing.raw_data_processor.RawDataProcessor">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">data_processing.raw_data_processor.</span></span><span class="sig-name descname"><span class="pre">RawDataProcessor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">processed_data_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">processor_select</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">processor_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">train_test_split</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'/data'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plotting_func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">slices</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#data_processing.raw_data_processor.RawDataProcessor" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="data_processor.html#data_processing.data_processor.DataProcessor" title="data_processing.data_processor.DataProcessor"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataProcessor</span></code></a></p>
+<p>A class to preprocess raw data for the Bayesian Inference tool.
+It’s a subclass of DataProcessor.
+Raw data are processed via a specified processor and its parameters.
+The processed data are saved as a csv file.
+The construction (configuration) parameters are saved as a json file.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><p>raw_data_filename (str): Filename (not path) of the raw data.</p></li>
+<li><p>processed_data_name (str): The name of the processed data. This will indicate the name of the folder where the data is saved within the data directory, and the name of the folder where the inference results are saved in the results directory.</p></li>
+<li><dl class="simple">
+<dt>processor_select (str): Type of data processor to use.</dt><dd><p>Options are:
+- ‘GBR_processor’: The Great Barrier Reef processor.
+- ‘XYLO_processor’: The XYLO processor.
+- A custom data processor function. This function must not take inputs and return a tuple containing two DataFrames (the training and test data).</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>processor_params (dict): The parameters for the data processor. Typically includes (for the Great Barrier Reef processor):</dt><dd><ul>
+<li><p>‘output_header’ (str): The header for the output data.</p></li>
+<li><p>‘log_output_data’ (bool): Whether to take the log of the output data.</p></li>
+<li><p>‘gridding’ (int): The size of the grid for the Great Barrier Reef processor.</p></li>
+<li><p>‘meta_data_select’ (str): The filename of the meta data.</p></li>
+<li><p>‘experiments_list’ (list): A list of experiments to process.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>train_test_split (float, optional): Ratio of training to test data. Defaults to 0.8.</p></li>
+<li><p>data_path (str, optional): The path to the data directory. Defaults to ‘data’.</p></li>
+<li><p>plot_data (bool, optional): Whether to plot the processed data. Defaults to True.</p></li>
+<li><p>plotting_func (callable, optional): A custom plotting function. Defaults to None. Not required if using the Great Barrier Reef processor, which has its own plotting function.</p></li>
+</ul>
+</dd>
+<dt>Attributes:</dt><dd><ul class="simple">
+<li><p>raw_data_filename (str): Filename (not path) of the raw data.</p></li>
+<li><p>processed_data_name (str): The name of the processed data. This indicates the name of the folder where the data is saved within the data directory, and the name of the folder where the inference results are saved in the results directory.</p></li>
+<li><p>processor_select (str, callable): Type of data processor to use. Can be a callable function or one of the predefined processor names.</p></li>
+<li><p>processor_params (dict): The parameters for the data processor.</p></li>
+<li><p>train_test_split (float): Ratio of training to test data.</p></li>
+<li><p>data_path (str): The root data path.</p></li>
+<li><p>processed_data (pd.DataFrame): The processed data.</p></li>
+<li><p>plot_data (bool): Whether to plot the processed data.</p></li>
+<li><p>processor_func (callable): The data processor function.</p></li>
+<li><p>plotting_func (callable): The plotting function.</p></li>
+<li><p>dependent_variable (str): The dependent variable.</p></li>
+<li><p>independent_variables (list): The independent variables.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="data_processing.raw_data_processor.RawDataProcessor.get_construction">
+<span class="sig-name descname"><span class="pre">get_construction</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#data_processing.raw_data_processor.RawDataProcessor.get_construction" title="Link to this definition"></a></dt>
+<dd><p>Gets the construction parameters.
+The construction parameters includes all of the config information used to process the raw data.
+This checks if the processed data already exists. It includes:
+- raw_data_filename: Filename of the raw data.
+- processed_data_name: The name of the processed data.
+- processor_select: Type of data processor to use.
+- processor_params: The parameters for the data processor (e.g. gridding, logging the output data, etc).
+- train_test_split: Ratio of training to test data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p>dict: The construction parameters.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="data_processing.raw_data_processor.RawDataProcessor.plot_data_values">
+<span class="sig-name descname"><span class="pre">plot_data_values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#data_processing.raw_data_processor.RawDataProcessor.plot_data_values" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="data_processing.raw_data_processor.RawDataProcessor.process_data">
+<span class="sig-name descname"><span class="pre">process_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#data_processing.raw_data_processor.RawDataProcessor.process_data" title="Link to this definition"></a></dt>
+<dd><p>This is the main function of the RawDataProcessor class that processes the raw data using the specified data processor and parameters.
+If data has already been processed, this function loads the data.
+If not, it is processed and saved.
+The processed data is then split into training and test data using the train_test_split parameter and returned.
+The processed data is then optionally plotted using the plotting function.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">DataFrame</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">DataFrame</span></code>]</span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p>tuple: A tuple containing two DataFrames, training data and test data.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sim_data_processor.html" class="btn btn-neutral float-left" title="Sim Data Processor" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="box_gridder.html" class="btn btn-neutral float-right" title="Box Gridder" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Samuel Davis.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

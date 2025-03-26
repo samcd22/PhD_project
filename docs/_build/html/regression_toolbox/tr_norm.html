@@ -1,0 +1,232 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Truncated Normal Distribution &mdash; BayeSpace  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Domain" href="../visualisation_toolbox/domain.html" />
+    <link rel="prev" title="Sampler" href="sampler.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            BayeSpace
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Regression Toolbox:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="likelihood.html">Likelihood</a></li>
+<li class="toctree-l1"><a class="reference internal" href="model.html">Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parameter.html">Parameter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sampler.html">Sampler</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Truncated Normal Distribution</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#regression_toolbox.tr_norm.TruncatedNormal"><code class="docutils literal notranslate"><span class="pre">TruncatedNormal</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.tr_norm.TruncatedNormal.arg_constraints"><code class="docutils literal notranslate"><span class="pre">TruncatedNormal.arg_constraints</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.tr_norm.TruncatedNormal.has_rsample"><code class="docutils literal notranslate"><span class="pre">TruncatedNormal.has_rsample</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.tr_norm.TruncatedNormal.log_prob"><code class="docutils literal notranslate"><span class="pre">TruncatedNormal.log_prob()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.tr_norm.TruncatedNormal.mean"><code class="docutils literal notranslate"><span class="pre">TruncatedNormal.mean</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.tr_norm.TruncatedNormal.sample"><code class="docutils literal notranslate"><span class="pre">TruncatedNormal.sample()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.tr_norm.TruncatedNormal.support"><code class="docutils literal notranslate"><span class="pre">TruncatedNormal.support</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.tr_norm.TruncatedNormal.variance"><code class="docutils literal notranslate"><span class="pre">TruncatedNormal.variance</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualisation Toolbox:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../visualisation_toolbox/domain.html">Domain</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../visualisation_toolbox/visualiser.html">Visualiser</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Data Processing:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/data_processor.html">Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/sim_data_processor.html">Sim Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/raw_data_processor.html">Raw Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/box_gridder.html">Box Gridder</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Gaussian Processing</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/gaussian_processor.html">Gaussian Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/kernel.html">Kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/transformation.html">Transformation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">BayeSpace</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Truncated Normal Distribution</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/regression_toolbox/tr_norm.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-regression_toolbox.tr_norm">
+<span id="truncated-normal-distribution"></span><h1>Truncated Normal Distribution<a class="headerlink" href="#module-regression_toolbox.tr_norm" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="regression_toolbox.tr_norm.TruncatedNormal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">regression_toolbox.tr_norm.</span></span><span class="sig-name descname"><span class="pre">TruncatedNormal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">low</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">high</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validate_args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.tr_norm.TruncatedNormal" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Distribution</span></code></p>
+<p>Class for truncated normal distribution.</p>
+<p>Attributes:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>loc (float): Mean of the normal distribution.</p></li>
+<li><p>scale (float): Standard deviation of the normal distribution.</p></li>
+<li><p>low (float): Lower bound of the truncated distribution.</p></li>
+<li><p>high (float): Upper bound of the truncated distribution.</p></li>
+<li><p>base_dist (numpyro.distributions.Normal): Base normal distribution.</p></li>
+</ul>
+</div></blockquote>
+<dl class="simple">
+<dt>Methods:</dt><dd><ul class="simple">
+<li><p>sample: Sample from the truncated normal distribution.</p></li>
+<li><p>log_prob: Compute the log probability of a value under the truncated normal distribution.</p></li>
+</ul>
+</dd>
+<dt>Properties:</dt><dd><ul class="simple">
+<li><p>mean: Compute the mean of the truncated normal distribution.</p></li>
+<li><p>variance: Compute the variance of the truncated normal</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="regression_toolbox.tr_norm.TruncatedNormal.arg_constraints">
+<span class="sig-name descname"><span class="pre">arg_constraints</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'loc':</span> <span class="pre">Real(),</span> <span class="pre">'scale':</span> <span class="pre">Positive(lower_bound=0.0)}</span></em><a class="headerlink" href="#regression_toolbox.tr_norm.TruncatedNormal.arg_constraints" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="regression_toolbox.tr_norm.TruncatedNormal.has_rsample">
+<span class="sig-name descname"><span class="pre">has_rsample</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></em><a class="headerlink" href="#regression_toolbox.tr_norm.TruncatedNormal.has_rsample" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="regression_toolbox.tr_norm.TruncatedNormal.log_prob">
+<span class="sig-name descname"><span class="pre">log_prob</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.tr_norm.TruncatedNormal.log_prob" title="Link to this definition"></a></dt>
+<dd><p>Compute the log probability of a value under the truncated normal distribution.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><p>value (jnp.ndarray): Value for which to compute the log probability.</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p>log_prob (jnp.ndarray): Log probability of the value under the truncated normal distribution</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="regression_toolbox.tr_norm.TruncatedNormal.mean">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">mean</span></span><a class="headerlink" href="#regression_toolbox.tr_norm.TruncatedNormal.mean" title="Link to this definition"></a></dt>
+<dd><p>Mean of the distribution.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="regression_toolbox.tr_norm.TruncatedNormal.sample">
+<span class="sig-name descname"><span class="pre">sample</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_shape</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.tr_norm.TruncatedNormal.sample" title="Link to this definition"></a></dt>
+<dd><p>Sample from the truncated normal distribution.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><p>key (jax.random.PRNGKey): Random key for sampling.</p></li>
+<li><p>sample_shape (tuple): Shape of the samples to draw.</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p>samples (jnp.ndarray): Samples from the truncated normal distribution</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="regression_toolbox.tr_norm.TruncatedNormal.support">
+<span class="sig-name descname"><span class="pre">support</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">Positive(lower_bound=0.0)</span></em><a class="headerlink" href="#regression_toolbox.tr_norm.TruncatedNormal.support" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="regression_toolbox.tr_norm.TruncatedNormal.variance">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">variance</span></span><a class="headerlink" href="#regression_toolbox.tr_norm.TruncatedNormal.variance" title="Link to this definition"></a></dt>
+<dd><p>Variance of the distribution.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sampler.html" class="btn btn-neutral float-left" title="Sampler" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../visualisation_toolbox/domain.html" class="btn btn-neutral float-right" title="Domain" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Samuel Davis.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

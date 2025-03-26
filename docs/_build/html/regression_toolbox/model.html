@@ -1,0 +1,280 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Model &mdash; BayeSpace  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Parameter" href="parameter.html" />
+    <link rel="prev" title="Likelihood" href="likelihood.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            BayeSpace
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Regression Toolbox:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="likelihood.html">Likelihood</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Model</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#regression_toolbox.model.Model"><code class="docutils literal notranslate"><span class="pre">Model</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.model.Model.add_fixed_model_param"><code class="docutils literal notranslate"><span class="pre">Model.add_fixed_model_param()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.model.Model.get_construction"><code class="docutils literal notranslate"><span class="pre">Model.get_construction()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#regression_toolbox.model.Model.get_model"><code class="docutils literal notranslate"><span class="pre">Model.get_model()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#regression_toolbox.model.add_model"><code class="docutils literal notranslate"><span class="pre">add_model()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#regression_toolbox.model.delete_model"><code class="docutils literal notranslate"><span class="pre">delete_model()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="parameter.html">Parameter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sampler.html">Sampler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tr_norm.html">Truncated Normal Distribution</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualisation Toolbox:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../visualisation_toolbox/domain.html">Domain</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../visualisation_toolbox/visualiser.html">Visualiser</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Data Processing:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/data_processor.html">Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/sim_data_processor.html">Sim Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/raw_data_processor.html">Raw Data Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing/box_gridder.html">Box Gridder</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Gaussian Processing</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/gaussian_processor.html">Gaussian Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/kernel.html">Kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gaussian_process_toolbox/transformation.html">Transformation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">BayeSpace</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Model</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/regression_toolbox/model.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-regression_toolbox.model">
+<span id="model"></span><h1>Model<a class="headerlink" href="#module-regression_toolbox.model" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="regression_toolbox.model.Model">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">regression_toolbox.model.</span></span><span class="sig-name descname"><span class="pre">Model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_select</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.model.Model" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A class representing the Model used for predicting a system’s behaviour. The parameters of this model are optimised using Bayesian Inference. The Sampler class requires a Model object to generate the sampled posterior.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><dl class="simple">
+<dt>model_select (str): The selected model. Default options are:</dt><dd><ul>
+<li><p>‘line’: y = m * x + c.</p></li>
+<li><p>‘curve’: y = m * x^2 + c.</p></li>
+<li><p>exponential: y = a * exp(b * x).</p></li>
+<li><p>logarithmic: y = a * log(b * x).</p></li>
+<li><p>Add more models using the add_model function.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</dd>
+<dt>Attributes:</dt><dd><ul class="simple">
+<li><p>fixed_model_params (pd.Series): A pandas Series object to store model parameters.</p></li>
+<li><p>model_select (str): The selected model. This is the key used to select the model from the models.json file.</p></li>
+<li><p>model_func_string (str): The model function string.</p></li>
+<li><p>independent_variables (list): A list of independent variable names.</p></li>
+<li><p>dependent_variable (str): The dependent variable name.</p></li>
+<li><p>all_param_names (list): A list of all parameter names.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="regression_toolbox.model.Model.add_fixed_model_param">
+<span class="sig-name descname"><span class="pre">add_fixed_model_param</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.model.Model.add_fixed_model_param" title="Link to this definition"></a></dt>
+<dd><p>Adds a named parameter to the Model class. This parameter is fixed and not optimised during the inference process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#regression_toolbox.model.Model" title="regression_toolbox.model.Model"><code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></a></span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><p>name (str): The name of the parameter.</p></li>
+<li><p>val: The value of the parameter.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="regression_toolbox.model.Model.get_construction">
+<span class="sig-name descname"><span class="pre">get_construction</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.model.Model.get_construction" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Gets the construction parameters. The conctruction parameters includes all of the config information used to construct the model object. It includes:</dt><dd><ul class="simple">
+<li><p>model_select: The selected model.</p></li>
+<li><p>fixed_model_params: The fixed model parameters.</p></li>
+<li><p>independent_variables: A list of independent variable names.</p></li>
+<li><p>dependent_variable: The dependent variable name.</p></li>
+<li><p>all_param_names: A list of all parameter names.</p></li>
+<li><p>model_func_string: The model function string.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="regression_toolbox.model.Model.get_model">
+<span class="sig-name descname"><span class="pre">get_model</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.model.Model.get_model" title="Link to this definition"></a></dt>
+<dd><p>Generates the selected model function using the model parameters. The model function is used to predict the system’s behaviour.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">callable</span></code></span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p>callable: The model function. This function takes the list of infered model parameters and a value list of independent variables as inputs and returns the predicted dependent variable values.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="regression_toolbox.model.add_model">
+<span class="sig-prename descclassname"><span class="pre">regression_toolbox.model.</span></span><span class="sig-name descname"><span class="pre">add_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">independent_variables</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dependent_variable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_param_names</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.model.add_model" title="Link to this definition"></a></dt>
+<dd><p>Adds a model to the model.json. The model string should be a mathematical expression that can be evaluated using SymPy. The model string should contain the independent variables, dependent variables, and all parameter names. A list of how mathematical expressions in the model string should be formatted is provided below.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><p>model_name (str): The name of the model. This name should be unique.</p></li>
+<li><p>model_str (str): The model string. This should be a mathematical expression that can be evaluated using SymPy.</p></li>
+<li><p>independent_variable (list): A list of independent variable names.</p></li>
+<li><p>dependent_variable (list): The dependent variable name.</p></li>
+<li><p>all_param_names (list): A list of all parameter names.</p></li>
+</ul>
+</dd>
+<dt>Mathematical expressions:</dt><dd><ul class="simple">
+<li><p>pi: The mathematical constant pi.</p></li>
+<li><p>exp: The exponential function.</p></li>
+<li><p>log: The natural logarithm function.</p></li>
+<li><p>log10: The logarithm function (base 10).</p></li>
+<li><p>sqrt: The square root function.</p></li>
+<li><p>sin: The sine function.</p></li>
+<li><p>cos: The cosine function.</p></li>
+<li><p>tan: The tangent function.</p></li>
+<li><p>arcsin: The inverse sine function.</p></li>
+<li><p>arccos: The inverse cosine function.</p></li>
+<li><p>arctan: The inverse tangent function.</p></li>
+<li><p>sinh: The hyperbolic sine function.</p></li>
+<li><p>cosh: The hyperbolic cosine function.</p></li>
+<li><p>tanh: The hyperbolic tangent function.</p></li>
+<li><p>arcsinh: The inverse hyperbolic sine function.</p></li>
+<li><p>arccosh: The inverse hyperbolic cosine function.</p></li>
+<li><p>arctanh: The inverse hyperbolic tangent function.</p></li>
+<li><p>abs: The absolute value function.</p></li>
+<li><p>ceil: The ceiling function.</p></li>
+<li><p>floor: The floor function.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="regression_toolbox.model.delete_model">
+<span class="sig-prename descclassname"><span class="pre">regression_toolbox.model.</span></span><span class="sig-name descname"><span class="pre">delete_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#regression_toolbox.model.delete_model" title="Link to this definition"></a></dt>
+<dd><p>Deletes a model from model.json using the model name.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><ul class="simple">
+<li><p>model_name (str): The name of the model. This is the key used to select the model from the models.json file.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="likelihood.html" class="btn btn-neutral float-left" title="Likelihood" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="parameter.html" class="btn btn-neutral float-right" title="Parameter" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Samuel Davis.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
