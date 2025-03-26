@@ -47,7 +47,7 @@ Navigate to the folder where `run_bayespace.ps1` is located. You can do this by 
 In PowerShell, run the following command to allow the script to execute and start the container:
 
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\run.ps1
+.\run_bayespace.ps1
 
 ---
 
