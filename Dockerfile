@@ -15,10 +15,10 @@ RUN apt-get update && \
     update-locale LANG=en_US.UTF-8 && \
     rm -rf /var/lib/apt/lists/*
     
-WORKDIR /PhD_project
+WORKDIR /BayeSpace
 
 # Clone the GitHub repository
-RUN git clone https://github.com/samcd22/PhD_project.git /PhD_project
+RUN git clone https://github.com/samcd22/BayeSpace.git /BayeSpace
 
 # Install Miniconda
 RUN curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
@@ -38,7 +38,7 @@ RUN /build/miniconda3/bin/conda clean -afy
 RUN /build/miniconda3/bin/conda info -e
 
 # Install Python dependencies inside the Conda environment
-RUN /build/miniconda3/envs/myenv/bin/pip install -r https://raw.githubusercontent.com/samcd22/PhD_project/main/requirements.txt
+RUN /build/miniconda3/envs/myenv/bin/pip install -r https://raw.githubusercontent.com/samcd22/BayeSpace/main/requirements.txt
 
 # Set the environment variables to activate the environment by default
 ENV PATH="/build/miniconda3/envs/myenv/bin:$PATH"
@@ -52,7 +52,7 @@ ENV LANG=en_US.UTF-8 \
 # COPY . /PhD_project
 
 # Create necessary directories
-RUN mkdir /PhD_project/data /PhD_project/results
+RUN mkdir /BayeSpace/data /BayeSpace/results
 
 # Default command
 CMD ["bash"]
