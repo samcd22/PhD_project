@@ -63,3 +63,16 @@ From the list of running containers, select:
 bayespace-container
 
 This will open a full VS Code workspace inside the running container, with access to all project files in /BayeSpace.
+
+---
+
+### 6. Install recommended extensions inside the container
+
+VS Code will usually prompt you to install missing extensions. Make sure the following are installed inside the container:
+
+- Python — ms-python.python
+- Jupyter — ms-toolsai.jupyter
+
+These will enable code execution, syntax highlighting, and notebook support.
+
+**YOU'RE READY TO GO!!**
