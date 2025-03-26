@@ -14,6 +14,8 @@ RUN apt-get update && \
     locale-gen en_US.UTF-8 && \
     update-locale LANG=en_US.UTF-8 && \
     rm -rf /var/lib/apt/lists/*
+    
+WORKDIR /PhD_project
 
 # Clone the GitHub repository
 RUN git clone https://github.com/samcd22/PhD_project.git /PhD_project
@@ -46,9 +48,8 @@ ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8
 
-# Set the working directory
-COPY . /PhD_project
-WORKDIR /PhD_project
+# # Set the working directory
+# COPY . /PhD_project
 
 # Create necessary directories
 RUN mkdir /PhD_project/data /PhD_project/results
