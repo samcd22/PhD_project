@@ -24,7 +24,7 @@ Decide where you want to work from — this is where your `data/`, `results/`, a
 
 ### 2. Download the run_bayespace.ps1 script
 
-Right click [`here`](https://raw.githubusercontent.com/samcd22/BayeSpace/main/run.ps1) to download the ps1 file and save it in your working directory
+Right click [`here`](https://raw.githubusercontent.com/samcd22/BayeSpace/main/run_bayespace.ps1) to download the ps1 file and save it in your working directory
 
 Place the `run_bayespace.ps1` PowerShell script **directly into your working directory**. This script:
 
