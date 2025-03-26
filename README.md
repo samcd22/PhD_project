@@ -22,9 +22,11 @@ Decide where you want to work from — this is where your `data/`, `results/`, a
 
 ---
 
-### 2. Download the `run.ps1` script
+### 2. Download the run_bayespace.ps1 script
 
-Place the `run.ps1` PowerShell script **directly into your working directory**. This script:
+Right click [`here`](https://raw.githubusercontent.com/samcd22/BayeSpace/main/run_bayespace.ps1) to download the ps1 file and save it in your working directory
+
+Place the `run_bayespace.ps1` PowerShell script **directly into your working directory**. This script:
 
 - Builds the BayeSpace Docker image from GitHub
 - Creates and starts a container named `bayespace-container`
@@ -34,7 +36,7 @@ Place the `run.ps1` PowerShell script **directly into your working directory**. 
 
 ### 3. Open PowerShell in the working directory
 
-Navigate to the folder where `run.ps1` is located. You can do this by right-clicking in the folder and selecting:
+Navigate to the folder where `run_bayespace.ps1` is located. You can do this by right-clicking in the folder and selecting:
 
 > **"Open in Terminal"** or **"Open in PowerShell"**
 
@@ -45,7 +47,7 @@ Navigate to the folder where `run.ps1` is located. You can do this by right-clic
 In PowerShell, run the following command to allow the script to execute and start the container:
 
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\run.ps1
+.\run_bayespace.ps1
 
 ---
 
