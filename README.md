@@ -76,3 +76,5 @@ VS Code will usually prompt you to install missing extensions. Make sure the fol
 These will enable code execution, syntax highlighting, and notebook support.
 
 **YOU'RE READY TO GO!!**
+
+## Explore the notebook directory for example notebooks using BayeSpace
