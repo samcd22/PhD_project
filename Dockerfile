@@ -47,6 +47,7 @@ ENV LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8
 
 # Set the working directory
+COPY . /PhD_project
 WORKDIR /PhD_project
 
 # Create necessary directories
