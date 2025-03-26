@@ -162,8 +162,18 @@ class Visualiser:
 
         r_prime_frac = Fraction(r_prime)
 
+        # Ensure bottom row has at least a 1:4 ratio with the top if it's too squashed
+        min_bottom_ratio = 0.25
+        if r_prime < (1 - min_bottom_ratio):
+            r_prime_frac = Fraction(min_bottom_ratio / (1 - min_bottom_ratio)).limit_denominator()
+            height_ratios = [r_prime_frac.denominator - r_prime_frac.numerator, r_prime_frac.numerator]
+        else:
+            r_prime_frac = Fraction(r_prime).limit_denominator()
+            height_ratios = [r_prime_frac.numerator, r_prime_frac.denominator - r_prime_frac.numerator]
+
+
         fig = plt.figure(constrained_layout = True, figsize = (24,y_prime))
-        spec = GridSpec(2, 6, figure = fig, height_ratios= [r_prime_frac.numerator, r_prime_frac.denominator - r_prime_frac.numerator])
+        spec = GridSpec(2, 6, figure = fig, height_ratios= height_ratios)
         axes = [None]*5
         
         projection = None
@@ -285,7 +295,6 @@ class Visualiser:
             fig.suptitle(title, fontsize = 40)
 
             fig, axes = self._fill_figure_metadata(fig, axes)
-
             fig.savefig(full_path)
             plt.close()
     
