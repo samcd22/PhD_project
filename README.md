@@ -1,82 +1,103 @@
-# 🚀 BayeSpace: Installation Guide
+# BayeSpace
 
-This guide walks you through setting up **BayeSpace** inside a Docker container with full VS Code integration. You'll be able to run Python scripts and Jupyter notebooks in a reproducible environment with minimal setup.
+Bayesian regression and Gaussian-process inference for spatial environmental models, built on
+[NumPyro](https://num.pyro.ai/) and JAX. Write the forward model as an equation, attach priors
+parameterised by their modes, sample with NUTS, and get every run saved with its configuration so it
+can be reloaded rather than repeated.
 
----
+BayeSpace was written for the PhD thesis *BayeSpace: applying Bayesian statistics to environmental and
+ecological phenomena* (S. Davis, University of Sydney, 2025). Its two case studies are the inference of
+Gaussian-plume dispersion coefficients from drone transects of a marine cloud brightening plume, and
+Gaussian-process species-distribution models. Release `v0.1.0` is the commit used for the dispersion
+paper; `v0.2.0` adds packaging, tests and the fixes listed in the changelog.
 
-## ✅ Prerequisites
+## Install
 
-Make sure you have the following installed:
+```bash
+pip install git+https://github.com/samcd22/BayeSpace.git
+```
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [Visual Studio Code](https://code.visualstudio.com/)
-- The **Remote - Containers** extension in VS Code
+or, for development:
 
----
+```bash
+git clone https://github.com/samcd22/BayeSpace.git
+cd BayeSpace
+pip install -e ".[test]"
+pytest
+```
 
-## 📦 Setup Steps
+Python 3.10 or later. CPU JAX is installed by default; follow the JAX instructions for GPU builds.
+Data and results are written under `data/` and `results/` in the current working directory.
 
-### 1. Choose your working directory
+## Quickstart
 
-Decide where you want to work from — this is where your `data/`, `results/`, and notebooks will live.
+Simulate a noisy line, infer its slope and intercept, and plot the diagnostics.
 
----
+```python
+import pandas as pd
+from regression_toolbox.model import Model
+from regression_toolbox.likelihood import Likelihood
+from regression_toolbox.parameter import Parameter
+from regression_toolbox.sampler import Sampler
+from visualisation_toolbox.domain import Domain
+from visualisation_toolbox.visualiser import RegressionVisualiser
+from data_processing.sim_data_processor import SimDataProcessor
 
-### 2. Download the run_bayespace.ps1 script
+# a forward model is an equation string registered in models.json ('line' is y = a*x + b)
+truth = Model('line').add_fixed_model_param('a', 1).add_fixed_model_param('b', 1)
+domain = Domain(1, 'linear').add_domain_param('min', 0).add_domain_param('max', 100).add_domain_param('n_points', 50)
+domain.build_domain()
+data = SimDataProcessor('linear_example', truth, domain, noise_dist='gaussian', noise_level=1)
 
-Right click [`here`](https://raw.githubusercontent.com/samcd22/BayeSpace/main/run_bayespace.ps1) to download the ps1 file and save it in your working directory
+a = Parameter(name='a', prior_select='gaussian').add_prior_param('mu', 1).add_prior_param('sigma', 1)
+b = Parameter(name='b', prior_select='gaussian').add_prior_param('mu', 1).add_prior_param('sigma', 1)
+sigma = Parameter(name='sigma', prior_select='uniform').add_prior_param('low', 0.0001).add_prior_param('high', 5)
 
-Place the `run_bayespace.ps1` PowerShell script **directly into your working directory**. This script:
+sampler = Sampler(pd.Series({'a': a, 'b': b, 'sigma': sigma}), Model('line'), Likelihood('gaussian'), data,
+                  n_samples=10000, n_chains=3)
+samples, chain_samples, fields = sampler.sample_all()   # reloads if this exact configuration has run before
 
-- Builds the BayeSpace Docker image from GitHub
-- Creates and starts a container named `bayespace-container`
-- Mounts local `data/` and `results/` folders for persistent I/O
+vis = RegressionVisualiser(sampler)
+vis.get_traceplots(); vis.get_autocorrelations()
+vis.plot_posterior('a', [-2, 2]); vis.show_predictions(domain, 'predictions', '1D')
+```
 
----
+Register your own model with `add_model(name, expression, independent_variables, dependent_variable, parameters)`
+from `regression_toolbox.model`; expressions are parsed by SymPy and compiled to JAX. Multivariate and
+mixture priors (for example a log-normal mixture with one mode per Pasquill-Gifford class) are built with
+`Parameter(name=[...], prior_select='log_norm', multi_mode=True)`; see the plume notebook.
 
-### 3. Open PowerShell in the working directory
+## Notebooks
 
-Navigate to the folder where `run_bayespace.ps1` is located. You can do this by right-clicking in the folder and selecting:
+- `notebooks/Bayesian Regression example.ipynb`: lines, polynomials, planes and a nonlinear surface.
+- `notebooks/Gaussian Process Regression example.ipynb`: kernels and transformations.
+- `notebooks/Case study 1 - Gaussian Plume Modeling.ipynb`: the marine cloud brightening inference.
+- `notebooks/Case study 2 - Species Distributions.ipynb`, `Case study 3 - Source Detection of Plume.ipynb`.
 
-> **"Open in Terminal"** or **"Open in PowerShell"**
+The plume case study needs the Great Barrier Reef drone data, which are not distributed with this
+repository; its `RawDataProcessor` call expects `data/raw_data/GBR_data.csv` and `GBR_data_summary.csv`.
 
----
+## Docker
 
-### 4. Run the setup script
+`run_bayespace.ps1` builds a container with the repository and a conda environment and mounts `data/`
+and `results/`; attach VS Code with *Dev Containers: Attach to Running Container*. This is the route the
+thesis work used and is kept for that reason; `pip install` is the simpler path.
 
-In PowerShell, run the following command to allow the script to execute and start the container:
+## Layout
 
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\run_bayespace.ps1
+| Package | Holds |
+|---|---|
+| `regression_toolbox` | `Model` (equation strings to JAX), `Parameter` (priors), `Likelihood`, `Sampler` (NUTS, save and reload) |
+| `gaussian_process_toolbox` | `GP`, `Kernel`, `Transformation` on scikit-learn kernels |
+| `data_processing` | `SimDataProcessor`, `RawDataProcessor`, `BoxGridder` (cuboid averaging of field points) |
+| `visualisation_toolbox` | `Domain` builders and the `RegressionVisualiser` / `GPVisualiser` plotting |
 
----
+## Citing
 
-### 5. Attach VS Code to the container
+Davis, S. (2025). *BayeSpace: applying Bayesian statistics to environmental and ecological phenomena.*
+PhD thesis, University of Sydney. Software: https://github.com/samcd22/BayeSpace, release v0.1.0 for
+the dispersion analysis.
 
-Once the container is running:
+## Licence
 
-- Open Visual Studio Code
-- Press Ctrl+Shift+P (or F1) to open the Command Palette
-- Type and select:
-
-Dev Containers: Attach to Running Container
-From the list of running containers, select:
-
-bayespace-container
-
-This will open a full VS Code workspace inside the running container, with access to all project files in /BayeSpace.
-
----
-
-### 6. Install recommended extensions inside the container
-
-VS Code will usually prompt you to install missing extensions. Make sure the following are installed inside the container:
-
-- Python — ms-python.python
-- Jupyter — ms-toolsai.jupyter
-
-These will enable code execution, syntax highlighting, and notebook support.
-
-**YOU'RE READY TO GO!!**
-
-## Explore the notebook directory for example notebooks using BayeSpace
+MIT. See `LICENSE`.
