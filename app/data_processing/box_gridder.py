@@ -121,8 +121,14 @@ class BoxGridder:
         """
         Calculate the averages of the data points within each box.
 
+        Each point is assigned to the box [lower, lower + size) along every axis, boxes are laid
+        from the flexible floor of the minimum to the flexible floor of the maximum plus one box,
+        and the cell takes the mean of the (linear) values at its centroid. Empty cells are dropped.
+        Vectorised: linear in the number of points (the previous implementation rebuilt the whole
+        output table once per point).
+
         Returns:
-            - DataFrame: averaged data.
+            - DataFrame: averaged data with columns [x, y, z, dependent, counts, samples].
         """
         if self.data is None:
             raise Exception('RawDataProcessor - Data not provided')
@@ -130,111 +136,25 @@ class BoxGridder:
             raise Exception('RawDataProcessor - Grid size not provided')
 
         print('Generating gridded averages...')
-        min_x = self._flexible_floor(
-            np.min(self.data[self.independent_variables[0]]),
-            self.grid_size[0])
-        min_y = self._flexible_floor(
-            np.min(self.data[self.independent_variables[1]]),
-            self.grid_size[1])
-        min_z = self._flexible_floor(
-            np.min(self.data[self.independent_variables[2]]),
-            self.grid_size[2])
+        cols = self.independent_variables
+        pts = self.data[cols].to_numpy(dtype=float)
+        values = self.data[self.dependent_variable].to_numpy(dtype=float)
+        if self.input_data_logarithmised:
+            values = 10.0 ** values
+        sizes = np.asarray(self.grid_size, dtype=float)
+        mins = np.array([self._flexible_floor(pts[:, d].min(), sizes[d]) for d in range(3)])
+        idx = np.floor((pts - mins) / sizes).astype(int)
+        centroids = mins + (idx + 0.5) * sizes
 
-        max_x = self._flexible_floor(
-            np.max(self.data[self.independent_variables[0]]),
-            self.grid_size[0]) + self.grid_size[0]
-        max_y = self._flexible_floor(
-            np.max(self.data[self.independent_variables[1]]),
-            self.grid_size[1]) + self.grid_size[1]
-        max_z = self._flexible_floor(
-            np.max(self.data[self.independent_variables[2]]),
-            self.grid_size[2]) + self.grid_size[2]
-
-        # Add x, y, z component to grid.
-        grid = (
-            np.arange(min_x, max_x + self.grid_size[0], self.grid_size[0]),
-            np.arange(min_y, max_y + self.grid_size[1], self.grid_size[1]),
-            np.arange(min_z, max_z + self.grid_size[2], self.grid_size[2]))
-
-        grid_len_x = len(grid[0])
-        grid_len_y = len(grid[1])
-        grid_len_z = len(grid[2])
-
-        indices = []
-        centroids = []
-        for i in range(grid_len_x - 1):
-            for j in range(grid_len_y - 1):
-                for k in range(grid_len_z - 1):
-                    indices.append([i, j, k])
-                    centroids.append([np.mean([grid[0][i], grid[0][i + 1]]),
-                                      np.mean([grid[1][j], grid[1][j + 1]]),
-                                      np.mean([grid[2][k], grid[2][k + 1]])])
-
-        centroids = np.array(centroids)
-        sums = np.zeros((grid_len_x - 1, grid_len_y - 1, grid_len_z - 1))
-        counts = np.zeros((grid_len_x - 1, grid_len_y - 1, grid_len_z - 1))
-        self.samples = np.empty(
-            (grid_len_x - 1, grid_len_y - 1, grid_len_z - 1), object)
-        self.samples.fill(())
-
-        for i in range(self.data.shape[0]):
-            point = [self.data.loc[i, self.independent_variables[0]],
-                     self.data.loc[i, self.independent_variables[1]],
-                     self.data.loc[i, self.independent_variables[2]]]
-            if self.input_data_logarithmised:
-                concentration = 10**self.data.loc[i, self.dependent_variable]
-            else:
-                concentration = self.data.loc[i, self.dependent_variable]
-            y_lower, y_upper = self._get_bounds(grid[1], point[1])
-            z_lower, z_upper = self._get_bounds(grid[2], point[2])
-            x_lower, x_upper = self._get_bounds(grid[0], point[0])
-            box_bounds = np.array([[x_lower, x_upper],
-                                   [y_lower, y_upper],
-                                   [z_lower, z_upper]])
-
-            # Calculate the data point's position in 3D centroid space.
-            # E.g., [1.5, 1.5, 2.5].
-            centroid = np.mean(box_bounds, axis=1)
-
-            idx = np.where(np.all(centroid == centroids, axis=1))[0][0]
-            sums[indices[idx][0],
-                 indices[idx][1],
-                 indices[idx][2]] += concentration
-            counts[indices[idx][0], indices[idx][1], indices[idx][2]] += 1
-            self.samples[indices[idx][0],
-                         indices[idx][1],
-                         indices[idx][2]] += (concentration,)
-
-            averages = sums/counts
-            averages_data = []
-            counts_data = []
-            samples_data = []
-            centroid_x = []
-            centroid_y = []
-            centroid_z = []
-            for i in range(len(indices)):
-                averages_data.append(
-                    averages[indices[i][0], indices[i][1], indices[i][2]])
-                counts_data.append(
-                    counts[indices[i][0], indices[i][1], indices[i][2]])
-                samples_data.append(
-                    list(self.samples[indices[i][0],
-                                      indices[i][1],
-                                      indices[i][2]]))
-                centroid_x.append(centroids[i][0])
-                centroid_y.append(centroids[i][1])
-                centroid_z.append(centroids[i][2])
-
-            if self.output_data_logarithmised:
-                averages_data = np.log10(averages_data)
-
-            processed_data = pd.DataFrame({
-                self.independent_variables[0]: centroid_x,
-                self.independent_variables[1]: centroid_y,
-                self.independent_variables[2]: centroid_z,
-                self.dependent_variable: averages_data,
-                'counts': counts_data, 'samples': samples_data})
-            processed_data = processed_data.dropna()
+        frame = pd.DataFrame({cols[0]: centroids[:, 0], cols[1]: centroids[:, 1], cols[2]: centroids[:, 2],
+                              '_value': values})
+        grouped = frame.groupby(cols, sort=True)['_value']
+        processed_data = grouped.agg(['mean', 'count', list]).reset_index()
+        processed_data.columns = [*cols, self.dependent_variable, 'counts', 'samples']
+        if self.output_data_logarithmised:
+            with np.errstate(divide='ignore', invalid='ignore'):
+                processed_data[self.dependent_variable] = np.log10(processed_data[self.dependent_variable])
+        processed_data = processed_data.dropna().reset_index(drop=True)
         return processed_data
 
     def visualise_counts(self) -> None:

@@ -23,7 +23,7 @@ class DataProcessor:
                  processed_data_name: str,
                  processor_params: dict,
                  train_test_split: float = 0.8,
-                 data_path='/data'):
+                 data_path='data'):
 
         """
         Initialises the DataProcessor class.

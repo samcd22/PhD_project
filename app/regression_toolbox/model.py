@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 import pandas as pd
-from numpyencoder import NumpyEncoder
+from data_processing.json_encoder import NumpyEncoder
 import sympy as sp
 import re
 

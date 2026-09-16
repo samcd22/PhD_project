@@ -66,7 +66,7 @@ class GP:
                  uncertainty_method = None,
                  uncertainty_params = None,
                  transformation: Transformation = Transformation('identity'),
-                 root_results_path = '/results/gaussian_process_results'):
+                 root_results_path = 'results/gaussian_process_results'):
 
         """
         Initialize the Gaussian Process model.

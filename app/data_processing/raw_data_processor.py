@@ -4,7 +4,7 @@ import os
 import pandas as pd
 from matplotlib import pyplot as plt  
 import matplotlib.gridspec as gridspec
-from numpyencoder import NumpyEncoder
+from data_processing.json_encoder import NumpyEncoder
 from sklearn.model_selection import train_test_split
 from scipy.interpolate import griddata
 from geopy.geocoders import Nominatim
@@ -60,7 +60,7 @@ class RawDataProcessor(DataProcessor):
                  processor_select: str,
                  processor_params: dict,
                  train_test_split: float = 0.8,
-                 data_path='/data',
+                 data_path='data',
                  plot_data=True,
                  plotting_func=None,
                  slices = None):

@@ -9,7 +9,7 @@ import imageio
 from data_processing.data_processor import DataProcessor
 from regression_toolbox.model import Model
 from matplotlib import pyplot as plt
-from numpyencoder import NumpyEncoder
+from data_processing.json_encoder import NumpyEncoder
 from sklearn.model_selection import train_test_split
 from visualisation_toolbox.domain import Domain
 
@@ -60,7 +60,7 @@ class SimDataProcessor(DataProcessor):
                  noise_dist='no_noise',
                  noise_level=None,
                  noise_percentage=None,
-                 data_path='/data',
+                 data_path='data',
                  plot_data=True):
 
         super().__init__(processed_data_name, None,

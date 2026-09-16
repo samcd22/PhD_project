@@ -2,7 +2,7 @@ import os
 import json
 import numpyro
 import jax.numpy as jnp
-from numpyencoder import NumpyEncoder
+from data_processing.json_encoder import NumpyEncoder
 import pandas as pd
 import numpy as np
 from jaxlib.xla_extension import ArrayImpl
@@ -58,7 +58,7 @@ class Sampler:
                  p_warmup:float=0.5, 
                  n_chains:int=1, 
                  thinning_rate:int=1, 
-                 root_results_path:str='/results/regression_results'):
+                 root_results_path:str='results/regression_results'):
         """
         Initializes the Sampler class.
 
@@ -96,6 +96,11 @@ class Sampler:
         root_results_path = os.getcwd() + root_results_path
 
         self.inference_params = inference_params
+        # Build every prior distribution now, outside any JAX trace. The six-mode equal-peak
+        # log-normal mixture uses scipy root finding that cannot run on traced values.
+        for param in self.inference_params:
+            if param.prior_func is None:
+                param.prior_func = param.get_prior_function()
         self.n_samples = n_samples
         self.n_chains = n_chains
         self.p_warmup = p_warmup
@@ -274,7 +279,7 @@ class Sampler:
         res = jnp.exp(jnp.log(base) + exponent * jnp.log(10))
         return res
 
-    def sample_all(self, rng_key=random.PRNGKey(0)) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+    def sample_all(self, rng_key=random.PRNGKey(0), resample: bool = False) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
         """
         Sample all sets of parameters. This function is used to generate all samples from the posterior distribution.
 
@@ -286,7 +291,7 @@ class Sampler:
             - pd.DataFrame: The chain samples.
             - dict: The fields dictionary.
         """
-        if not self.data_exists:
+        if resample or not self.data_exists:
             kernel = numpyro.infer.NUTS(self.sample_one)
             mcmc = numpyro.infer.MCMC(kernel, num_warmup=self.n_warmup, num_samples=self.n_samples, num_chains=self.n_chains, thinning=self.thinning_rate, chain_method='parallel')
             with numpyro.validation_enabled():

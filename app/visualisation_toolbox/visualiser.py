@@ -3,7 +3,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import os
 import json
-from numpyencoder import NumpyEncoder
+from data_processing.json_encoder import NumpyEncoder
 import imageio.v2 as imageio
 from matplotlib.gridspec import GridSpec
 from fractions import Fraction
@@ -1360,7 +1360,7 @@ class RegressionVisualiser(Visualiser):
         log_likelihood = self.likelihood_func(test_predictions, self.params_median).log_prob(jnp.array(test_measured)).sum()
         
         self.RMSE = np.sqrt(np.mean((test_predictions-test_measured)**2))
-        self.AIC = 2*self.params_median.size - log_likelihood
+        self.AIC = 2*self.params_median.size - 2*log_likelihood
         self.BIC = self.params_median.size*np.log(self.testing_data.shape[0]) - 2*log_likelihood
 
         self.autocorrs = self._calculate_autocorrs()
@@ -2105,7 +2105,7 @@ class GPVisualiser(Visualiser):
 
         log_likelihood = -0.5 * np.sum(np.log(2 * np.pi * test_std**2) + (y_test - test_predictions)**2 / test_std**2)
         self.RMSE = np.sqrt(np.mean((test_predictions-y_test)**2))
-        self.AIC = 2*num_kernel_params - log_likelihood
+        self.AIC = 2*num_kernel_params - 2*log_likelihood
         self.BIC = num_kernel_params*np.log(self.testing_data.shape[0]) - 2*log_likelihood
 
     def _get_param_string(self, kernel_dict=None):
